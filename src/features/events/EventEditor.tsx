@@ -28,6 +28,7 @@ export function EventEditor({ open, onClose, event, defaults }: EventEditorProps
   const [kind, setKind] = useState<EventKind>('personal')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [timeError, setTimeError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => {
@@ -40,11 +41,18 @@ export function EventEditor({ open, onClose, event, defaults }: EventEditorProps
     setKind(event?.kind ?? 'personal')
     setNotes(event?.notes ?? '')
     setError(null)
+    setTimeError(null)
   }, [open, event, defaults])
 
   const submit = () => {
     if (!title.trim()) {
       setError('El evento necesita un título.')
+      return
+    }
+    // Un evento que termina antes de empezar dibujaría una duración negativa
+    // en el calendario y no hay forma de interpretarlo.
+    if (startTime && endTime && endTime < startTime) {
+      setTimeError('La hora de fin no puede ser anterior a la de inicio.')
       return
     }
     const payload = {
@@ -137,12 +145,29 @@ export function EventEditor({ open, onClose, event, defaults }: EventEditorProps
             </Field>
             <Field label="Empieza">
               {({ id }) => (
-                <Input id={id} type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                <Input
+                  id={id}
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => {
+                    setStartTime(e.target.value)
+                    if (timeError) setTimeError(null)
+                  }}
+                />
               )}
             </Field>
-            <Field label="Termina">
-              {({ id }) => (
-                <Input id={id} type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+            <Field label="Termina" error={timeError}>
+              {({ id, describedBy }) => (
+                <Input
+                  id={id}
+                  type="time"
+                  aria-describedby={describedBy}
+                  value={endTime}
+                  onChange={(e) => {
+                    setEndTime(e.target.value)
+                    if (timeError) setTimeError(null)
+                  }}
+                />
               )}
             </Field>
           </div>

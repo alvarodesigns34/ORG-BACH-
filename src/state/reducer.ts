@@ -6,9 +6,9 @@
  * actividad se escriba solo y deja el estado reproducible para depurar.
  */
 
-import { newId } from '@/domain/id'
-import { nowISO } from '@/domain/dates'
-import { deriveShortName } from '@/domain/palette'
+import { newId } from '../domain/id.ts'
+import { nowISO } from '../domain/dates.ts'
+import { deriveShortName } from '../domain/palette.ts'
 import type {
   ActivityEntry,
   ActivityKind,
@@ -23,7 +23,7 @@ import type {
   Subject,
   Subtask,
   Task,
-} from '@/domain/types'
+} from '../domain/types.ts'
 
 /** Entradas de actividad que se conservan. Más allá, deja de ser "reciente". */
 const ACTIVITY_LIMIT = 60
@@ -172,6 +172,13 @@ export function reducer(state: AppData, action: Action): AppData {
         ),
         sessions: state.sessions.map((s) =>
           s.subjectId === action.id ? { ...s, subjectId: undefined } : s,
+        ),
+        // Un objetivo sobre la media de una asignatura que ya no existe no se
+        // puede volver a medir. Se archiva en lugar de borrarlo (no se pierde
+        // lo que el alumno escribió) y en lugar de dejarlo suelto (apuntando a
+        // una asignatura fantasma, mostraría «sin notas» para siempre).
+        goals: state.goals.map((g) =>
+          g.subjectId === action.id ? { ...g, subjectId: undefined, archived: true } : g,
         ),
       }
 

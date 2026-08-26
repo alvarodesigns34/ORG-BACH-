@@ -20,6 +20,7 @@ import {
   isRunning,
   minutesToLog,
   nextPhase,
+  parseTimerState,
   pause,
   phaseProgress,
   resume,
@@ -29,8 +30,7 @@ const MIN = 60_000
 const T0 = 1_700_000_000_000
 
 function startedAt(now: number) {
-  const timer = createTimer('pomodoro')
-  return { ...timer, runningSince: now }
+  return createTimer('pomodoro', undefined, undefined, now)
 }
 
 describe('elapsedMs', () => {
@@ -73,7 +73,7 @@ describe('fases del pomodoro', () => {
   })
 
   it('en modo libre el reloj sube en vez de bajar', () => {
-    const timer = { ...createTimer('libre'), runningSince: T0 }
+    const timer = createTimer('libre', undefined, undefined, T0)
     assert.equal(displayMs(timer, DEFAULT_POMODORO, T0 + 7 * MIN), 7 * MIN)
     assert.equal(phaseProgress(timer, DEFAULT_POMODORO, T0 + 7 * MIN), 0)
   })
@@ -133,5 +133,99 @@ describe('formatClock', () => {
 
   it('no muestra tiempos negativos', () => {
     assert.equal(formatClock(-5000), '00:00')
+  })
+})
+
+
+describe('inicio de la sesión completa', () => {
+  it('sobrevive a los cambios de fase', () => {
+    // El caso que motivó guardarlo aparte: 25 min de trabajo, 5 de descanso y
+    // 10 más de trabajo. `elapsedMs` solo conoce los últimos 10, así que
+    // reconstruir el inicio restándolos daría una hora 40 minutos tarde.
+    let timer = startedAt(T0)
+    timer = nextPhase(timer, T0 + 25 * MIN)
+    timer = nextPhase(timer, T0 + 30 * MIN)
+
+    assert.equal(timer.sessionStartedAt, T0)
+    assert.notEqual(timer.sessionStartedAt, T0 + 40 * MIN - elapsedMs(timer, T0 + 40 * MIN))
+  })
+
+  it('no se mueve al pausar y reanudar', () => {
+    let timer = startedAt(T0)
+    timer = pause(timer, T0 + 5 * MIN)
+    timer = resume(timer, T0 + 60 * MIN)
+    assert.equal(timer.sessionStartedAt, T0)
+  })
+
+  it('una sesión nocturna se archiva en el día en que empezó', () => {
+    // Empieza a las 23:40 y termina pasada la medianoche.
+    const night = new Date(2026, 9, 14, 23, 40).getTime()
+    let timer = createTimer('pomodoro', undefined, undefined, night)
+    timer = nextPhase(timer, night + 25 * MIN) // ya es día 15
+    assert.equal(new Date(timer.sessionStartedAt).getDate(), 14)
+  })
+})
+
+describe('parseTimerState', () => {
+  const valid = {
+    mode: 'pomodoro',
+    phase: 'trabajo',
+    runningSince: T0,
+    accumulatedMs: 0,
+    sessionStartedAt: T0,
+    completed: 0,
+  }
+  const NOW = T0 + 10 * MIN
+
+  it('acepta un estado correcto', () => {
+    const parsed = parseTimerState(valid, NOW)
+    assert.ok(parsed)
+    assert.equal(parsed.mode, 'pomodoro')
+    assert.equal(parsed.sessionStartedAt, T0)
+  })
+
+  it('rechaza lo que no es un temporizador', () => {
+    for (const bad of [null, undefined, 42, 'texto', [], {}]) {
+      assert.equal(parseTimerState(bad, NOW), null)
+    }
+  })
+
+  it('rechaza modos y fases inventados', () => {
+    assert.equal(parseTimerState({ ...valid, mode: 'turbo' }, NOW), null)
+    assert.equal(parseTimerState({ ...valid, phase: 'siesta' }, NOW), null)
+  })
+
+  it('rechaza números imposibles', () => {
+    assert.equal(parseTimerState({ ...valid, accumulatedMs: -1 }, NOW), null)
+    assert.equal(parseTimerState({ ...valid, accumulatedMs: 'mucho' }, NOW), null)
+    assert.equal(parseTimerState({ ...valid, completed: 1.5 }, NOW), null)
+    assert.equal(parseTimerState({ ...valid, completed: -2 }, NOW), null)
+  })
+
+  it('rechaza un inicio en el futuro', () => {
+    // Un reloj adelantado daría tiempos transcurridos negativos.
+    assert.equal(parseTimerState({ ...valid, runningSince: NOW + 60 * MIN }, NOW), null)
+  })
+
+  it('acepta el estado en pausa', () => {
+    const parsed = parseTimerState({ ...valid, runningSince: null, accumulatedMs: 5 * MIN }, NOW)
+    assert.ok(parsed)
+    assert.equal(parsed.runningSince, null)
+  })
+
+  it('reconstruye el inicio si falta, en vez de tirar la sesión', () => {
+    // Temporizadores guardados por una versión anterior del programa.
+    const { sessionStartedAt: _omitted, ...legacy } = valid
+    const parsed = parseTimerState({ ...legacy, accumulatedMs: 3 * MIN }, NOW)
+    assert.ok(parsed)
+    // 3 min acumulados + 10 min corriendo = arrancó 13 min antes de ahora.
+    assert.equal(parsed.sessionStartedAt, NOW - 13 * MIN)
+  })
+
+  it('descarta campos opcionales de tipo incorrecto', () => {
+    const parsed = parseTimerState({ ...valid, subjectId: 99, topic: {} }, NOW)
+    assert.ok(parsed)
+    assert.equal(parsed.subjectId, undefined)
+    assert.equal(parsed.topic, undefined)
   })
 })

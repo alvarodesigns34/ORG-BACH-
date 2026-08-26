@@ -3,7 +3,7 @@
  * Nada de esto se guarda: se calcula a partir de las tareas y de la fecha.
  */
 
-import { daysUntil, today as todayISO } from './dates.ts'
+import { daysUntil, parseDay, today as todayISO } from './dates.ts'
 import type { DateISO, Priority, Task, TaskStatus } from './types.ts'
 import { PRIORITIES } from './types.ts'
 
@@ -29,6 +29,35 @@ export function isOverdue(task: Task, today: DateISO = todayISO()): boolean {
 
 export function isDueToday(task: Task, today: DateISO = todayISO()): boolean {
   return !isDone(task) && task.dueDate === today
+}
+
+/**
+ * Instante exacto en que vence una tarea.
+ *
+ * Sin hora, vence al acabar el día: una tarea «para el viernes» sigue a tiempo
+ * a las once de la noche del viernes. Con hora, vence a esa hora, y entregarla
+ * después cuenta como tarde aunque sea el mismo día.
+ */
+export function dueMoment(task: Task): Date | null {
+  if (!task.dueDate) return null
+  const date = parseDay(task.dueDate)
+  if (task.dueTime) {
+    const [hours, minutes] = task.dueTime.split(':').map(Number)
+    if (Number.isFinite(hours) && Number.isFinite(minutes)) {
+      date.setHours(hours, minutes, 0, 0)
+      return date
+    }
+  }
+  date.setHours(23, 59, 59, 999)
+  return date
+}
+
+/** ¿Se completó dentro de plazo? null si no se puede juzgar. */
+export function wasOnTime(task: Task): boolean | null {
+  if (!isDone(task) || !task.completedAt || !task.dueDate) return null
+  const due = dueMoment(task)
+  if (!due) return null
+  return new Date(task.completedAt).getTime() <= due.getTime()
 }
 
 export function bucketOf(task: Task, today: DateISO = todayISO()): TaskBucket {

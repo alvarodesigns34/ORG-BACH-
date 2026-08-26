@@ -17,6 +17,8 @@ export function GoalsView() {
   const subjects = useSubjectMap()
   const results = useSubjectResults(settings.activeTerm)
   const globalAverage = useGlobalAverage(settings.activeTerm)
+  const courseResults = useSubjectResults('todas')
+  const courseAverage = useGlobalAverage('todas')
 
   const [editing, setEditing] = useState<Goal | null>(null)
   const [creating, setCreating] = useState(false)
@@ -28,11 +30,23 @@ export function GoalsView() {
       subjects: data.subjects,
       results,
       globalAverage,
+      courseResults,
+      courseAverage,
       scale: settings.gradeScale,
       today,
       weekStartsOn: settings.weekStartsOn,
     }),
-    [data.tasks, data.sessions, data.subjects, results, globalAverage, settings, today],
+    [
+      data.tasks,
+      data.sessions,
+      data.subjects,
+      results,
+      globalAverage,
+      courseResults,
+      courseAverage,
+      settings,
+      today,
+    ],
   )
 
   const goals = data.goals.filter((g) => !g.archived)

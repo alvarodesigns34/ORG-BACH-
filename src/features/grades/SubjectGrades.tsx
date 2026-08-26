@@ -7,6 +7,7 @@ import { colorVar } from '@/domain/palette'
 import { GRADE_KINDS, type GradeEntry, type GradeScale, type Subject } from '@/domain/types'
 import { useDispatch } from '@/state/StoreProvider'
 import { Menu } from '@/ui/Menu'
+import { ConfirmDialog } from '@/ui/Modal'
 import { Button, EmptyState, Numeral, Progress, cx } from '@/ui/primitives'
 
 const KIND_LABEL = Object.fromEntries(GRADE_KINDS.map((k) => [k.id, k.label])) as Record<
@@ -58,6 +59,7 @@ export function SubjectGrades({
 
   // Plegadas por defecto: la cabecera ya lleva media, progreso y objetivo, que
   // es lo que se consulta el 90 % de las veces.
+  const [pendingDelete, setPendingDelete] = useState<GradeEntry | null>(null)
   const [open, setOpen] = useState(!collapsible)
   const expanded = !collapsible || open
 
@@ -275,7 +277,7 @@ export function SubjectGrades({
                                 label: 'Eliminar nota',
                                 destructive: true,
                                 separated: true,
-                                onSelect: () => dispatch({ type: 'grade/remove', id: entry.id }),
+                                onSelect: () => setPendingDelete(entry),
                               },
                             ]}
                             trigger={({ onClick, ref, ...aria }) => (
@@ -324,6 +326,19 @@ export function SubjectGrades({
         </Button>
       </footer>
       )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) dispatch({ type: 'grade/remove', id: pendingDelete.id })
+          setPendingDelete(null)
+        }}
+        title="Eliminar nota"
+        message={`«${pendingDelete?.name}» se borrará y la media se recalculará sin ella. No se puede deshacer.`}
+        confirmLabel="Eliminar"
+        destructive
+      />
     </div>
   )
 }

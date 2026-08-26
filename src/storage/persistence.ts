@@ -11,10 +11,22 @@
  * haría falta si se guardaran adjuntos.
  */
 
-import { createEmptyData, SCHEMA_VERSION, STORAGE_KEY } from '@/data/defaults'
-import { DEFAULT_SETTINGS } from '@/data/defaults'
-import type { TimerState } from '@/domain/study'
-import type { AppData } from '@/domain/types'
+import { createEmptyData, SCHEMA_VERSION, STORAGE_KEY } from '../data/defaults.ts'
+import { DEFAULT_SETTINGS } from '../data/defaults.ts'
+import { parseTimerState, type TimerState } from '../domain/study.ts'
+import type { AppData } from '../domain/types.ts'
+import {
+  parseActivity,
+  parseCollection,
+  parseEvent,
+  parseExam,
+  parseGoal,
+  parseGrade,
+  parseSession,
+  parseSubject,
+  parseTask,
+  sanitizeSettings,
+} from './validate.ts'
 
 export type LoadOutcome =
   | { status: 'nuevo'; data: AppData }
@@ -32,40 +44,69 @@ const COLLECTIONS = [
   'activity',
 ] as const
 
-/**
- * Rellena lo que falte en unos datos guardados.
- *
- * Es el punto donde una versión antigua se pone al día: los campos nuevos
- * aparecen con su valor por defecto en lugar de llegar como `undefined` y
- * romper la interfaz a mitad de render.
- */
-function migrate(raw: unknown): AppData {
-  const base = createEmptyData()
-  if (!raw || typeof raw !== 'object') return base
+/** Validadores de cada colección, en el orden en que se aplican. */
+const PARSERS = {
+  subjects: parseSubject,
+  tasks: parseTask,
+  grades: parseGrade,
+  exams: parseExam,
+  events: parseEvent,
+  sessions: parseSession,
+  goals: parseGoal,
+  activity: parseActivity,
+} as const
 
-  const input = raw as Partial<AppData>
+export interface MigrateReport {
+  data: AppData
+  /** Registros descartados por venir rotos, por colección. */
+  dropped: Partial<Record<keyof typeof PARSERS, number>>
+  totalDropped: number
+}
+
+/**
+ * Normaliza unos datos guardados y descarta lo que no se pueda usar.
+ *
+ * Hace dos trabajos a la vez. El primero es migrar: los campos añadidos en
+ * versiones nuevas aparecen con su valor por defecto en lugar de llegar como
+ * `undefined` y romper la interfaz a mitad de render. El segundo es validar
+ * cada registro campo a campo, porque un archivo importado puede ser JSON
+ * correcto y aun así traer notas sin escala o sesiones de duración imposible.
+ *
+ * Un registro roto se descarta solo él, no el archivo entero: perder dos
+ * notas de ciento veinte es mejor que perder el curso completo.
+ */
+export function migrateWithReport(raw: unknown): MigrateReport {
+  const base = createEmptyData()
+  if (!raw || typeof raw !== 'object') return { data: base, dropped: {}, totalDropped: 0 }
+
+  const input = raw as Record<string, unknown>
   const data: AppData = {
     ...base,
-    settings: {
-      ...DEFAULT_SETTINGS,
-      ...(input.settings ?? {}),
-      gradeScale: { ...DEFAULT_SETTINGS.gradeScale, ...(input.settings?.gradeScale ?? {}) },
-    },
+    settings: sanitizeSettings(input.settings, DEFAULT_SETTINGS),
     version: SCHEMA_VERSION,
   }
 
+  const dropped: MigrateReport['dropped'] = {}
+  let totalDropped = 0
+
+  // El bucle recorre pares (colección, validador) ya emparejados en PARSERS.
+  // El casteo es necesario porque TypeScript no puede correlacionar la clave
+  // con el tipo concreto de cada validador al iterar.
   for (const key of COLLECTIONS) {
-    const value = input[key]
-    // Un array corrupto se descarta entero antes que dejar pasar registros
-    // a medias que reventarían más adelante.
-    if (Array.isArray(value)) {
-      ;(data[key] as unknown[]) = value.filter(
-        (item) => item && typeof item === 'object' && typeof (item as { id?: unknown }).id === 'string',
-      )
+    const parse = PARSERS[key] as (item: unknown) => { id: string } | null
+    const result = parseCollection(input[key], parse)
+    ;(data[key] as unknown[]) = result.items
+    if (result.dropped > 0) {
+      dropped[key] = result.dropped
+      totalDropped += result.dropped
     }
   }
 
-  return data
+  return { data, dropped, totalDropped }
+}
+
+function migrate(raw: unknown): AppData {
+  return migrateWithReport(raw).data
 }
 
 export function load(): LoadOutcome {
@@ -137,9 +178,8 @@ export function loadTimer(): TimerState | null {
   try {
     const raw = localStorage.getItem(TIMER_KEY)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as TimerState
-    // Comprobación mínima: sin `mode` no es un temporizador utilizable.
-    return parsed && typeof parsed === 'object' && 'mode' in parsed ? parsed : null
+    // La validación vive en el dominio, donde se puede probar sin navegador.
+    return parseTimerState(JSON.parse(raw))
   } catch {
     return null
   }
@@ -163,7 +203,27 @@ export function exportJSON(data: AppData): string {
   return JSON.stringify({ ...data, exportedAt: new Date().toISOString() }, null, 2)
 }
 
-export type ImportResult = { ok: true; data: AppData } | { ok: false; error: string }
+export type ImportResult =
+  | {
+      ok: true
+      data: AppData
+      /** Registros descartados por venir rotos. 0 en una copia sana. */
+      dropped: number
+      /** Resumen legible de lo descartado, o null si no se descartó nada. */
+      warning: string | null
+    }
+  | { ok: false; error: string }
+
+const COLLECTION_NAMES: Record<string, string> = {
+  subjects: 'asignaturas',
+  tasks: 'tareas',
+  grades: 'notas',
+  exams: 'exámenes',
+  events: 'eventos',
+  sessions: 'sesiones de estudio',
+  goals: 'objetivos',
+  activity: 'entradas de actividad',
+}
 
 export function importJSON(text: string): ImportResult {
   let parsed: unknown
@@ -184,7 +244,24 @@ export function importJSON(text: string): ImportResult {
     return { ok: false, error: 'El archivo no parece una copia de Bachillerato OS.' }
   }
 
-  return { ok: true, data: migrate(parsed) }
+  const report = migrateWithReport(parsed)
+
+  // Importar sustituye TODO lo que había. Si el archivo traía registros
+  // corruptos, el alumno tiene que enterarse en ese momento: descubrir tres
+  // meses después que faltan notas, sin saber por qué, es mucho peor.
+  const detail = Object.entries(report.dropped)
+    .map(([key, count]) => `${count} ${COLLECTION_NAMES[key] ?? key}`)
+    .join(', ')
+
+  return {
+    ok: true,
+    data: report.data,
+    dropped: report.totalDropped,
+    warning:
+      report.totalDropped === 0
+        ? null
+        : `Se descartaron ${report.totalDropped} registros con datos incompletos (${detail}). El resto se importó correctamente.`,
+  }
 }
 
 function describe(error: unknown): string {

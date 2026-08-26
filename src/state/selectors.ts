@@ -8,11 +8,11 @@
 
 import { useMemo } from 'react'
 
-import { detectAlerts, type Alert } from '@/domain/alerts'
-import { addDays, daysUntil, startOfWeek, startOfMonth, toDay } from '@/domain/dates'
-import { globalAverage, subjectResult, type SubjectResult } from '@/domain/grades'
-import { bucketOf, isOverdue, sortTasks } from '@/domain/tasks'
-import type { DateISO, Exam, ID, Subject, Task, TermId } from '@/domain/types'
+import { detectAlerts, type Alert } from '../domain/alerts.ts'
+import { addDays, daysUntil, startOfWeek, startOfMonth, toDay } from '../domain/dates.ts'
+import { globalAverage, subjectResult, type SubjectResult } from '../domain/grades.ts'
+import { bucketOf, isOverdue, sortTasks } from '../domain/tasks.ts'
+import type { DateISO, Exam, ID, Subject, Task, TermId } from '../domain/types.ts'
 import { useStore } from './StoreProvider'
 
 // ---------------------------------------------------------------------------

@@ -15,10 +15,13 @@ npm install
 npm run dev      # desarrollo en http://localhost:5173
 npm run build    # compila a dist/
 npm run preview  # sirve lo compilado
-npm run lint     # comprueba tipos (tsc --noEmit)
-npm test         # pruebas del motor de notas (runner de Node, sin dependencias)
-npm run check    # tipos + pruebas
+npm run typecheck  # comprueba tipos (src y tests)
+npm test           # pruebas (runner de Node, sin dependencias)
+npm run check      # tipos + pruebas, lo mismo que ejecuta el despliegue
 ```
+
+No hay linter configurado: lo que antes se llamaba `lint` era en realidad una
+comprobación de tipos, y ahora se llama por lo que hace.
 
 ## Estado por fases
 
@@ -28,12 +31,25 @@ npm run check    # tipos + pruebas
 | 2 · Productividad | Tareas, subtareas, prioridades, calendario, exámenes, asignaturas | Hecha |
 | 3 · Académico | Notas, categorías de peso, medias ponderadas, calculadora de nota, evaluaciones | Hecha |
 | 4 · Análisis | Estadísticas, gráficos, sesiones de estudio, objetivos | Hecha |
-| 5 · Pulido | Microinteracciones, accesibilidad avanzada, optimización | Pendiente |
+| 5 · Pulido | Microinteracciones, accesibilidad avanzada, optimización | Parcial |
 
-La lógica de dominio está cubierta por 88 pruebas que recorren los casos que
-rompen este tipo de aplicaciones: pesos que no suman 100, escalas distintas
-del 10, categorías todavía sin evaluar, objetivos imposibles, la coma decimal
-española y un temporizador que no se desvía en segundo plano.
+Tras una auditoría externa se hizo una **ronda de endurecimiento**: se corrigió
+el registro del inicio de las sesiones de estudio, se añadió validación campo a
+campo de los datos importados y del temporizador guardado, se resolvió qué pasa
+con los objetivos de una asignatura borrada, se arregló la entrada de decimales
+en Ajustes, se hizo consistente la confirmación al borrar y se ajustó el
+contraste de los textos secundarios en ambos temas.
+
+La lógica está cubierta por 164 pruebas que recorren los casos que rompen este
+tipo de aplicaciones: pesos que no suman 100, escalas distintas del 10,
+categorías todavía sin evaluar, objetivos imposibles, la coma decimal española,
+un temporizador que no se desvía en segundo plano, los efectos en cadena de
+borrar una asignatura y archivos de importación corruptos.
+
+El dominio, el estado y la persistencia usan **rutas relativas con extensión**
+en sus importaciones. No es un capricho: permite que Node los ejecute
+directamente, y por eso las pruebas funcionan sin bundler ni loader. Las capas
+de interfaz conservan el alias `@/`.
 
 ## Arquitectura
 
@@ -53,7 +69,9 @@ src/
 │   ├── goals.ts       Progreso de objetivos
 │   └── palette.ts     Claves de color de asignatura
 │
-├── storage/       Persistencia. Único módulo que toca localStorage.
+├── storage/       Persistencia y validación de lo que entra.
+│   ├── persistence.ts  Único módulo que toca localStorage
+│   └── validate.ts     Revisión campo a campo de los datos importados
 ├── state/         Reductor, proveedor y selectores (datos derivados).
 ├── ui/            Componentes base sin conocimiento del dominio.
 ├── layout/        Armazón: barra lateral, navegación móvil, cabeceras.
@@ -122,12 +140,40 @@ etiquetadas serían diez colores que no informan.
 
 Cada gráfico incluye además una tabla equivalente para lectores de pantalla.
 
+### Los datos que entran
+
+Importar **sustituye todo** lo que había, así que un archivo con registros rotos
+puede destruir un curso entero. Comprobar solo que existan las colecciones no
+basta: un JSON puede ser sintácticamente correcto y traer notas sin escala o
+sesiones de duración imposible que revientan la interfaz semanas después.
+
+Por eso cada entidad se revisa campo a campo antes de entrar, y el criterio es
+**descartar el registro roto, no el archivo entero**: de ciento veinte notas con
+dos corruptas se recuperan ciento dieciocho, y se dice cuántas se quedaron
+fuera. El mismo criterio se aplica al temporizador guardado.
+
 ### Los objetivos
 
 El progreso sale de los datos reales; solo los de tipo «manual» se actualizan a
 mano. Los de **nota media** muestran cuánto falta en lugar de un porcentaje:
 decir que un 8,09 es «el 90 %» de un objetivo de 9 da a entender que se parte
 de cero, cuando el punto de partida real es el aprobado.
+
+## Limitaciones conocidas
+
+Cosas decididas a conciencia, no olvidos:
+
+- **Los periodos «esta evaluación» y «este curso» no tienen fechas.** La
+  aplicación no sabe cuándo empieza ni termina un trimestre, así que los
+  objetivos de horas y tareas con esos alcances cuentan todo lo acumulado. Los
+  de nota sí distinguen correctamente evaluación y curso, porque las notas
+  llevan su evaluación anotada. Resolverlo del todo pide guardar el calendario
+  académico.
+- **No hay separación entre cursos académicos.** `academicYear` es solo una
+  etiqueta de configuración. Al pasar a 2.º habrá que decidir si se archivan
+  los datos, se separan por curso o se empieza de cero exportando antes.
+- **El catálogo de asignaturas del alta es genérico de LOMLOE**, sin distinguir
+  optativas ni particularidades de cada comunidad autónoma.
 
 ## Datos
 

@@ -19,10 +19,13 @@
   --c-raised: #ffffff;
   --c-sunken: #ece9e3;
 
-  /* --- Tinta: negro calido, nunca #000 ni grises puros --- */
+  /* --- Tinta: negro calido, nunca #000 ni grises puros.
+         ink-3 esta calculado para pasar AA (4.5:1) sobre el MAS claro de los
+         fondos del tema, que es --c-sunken. Aclararlo mas rompe el contraste
+         en las cabeceras de categoria y en las filas hundidas. --- */
   --c-ink: #1b1917;
   --c-ink-2: #57514a;
-  --c-ink-3: #7a7269;
+  --c-ink-3: #706860;
 
   /* --- Lineas de 1px: casi siempre mejor que una sombra --- */
   --c-hairline: #e4e0d8;
@@ -83,7 +86,7 @@
 
   --c-ink: #f2efe9;
   --c-ink-2: #a9a196;
-  --c-ink-3: #837b70;
+  --c-ink-3: #8d867b;  /* AA sobre --c-raised, el fondo mas claro del tema oscuro */
 
   --c-hairline: #2c2926;
   --c-hairline-strong: #3c3833;

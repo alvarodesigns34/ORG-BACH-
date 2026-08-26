@@ -9,7 +9,7 @@
 
 import { addDays, toDay } from './dates.ts'
 import { globalAverage, subjectResult, type SubjectResult } from './grades.ts'
-import { isDone, isOverdue } from './tasks.ts'
+import { isDone, isOverdue, wasOnTime } from './tasks.ts'
 import type {
   AverageMode,
   DateISO,
@@ -143,15 +143,18 @@ export function taskStats(tasks: Task[], today: DateISO): TaskStats {
   const overdue = tasks.filter((t) => isOverdue(t, today))
 
   // Solo se puede juzgar la puntualidad de lo que tenía fecha y ya está hecho.
-  const judged = completed.filter((t) => t.dueDate && t.completedAt)
-  const onTime = judged.filter((t) => (t.completedAt as string).slice(0, 10) <= (t.dueDate as string))
+  // La comparación es al instante, no al día: una tarea con hora límite a las
+  // 10:00 entregada a las 18:00 llegó tarde, aunque fuera la misma fecha.
+  const judgements = completed.map(wasOnTime).filter((v): v is boolean => v !== null)
+  const onTime = judgements.filter(Boolean)
 
   return {
     total: tasks.length,
     completed: completed.length,
     pending: tasks.length - completed.length,
     overdue: overdue.length,
-    onTimeRate: judged.length === 0 ? null : Math.round((onTime.length / judged.length) * 100),
+    onTimeRate:
+      judgements.length === 0 ? null : Math.round((onTime.length / judgements.length) * 100),
     withDueDate: tasks.filter((t) => t.dueDate).length,
   }
 }

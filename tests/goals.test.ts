@@ -58,6 +58,8 @@ function makeContext(overrides: Partial<GoalContext> = {}): GoalContext {
     subjects: [],
     results: new Map(),
     globalAverage: null,
+    courseResults: new Map(),
+    courseAverage: null,
     scale: DEFAULT_SCALE,
     today: TODAY,
     weekStartsOn: 1,

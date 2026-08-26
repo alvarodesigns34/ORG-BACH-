@@ -20,6 +20,16 @@ export interface TimerState {
   runningSince: number | null
   /** Milisegundos acumulados de tramos anteriores de esta misma fase. */
   accumulatedMs: number
+  /**
+   * Instante en que empezó la sesión ENTERA, no la fase actual.
+   *
+   * Hace falta guardarlo aparte porque `accumulatedMs` se reinicia en cada
+   * cambio de fase: reconstruir el inicio restando el tiempo transcurrido
+   * daría la hora de comienzo del último pomodoro, no la de la sesión. En una
+   * sesión de tres tramos que cruza la medianoche, eso la archivaría en el día
+   * equivocado.
+   */
+  sessionStartedAt: number
   subjectId?: ID
   topic?: string
   /** Pomodoros de trabajo completados desde que empezó. */
@@ -33,12 +43,18 @@ export interface PomodoroConfig {
 
 export const DEFAULT_POMODORO: PomodoroConfig = { workMinutes: 25, breakMinutes: 5 }
 
-export function createTimer(mode: TimerMode, subjectId?: ID, topic?: string): TimerState {
+export function createTimer(
+  mode: TimerMode,
+  subjectId?: ID,
+  topic?: string,
+  now = Date.now(),
+): TimerState {
   return {
     mode,
     phase: 'trabajo',
-    runningSince: Date.now(),
+    runningSince: now,
     accumulatedMs: 0,
+    sessionStartedAt: now,
     subjectId,
     topic,
     completed: 0,
@@ -130,4 +146,72 @@ export function displayMs(state: TimerState, config: PomodoroConfig, now = Date.
   const target = targetMs(state, config)
   const elapsed = elapsedMs(state, now)
   return target === null ? elapsed : Math.max(0, target - elapsed)
+}
+
+// ---------------------------------------------------------------------------
+// Lectura del estado guardado
+// ---------------------------------------------------------------------------
+
+/** Margen para relojes ligeramente desajustados al validar marcas futuras. */
+const CLOCK_SKEW_MS = 60_000
+
+const MODES: TimerMode[] = ['pomodoro', 'libre']
+const PHASES: TimerPhase[] = ['trabajo', 'descanso']
+
+function isPositiveTime(value: unknown, now: number): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= now + CLOCK_SKEW_MS
+}
+
+/**
+ * Valida un temporizador recuperado del almacenamiento.
+ *
+ * Comprobar solo que exista `mode` no basta: el estado guardado puede venir de
+ * una versión anterior, de una edición manual del almacenamiento o de un
+ * guardado interrumpido. Restaurar un temporizador con un `runningSince` en el
+ * futuro o un `accumulatedMs` absurdo produce relojes imposibles y, peor,
+ * sesiones de estudio con duraciones inventadas.
+ *
+ * Devuelve null si no se puede usar; nunca lanza.
+ */
+export function parseTimerState(raw: unknown, now = Date.now()): TimerState | null {
+  if (!raw || typeof raw !== 'object') return null
+  const input = raw as Record<string, unknown>
+
+  if (!MODES.includes(input.mode as TimerMode)) return null
+  if (!PHASES.includes(input.phase as TimerPhase)) return null
+
+  const runningSince =
+    input.runningSince === null ? null : isPositiveTime(input.runningSince, now) ? input.runningSince : undefined
+  if (runningSince === undefined) return null
+
+  const accumulatedMs = input.accumulatedMs
+  if (typeof accumulatedMs !== 'number' || !Number.isFinite(accumulatedMs) || accumulatedMs < 0) {
+    return null
+  }
+
+  const completed = input.completed
+  if (typeof completed !== 'number' || !Number.isInteger(completed) || completed < 0) {
+    return null
+  }
+
+  // Los temporizadores guardados antes de que existiera `sessionStartedAt` no
+  // lo traen. Se reconstruye lo mejor posible en vez de tirar la sesión: es
+  // una aproximación, pero perder el temporizador en marcha es peor.
+  const sessionStartedAt = isPositiveTime(input.sessionStartedAt, now)
+    ? input.sessionStartedAt
+    : now - (accumulatedMs + (runningSince === null ? 0 : now - runningSince))
+
+  const subjectId = typeof input.subjectId === 'string' ? input.subjectId : undefined
+  const topic = typeof input.topic === 'string' ? input.topic : undefined
+
+  return {
+    mode: input.mode as TimerMode,
+    phase: input.phase as TimerPhase,
+    runningSince,
+    accumulatedMs,
+    sessionStartedAt: Math.min(sessionStartedAt, now),
+    completed,
+    subjectId,
+    topic,
+  }
 }

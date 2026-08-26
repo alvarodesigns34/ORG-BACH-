@@ -27,8 +27,12 @@ export interface GoalContext {
   tasks: Task[]
   sessions: StudySession[]
   subjects: Subject[]
+  /** Resultados de la evaluación activa. Los usa el alcance «trimestral». */
   results: Map<ID, SubjectResult>
   globalAverage: number | null
+  /** Resultados de TODO el curso. Los usa el alcance «anual». */
+  courseResults: Map<ID, SubjectResult>
+  courseAverage: number | null
   scale: GradeScale
   today: DateISO
   weekStartsOn: 0 | 1
@@ -99,9 +103,14 @@ export function goalProgress(goal: Goal, ctx: GoalContext): GoalProgress {
 
   switch (goal.kind) {
     case 'media': {
-      const average = goal.subjectId
-        ? (ctx.results.get(goal.subjectId)?.average ?? null)
-        : ctx.globalAverage
+      // «Este curso» tiene que mirar el curso entero. Usar los resultados de
+      // la evaluación activa haría que un objetivo anual midiera en realidad
+      // un trimestre, sin que nada en la interfaz lo delatara.
+      const annual = goal.scope === 'anual'
+      const source = annual ? ctx.courseResults : ctx.results
+      const overall = annual ? ctx.courseAverage : ctx.globalAverage
+
+      const average = goal.subjectId ? (source.get(goal.subjectId)?.average ?? null) : overall
 
       if (average === null) {
         return {

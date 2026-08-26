@@ -6,10 +6,10 @@
  * el alta: nada se inserta sin que él lo pida.
  */
 
-import { DEFAULT_SCALE } from '@/domain/grades'
-import { DEFAULT_POMODORO } from '@/domain/study'
-import type { AppData, GradeCategory, Settings, SubjectColor } from '@/domain/types'
-import { newId } from '@/domain/id'
+import { DEFAULT_SCALE } from '../domain/grades.ts'
+import { DEFAULT_POMODORO } from '../domain/study.ts'
+import type { AppData, GradeCategory, Settings, SubjectColor } from '../domain/types.ts'
+import { newId } from '../domain/id.ts'
 
 /** Versión del esquema guardado. Súbela al cambiar la forma de los datos. */
 export const SCHEMA_VERSION = 1

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Clock, Ellipsis, ListTree, Pencil, Trash2 } from 'lucide-react'
 
 import { formatDuration, relativeDay } from '@/domain/dates'
@@ -5,6 +6,7 @@ import { bucketOf, subtaskProgress } from '@/domain/tasks'
 import { PRIORITIES, type Priority, type Subject, type Task } from '@/domain/types'
 import { useDispatch, useToday } from '@/state/StoreProvider'
 import { Checkbox } from '@/ui/fields'
+import { ConfirmDialog } from '@/ui/Modal'
 import { Menu } from '@/ui/Menu'
 import { PriorityMark, PRIORITY_LABEL, SubjectTag, cx } from '@/ui/primitives'
 
@@ -36,6 +38,9 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className }: TaskR
   const today = useToday()
   const done = task.status === 'completada'
   const progress = subtaskProgress(task)
+  // Borrar desde el menú pide confirmación igual que desde el editor: que la
+  // acción sea rápida no la hace menos irreversible.
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   return (
     <li
@@ -148,7 +153,7 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className }: TaskR
               icon: <Trash2 className="size-3.5" />,
               destructive: true,
               separated: true,
-              onSelect: () => dispatch({ type: 'task/remove', id: task.id }),
+              onSelect: () => setConfirmDelete(true),
             },
           ]}
           trigger={({ onClick, ref, ...aria }) => (
@@ -173,6 +178,19 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className }: TaskR
           )}
         />
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => {
+          dispatch({ type: 'task/remove', id: task.id })
+          setConfirmDelete(false)
+        }}
+        title="Eliminar tarea"
+        message={`«${task.title}» se borrará definitivamente. Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        destructive
+      />
     </li>
   )
 }

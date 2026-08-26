@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useEffect, useId, useState } from 'react'
 import type {
   InputHTMLAttributes,
   ReactNode,
@@ -7,7 +7,7 @@ import type {
 } from 'react'
 import { Check } from 'lucide-react'
 
-import { sanitizeNumericInput } from '@/domain/number'
+import { parseDecimal, sanitizeNumericInput, toDecimalInput } from '@/domain/number'
 import { cx } from './primitives'
 
 /** Estilo común a todo control de formulario, para que no deriven entre sí. */
@@ -157,6 +157,119 @@ export function NumberInput({
       />
       {suffix && (
         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[0.8125rem] text-ink-3">
+          {suffix}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Campo numérico con confirmación diferida
+// ---------------------------------------------------------------------------
+
+interface NumberFieldProps
+  extends Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'min' | 'max'> {
+  value: number
+  /** Se llama al salir del campo o al pulsar Intro, no en cada tecla. */
+  onCommit: (value: number) => void
+  min?: number
+  max?: number
+  /** Redondea al confirmar. Para minutos, días y otras cantidades enteras. */
+  integer?: boolean
+  suffix?: string
+  /** Valor al que volver si el campo queda vacío o ilegible. */
+  fallback?: number
+  /** 'sm' para filas densas, como el reparto de pesos de una asignatura. */
+  inputSize?: 'sm' | 'md'
+  /**
+   * Clases del contenedor. Aquí van las de anchura y colocación: el input
+   * lleva `w-full`, así que ponérselas a él no tendría efecto.
+   */
+  containerClassName?: string
+}
+
+/**
+ * Campo numérico ligado directamente a un número del estado.
+ *
+ * A diferencia de `NumberInput`, que espera que el formulario guarde el texto
+ * y lo interprete al enviar, este mantiene su propio borrador y solo confirma
+ * al salir del campo o al pulsar Intro.
+ *
+ * Hace falta porque normalizar en cada pulsación impide escribir decimales:
+ * al teclear «5,» el valor se convierte en 5, el componente se vuelve a
+ * dibujar con «5» y la coma desaparece antes de poder escribir lo que va
+ * detrás. Con un borrador, el estado intermedio sobrevive hasta que la cifra
+ * está completa.
+ */
+export function NumberField({
+  value,
+  onCommit,
+  min,
+  max,
+  integer,
+  suffix,
+  fallback,
+  inputSize = 'md',
+  className,
+  containerClassName,
+  ...props
+}: NumberFieldProps) {
+  const [draft, setDraft] = useState(() => toDecimalInput(value))
+  const [editing, setEditing] = useState(false)
+
+  // Si el valor cambia desde fuera (importar datos, reiniciar) el borrador se
+  // pone al día, pero nunca mientras se está escribiendo en él.
+  useEffect(() => {
+    if (!editing) setDraft(toDecimalInput(value))
+  }, [value, editing])
+
+  const commit = () => {
+    setEditing(false)
+    const parsed = parseDecimal(draft)
+    const base = Number.isFinite(parsed) ? parsed : (fallback ?? value)
+
+    let next = base
+    if (min !== undefined) next = Math.max(min, next)
+    if (max !== undefined) next = Math.min(max, next)
+    if (integer) next = Math.round(next)
+
+    setDraft(toDecimalInput(next))
+    if (next !== value) onCommit(next)
+  }
+
+  return (
+    <div className={cx('relative', containerClassName)}>
+      <input
+        type="text"
+        inputMode="decimal"
+        autoComplete="off"
+        value={draft}
+        className={cx(
+          CONTROL,
+          'tabular-nums',
+          inputSize === 'sm' ? 'h-8 text-[0.8125rem]' : 'h-10',
+          suffix && (inputSize === 'sm' ? 'pr-7' : 'pr-10'),
+          className,
+        )}
+        onFocus={() => setEditing(true)}
+        onChange={(e) => setDraft(sanitizeNumericInput(e.target.value))}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            e.currentTarget.blur()
+          }
+        }}
+        {...props}
+      />
+      {suffix && (
+        <span
+          className={cx(
+            'pointer-events-none absolute top-1/2 -translate-y-1/2 text-ink-3',
+            inputSize === 'sm' ? 'right-2.5 text-[0.75rem]' : 'right-3 text-[0.8125rem]',
+          )}
+        >
           {suffix}
         </span>
       )}

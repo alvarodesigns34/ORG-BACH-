@@ -2,13 +2,12 @@ import { useRef, useState } from 'react'
 import { Download, RotateCcw, Upload } from 'lucide-react'
 
 import { createEmptyData } from '@/data/defaults'
-import { parseDecimalOr } from '@/domain/number'
 import { TERMS, type AverageMode, type TermId } from '@/domain/types'
 import { useDispatch, useSettings, useStore } from '@/state/StoreProvider'
 import * as storage from '@/storage/persistence'
 import { Page, PageHeader } from '@/layout/AppShell'
 import { ThemeToggle } from '@/layout/ThemeToggle'
-import { Field, Input, NumberInput, Select, Switch } from '@/ui/fields'
+import { Field, Input, NumberField, Select, Switch } from '@/ui/fields'
 import { ConfirmDialog } from '@/ui/Modal'
 import { Button, Card, SectionHeader, cx } from '@/ui/primitives'
 
@@ -18,7 +17,9 @@ export function SettingsView() {
   const { data } = useStore()
 
   const fileInput = useRef<HTMLInputElement>(null)
-  const [notice, setNotice] = useState<{ tone: 'ok' | 'danger'; text: string } | null>(null)
+  const [notice, setNotice] = useState<{ tone: 'ok' | 'warn' | 'danger'; text: string } | null>(
+    null,
+  )
   const [confirmReset, setConfirmReset] = useState(false)
 
   const update = (patch: Parameters<typeof dispatch>[0] extends never ? never : Partial<typeof settings>) =>
@@ -46,7 +47,11 @@ export function SettingsView() {
       return
     }
     dispatch({ type: 'data/replace', data: result.data })
-    setNotice({ tone: 'ok', text: 'Datos importados. Se ha sustituido todo el contenido anterior.' })
+    setNotice(
+      result.warning
+        ? { tone: 'warn', text: `Datos importados. ${result.warning}` }
+        : { tone: 'ok', text: 'Datos importados. Se ha sustituido todo el contenido anterior.' },
+    )
   }
 
   const counts = [
@@ -152,16 +157,19 @@ export function SettingsView() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Field label="Nota máxima">
               {({ id }) => (
-                <NumberInput
+                <NumberField
                   id={id}
                   min={1}
                   max={100}
                   value={settings.gradeScale.max}
-                  onChange={(e) =>
+                  fallback={10}
+                  onCommit={(max) =>
                     update({
                       gradeScale: {
                         ...settings.gradeScale,
-                        max: parseDecimalOr(e.target.value, 10),
+                        max,
+                        // El aprobado nunca puede quedar por encima del máximo.
+                        pass: Math.min(settings.gradeScale.pass, max),
                       },
                     })
                   }
@@ -170,19 +178,14 @@ export function SettingsView() {
             </Field>
             <Field label="Aprobado a partir de">
               {({ id }) => (
-                <NumberInput
+                <NumberField
                   id={id}
                   min={0}
                   max={settings.gradeScale.max}
-                  step={0.5}
                   value={settings.gradeScale.pass}
-                  onChange={(e) =>
-                    update({
-                      gradeScale: {
-                        ...settings.gradeScale,
-                        pass: parseDecimalOr(e.target.value, 5),
-                      },
-                    })
+                  fallback={5}
+                  onCommit={(pass) =>
+                    update({ gradeScale: { ...settings.gradeScale, pass } })
                   }
                 />
               )}
@@ -244,16 +247,16 @@ export function SettingsView() {
             {settings.alertsEnabled && (
               <Field label="Avisar de un examen con esta antelación">
                 {({ id }) => (
-                  <NumberInput
+                  <NumberField
                     id={id}
                     min={1}
                     max={30}
+                    integer
                     suffix="días"
                     className="max-w-[12rem]"
                     value={settings.examAlertDays}
-                    onChange={(e) =>
-                      update({ examAlertDays: Math.round(parseDecimalOr(e.target.value, 7)) })
-                    }
+                    fallback={7}
+                    onCommit={(examAlertDays) => update({ examAlertDays })}
                   />
                 )}
               </Field>
@@ -271,29 +274,29 @@ export function SettingsView() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Tramo de trabajo">
               {({ id }) => (
-                <NumberInput
+                <NumberField
                   id={id}
                   min={5}
                   max={120}
+                  integer
                   suffix="min"
                   value={settings.pomodoroMinutes}
-                  onChange={(e) =>
-                    update({ pomodoroMinutes: Math.round(parseDecimalOr(e.target.value, 25)) })
-                  }
+                  fallback={25}
+                  onCommit={(pomodoroMinutes) => update({ pomodoroMinutes })}
                 />
               )}
             </Field>
             <Field label="Descanso">
               {({ id }) => (
-                <NumberInput
+                <NumberField
                   id={id}
                   min={1}
                   max={60}
+                  integer
                   suffix="min"
                   value={settings.pomodoroBreakMinutes}
-                  onChange={(e) =>
-                    update({ pomodoroBreakMinutes: Math.round(parseDecimalOr(e.target.value, 5)) })
-                  }
+                  fallback={5}
+                  onCommit={(pomodoroBreakMinutes) => update({ pomodoroBreakMinutes })}
                 />
               )}
             </Field>
@@ -332,7 +335,9 @@ export function SettingsView() {
               role="status"
               className={cx(
                 'text-[0.8125rem] rounded-sm px-3 py-2 mb-4',
-                notice.tone === 'ok' ? 'bg-ok-quiet text-ok' : 'bg-danger-quiet text-danger',
+                notice.tone === 'ok' && 'bg-ok-quiet text-ok',
+                notice.tone === 'warn' && 'bg-warn-quiet text-warn',
+                notice.tone === 'danger' && 'bg-danger-quiet text-danger',
               )}
             >
               {notice.text}

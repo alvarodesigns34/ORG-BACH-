@@ -7,7 +7,6 @@ import { studyByDay } from '@/domain/stats'
 import {
   createTimer,
   displayMs,
-  elapsedMs,
   formatClock,
   isPhaseComplete,
   isRunning,
@@ -28,6 +27,7 @@ import { Page, PageHeader } from '@/layout/AppShell'
 import { ColumnChart, type Column } from '@/ui/charts'
 import { Input, Select } from '@/ui/fields'
 import { Menu } from '@/ui/Menu'
+import { ConfirmDialog } from '@/ui/Modal'
 import { Button, Card, EmptyState, Numeral, SectionHeader, cx } from '@/ui/primitives'
 
 /** Cada cuánto se repinta. El tiempo sale del reloj, no de este intervalo. */
@@ -52,6 +52,7 @@ export function StudyView() {
   const [timer, setTimer] = useState<TimerState | null>(() => storage.loadTimer())
   const [now, setNow] = useState(() => Date.now())
   const [mode, setMode] = useState<TimerMode>('pomodoro')
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null)
   const [subjectId, setSubjectId] = useState('')
   const [topic, setTopic] = useState('')
 
@@ -107,9 +108,11 @@ export function StudyView() {
         session: {
           subjectId: timer.subjectId,
           topic: timer.topic,
-          // Se registra la hora de INICIO, para que la sesión caiga en el día
-          // en que se empezó aunque termine pasada la medianoche.
-          startedAt: new Date(Date.now() - elapsedMs(timer, Date.now())).toISOString(),
+          // Inicio real de la sesión completa, guardado desde que arrancó.
+          // Restarle el tiempo transcurrido daría el comienzo del último
+          // tramo, no el de la sesión: en un pomodoro de varias fases que
+          // cruza la medianoche, la archivaría en el día equivocado.
+          startedAt: new Date(timer.sessionStartedAt).toISOString(),
           minutes,
           mode: timer.mode,
         },
@@ -281,7 +284,7 @@ export function StudyView() {
                             label: 'Eliminar sesión',
                             icon: <Trash2 className="size-3.5" />,
                             destructive: true,
-                            onSelect: () => dispatch({ type: 'session/remove', id: session.id }),
+                            onSelect: () => setPendingDelete(session.id),
                           },
                         ]}
                         trigger={({ onClick, ref, ...aria }) => (
@@ -311,6 +314,19 @@ export function StudyView() {
           </Card>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) dispatch({ type: 'session/remove', id: pendingDelete })
+          setPendingDelete(null)
+        }}
+        title="Eliminar sesión"
+        message="La sesión se borrará y dejará de contar en tus horas de estudio. No se puede deshacer."
+        confirmLabel="Eliminar"
+        destructive
+      />
     </Page>
   )
 }

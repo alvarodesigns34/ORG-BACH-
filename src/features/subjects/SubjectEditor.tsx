@@ -4,12 +4,12 @@ import { Plus, Trash2, TriangleAlert, X } from 'lucide-react'
 import { defaultCategories } from '@/data/defaults'
 import { checkWeights } from '@/domain/grades'
 import { newId } from '@/domain/id'
-import { parseDecimal, parseDecimalOr, toDecimalInput } from '@/domain/number'
+import { parseDecimal, toDecimalInput } from '@/domain/number'
 import { SUBJECT_COLORS, colorVar, nextColor } from '@/domain/palette'
 import type { GradeCategory, Subject, SubjectColor } from '@/domain/types'
 import { useDispatch, useSettings } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
-import { Field, Input, NumberInput } from '@/ui/fields'
+import { Field, Input, NumberField, NumberInput } from '@/ui/fields'
 import { ConfirmDialog, Modal } from '@/ui/Modal'
 import { Button, IconButton, cx } from '@/ui/primitives'
 
@@ -245,29 +245,21 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
                       }
                       className="flex-1 min-w-0 bg-transparent text-[0.875rem] outline-none focus:underline decoration-accent underline-offset-4"
                     />
-                    <div className="relative w-24 shrink-0">
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={5}
-                        value={category.weight}
-                        aria-label={`Peso de ${category.name || 'la categoría'}`}
-                        onChange={(e) =>
-                          setCategories((prev) =>
-                            prev.map((c) =>
-                              c.id === category.id
-                                ? { ...c, weight: parseDecimalOr(e.target.value, 0) }
-                                : c,
-                            ),
-                          )
-                        }
-                        className="w-full h-8 pl-2.5 pr-7 rounded-xs bg-surface border border-hairline-strong text-[0.8125rem] tabular-nums outline-none focus:border-accent"
-                      />
-                      <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[0.75rem] text-ink-3">
-                        %
-                      </span>
-                    </div>
+                    <NumberField
+                      inputSize="sm"
+                      containerClassName="w-24 shrink-0"
+                      min={0}
+                      max={100}
+                      suffix="%"
+                      value={category.weight}
+                      fallback={0}
+                      aria-label={`Peso de ${category.name || 'la categoría'}`}
+                      onCommit={(weight) =>
+                        setCategories((prev) =>
+                          prev.map((c) => (c.id === category.id ? { ...c, weight } : c)),
+                        )
+                      }
+                    />
                     <IconButton
                       label={`Quitar ${category.name || 'categoría'}`}
                       size="sm"
