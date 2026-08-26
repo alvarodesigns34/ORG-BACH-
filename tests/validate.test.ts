@@ -63,6 +63,20 @@ describe('parseSubject', () => {
     })
     assert.equal(parsed?.schedule.length, 1)
   })
+
+  it('deriva la abreviatura cuando falta, igual que al crearla a mano', () => {
+    // Sin esto, una asignatura importada de una versión antigua se queda con
+    // la insignia vacía en la ficha, porque solo el reducer la rellenaba.
+    assert.equal(parseSubject(valid)?.shortName, 'MI')
+  })
+
+  it('respeta la abreviatura si ya viene puesta', () => {
+    assert.equal(parseSubject({ ...valid, shortName: 'MA1' })?.shortName, 'MA1')
+  })
+
+  it('rechaza una nota objetivo negativa', () => {
+    assert.equal(parseSubject({ ...valid, targetGrade: -2 })?.targetGrade, undefined)
+  })
 })
 
 describe('parseGrade', () => {
@@ -82,6 +96,16 @@ describe('parseGrade', () => {
 
   it('acepta una nota correcta', () => {
     assert.equal(parseGrade(valid)?.score, 8)
+  })
+
+  it('rechaza una nota por encima de su propia escala', () => {
+    // Un 17/10 es imposible. Se descarta en vez de recortarlo: recortar
+    // inventaría una nota que nadie sacó.
+    assert.equal(parseGrade({ ...valid, score: 17, maxScore: 10 }), null)
+  })
+
+  it('acepta la nota máxima exacta', () => {
+    assert.equal(parseGrade({ ...valid, score: 10, maxScore: 10 })?.score, 10)
   })
 
   it('rechaza notas sin escala', () => {
@@ -310,5 +334,57 @@ describe('migrateWithReport', () => {
     const report = migrateWithReport(null)
     assert.equal(report.data.subjects.length, 0)
     assert.equal(report.totalDropped, 0)
+  })
+
+  describe('integridad referencial', () => {
+    // Cada registro puede ser válido por sí solo y aun así apuntar a una
+    // asignatura que no existe: eso también hay que detectarlo, o la app
+    // sobrevive con `.find()` devolviendo `undefined` y datos huérfanos.
+    const subjects = [
+      { id: 'mat', name: 'Matemáticas', color: 'indigo', weight: 4, schedule: [], categories: [] },
+    ]
+
+    it('descarta notas y exámenes de una asignatura que no existe', () => {
+      const report = migrateWithReport({
+        subjects,
+        grades: [
+          { id: 'g1', subjectId: 'mat', score: 8, maxScore: 10 },
+          { id: 'g2', subjectId: 'fantasma', score: 8, maxScore: 10 },
+        ],
+        exams: [
+          { id: 'e1', subjectId: 'mat', date: '2026-10-01' },
+          { id: 'e2', subjectId: 'fantasma', date: '2026-10-01' },
+        ],
+      })
+      assert.equal(report.data.grades.length, 1)
+      assert.equal(report.data.exams.length, 1)
+      assert.equal(report.totalDropped, 2)
+    })
+
+    it('limpia el vínculo, pero conserva la tarea, el evento y el objetivo', () => {
+      // Una asignatura borrada no debería llevarse por delante una tarea
+      // entera: el vínculo es opcional, se limpia y el registro se queda.
+      const report = migrateWithReport({
+        subjects,
+        tasks: [{ id: 't1', title: 'Repasar', subjectId: 'fantasma', tags: [], subtasks: [] }],
+        events: [{ id: 'e1', title: 'Clase', date: '2026-10-01', subjectId: 'fantasma' }],
+        goals: [{ id: 'go1', kind: 'manual', scope: 'semanal', target: 5, subjectId: 'fantasma' }],
+      })
+      assert.equal(report.data.tasks.length, 1)
+      assert.equal(report.data.tasks[0].subjectId, undefined)
+      assert.equal(report.data.events.length, 1)
+      assert.equal(report.data.events[0].subjectId, undefined)
+      assert.equal(report.data.goals.length, 1)
+      assert.equal(report.data.goals[0].subjectId, undefined)
+      assert.equal(report.totalDropped, 0)
+    })
+
+    it('limpia el enlace de un examen a una nota que ya no existe', () => {
+      const report = migrateWithReport({
+        subjects,
+        exams: [{ id: 'e1', subjectId: 'mat', date: '2026-10-01', gradeEntryId: 'g-fantasma' }],
+      })
+      assert.equal(report.data.exams[0].gradeEntryId, undefined)
+    })
   })
 })

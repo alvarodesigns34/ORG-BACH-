@@ -10,7 +10,7 @@ import {
   type TaskSort,
   type TaskView,
 } from '@/domain/tasks'
-import { formatDuration, relativeDay } from '@/domain/dates'
+import { daysUntil, formatDuration, relativeDay } from '@/domain/dates'
 import { PRIORITIES, type Priority, type Task } from '@/domain/types'
 import { useRoute } from '@/router'
 import { useStore, useToday } from '@/state/StoreProvider'
@@ -330,8 +330,9 @@ function groupByDay(tasks: Task[], today: string): TaskGroup[] {
     else if (relative === 'Hoy') groups.hoy.tasks.push(task)
     else if (relative === 'Mañana') groups.manana.tasks.push(task)
     else {
-      const diff = (new Date(task.dueDate).getTime() - new Date(today).getTime()) / 86_400_000
-      if (diff <= 7) groups.semana.tasks.push(task)
+      // Nunca `new Date(dayString)` directamente: interpretaría la cadena
+      // como UTC. `daysUntil` construye las fechas componente a componente.
+      if (daysUntil(task.dueDate, today) <= 7) groups.semana.tasks.push(task)
       else groups.despues.tasks.push(task)
     }
   }

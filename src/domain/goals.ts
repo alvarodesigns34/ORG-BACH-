@@ -160,7 +160,9 @@ export function goalProgress(goal: Goal, ctx: GoalContext): GoalProgress {
       const completed = ctx.tasks.filter((t) => {
         if (!isDone(t) || !t.completedAt) return false
         if (goal.subjectId && t.subjectId !== goal.subjectId) return false
-        return !from || t.completedAt.slice(0, 10) >= from
+        // El día natural sale de la hora local, no de recortar el ISO: cerca
+        // de medianoche esos dos días pueden no coincidir.
+        return !from || toDay(new Date(t.completedAt)) >= from
       }).length
 
       const percent = clampPercent((completed / target) * 100)

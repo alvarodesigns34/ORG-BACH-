@@ -21,10 +21,20 @@ export function isDone(task: Task): boolean {
   return task.status === 'completada'
 }
 
-/** Atrasada = tiene fecha, ya pasó y sigue sin completarse. */
-export function isOverdue(task: Task, today: DateISO = todayISO()): boolean {
+/**
+ * Atrasada = tiene fecha, ya pasó y sigue sin completarse.
+ *
+ * Un día ya pasado es atrasado sin más. El día de hoy depende de la hora
+ * límite: una tarea para hoy a las 10:00 está atrasada a partir de las
+ * 10:00, no a partir de mañana. `now` es la hora exacta, no el día — se
+ * recibe aparte de `today` para poder fijarla en las pruebas.
+ */
+export function isOverdue(task: Task, today: DateISO = todayISO(), now: number = Date.now()): boolean {
   if (isDone(task) || !task.dueDate) return false
-  return task.dueDate < today
+  if (task.dueDate < today) return true
+  if (task.dueDate > today) return false
+  const due = dueMoment(task)
+  return due !== null && due.getTime() < now
 }
 
 export function isDueToday(task: Task, today: DateISO = todayISO()): boolean {
@@ -60,12 +70,19 @@ export function wasOnTime(task: Task): boolean | null {
   return new Date(task.completedAt).getTime() <= due.getTime()
 }
 
-export function bucketOf(task: Task, today: DateISO = todayISO()): TaskBucket {
+export function bucketOf(
+  task: Task,
+  today: DateISO = todayISO(),
+  now: number = Date.now(),
+): TaskBucket {
   if (isDone(task)) return 'completada'
   if (!task.dueDate) return 'sin_fecha'
   const diff = daysUntil(task.dueDate, today)
   if (diff < 0) return 'atrasada'
-  if (diff === 0) return 'hoy'
+  // Un plazo de hoy con hora ya pasada es tan atrasado como uno de ayer: si
+  // no, la ficha dice "Hoy" y la pestaña "Atrasadas" no la lista, y las dos
+  // pantallas se contradicen sobre la misma tarea.
+  if (diff === 0) return isOverdue(task, today, now) ? 'atrasada' : 'hoy'
   if (diff === 1) return 'manana'
   return 'proxima'
 }

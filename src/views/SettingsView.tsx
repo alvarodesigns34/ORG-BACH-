@@ -383,7 +383,7 @@ export function SettingsView() {
         open={confirmReset}
         onCancel={() => setConfirmReset(false)}
         onConfirm={() => {
-          storage.clear()
+          storage.resetAll()
           dispatch({ type: 'data/replace', data: createEmptyData() })
           setConfirmReset(false)
         }}

@@ -89,6 +89,12 @@ export function migrateWithReport(raw: unknown): MigrateReport {
   const dropped: MigrateReport['dropped'] = {}
   let totalDropped = 0
 
+  const addDropped = (key: keyof typeof PARSERS, count: number) => {
+    if (count <= 0) return
+    dropped[key] = (dropped[key] ?? 0) + count
+    totalDropped += count
+  }
+
   // El bucle recorre pares (colección, validador) ya emparejados en PARSERS.
   // El casteo es necesario porque TypeScript no puede correlacionar la clave
   // con el tipo concreto de cada validador al iterar.
@@ -96,11 +102,43 @@ export function migrateWithReport(raw: unknown): MigrateReport {
     const parse = PARSERS[key] as (item: unknown) => { id: string } | null
     const result = parseCollection(input[key], parse)
     ;(data[key] as unknown[]) = result.items
-    if (result.dropped > 0) {
-      dropped[key] = result.dropped
-      totalDropped += result.dropped
-    }
+    addDropped(key, result.dropped)
   }
+
+  // --- Integridad referencial ---
+  // Cada registro ya es válido por sí solo, pero un JSON importado puede
+  // apuntar a una asignatura o a una nota que no existe (o que se descartó
+  // arriba). Una nota o un examen sin asignatura real no significan nada: se
+  // descartan. Un vínculo opcional roto, en cambio, se limpia sin tirar el
+  // registro entero — perder la tarea por una asignatura borrada sería
+  // desproporcionado.
+  const subjectIds = new Set(data.subjects.map((s) => s.id))
+
+  const validGrades = data.grades.filter((g) => subjectIds.has(g.subjectId))
+  addDropped('grades', data.grades.length - validGrades.length)
+  data.grades = validGrades
+
+  const validExams = data.exams.filter((e) => subjectIds.has(e.subjectId))
+  addDropped('exams', data.exams.length - validExams.length)
+  data.exams = validExams
+
+  const gradeIds = new Set(data.grades.map((g) => g.id))
+  data.exams = data.exams.map((e) =>
+    e.gradeEntryId && !gradeIds.has(e.gradeEntryId) ? { ...e, gradeEntryId: undefined } : e,
+  )
+
+  data.tasks = data.tasks.map((t) =>
+    t.subjectId && !subjectIds.has(t.subjectId) ? { ...t, subjectId: undefined } : t,
+  )
+  data.events = data.events.map((e) =>
+    e.subjectId && !subjectIds.has(e.subjectId) ? { ...e, subjectId: undefined } : e,
+  )
+  data.sessions = data.sessions.map((s) =>
+    s.subjectId && !subjectIds.has(s.subjectId) ? { ...s, subjectId: undefined } : s,
+  )
+  data.goals = data.goals.map((g) =>
+    g.subjectId && !subjectIds.has(g.subjectId) ? { ...g, subjectId: undefined } : g,
+  )
 
   return { data, dropped, totalDropped }
 }
@@ -159,6 +197,21 @@ export function clear(): void {
   } catch {
     // Si no se puede borrar, el siguiente guardado sobrescribirá igualmente.
   }
+}
+
+/**
+ * Borra los datos académicos Y el temporizador en marcha.
+ *
+ * `clear()` a secas deja el temporizador vivo a propósito: importar una copia
+ * no debería interrumpir una sesión de estudio que está corriendo, porque el
+ * temporizador es estado de la sesión del navegador, no parte de la copia.
+ * Pero "Empezar de cero" es justo lo contrario — significa CERO — así que
+ * también se lleva el temporizador. Si no, un pomodoro en marcha sobrevive al
+ * borrado y reaparece al volver a la pantalla de Estudio.
+ */
+export function resetAll(): void {
+  clear()
+  saveTimer(null)
 }
 
 // ---------------------------------------------------------------------------

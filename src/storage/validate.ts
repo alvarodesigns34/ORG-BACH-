@@ -11,6 +11,7 @@
  * y decir cuántas se han quedado fuera que perderlo todo.
  */
 
+import { deriveShortName } from '../domain/palette.ts'
 import { DEFAULT_POMODORO } from '../domain/study.ts'
 import type {
   ActivityEntry,
@@ -105,14 +106,16 @@ export function parseSubject(raw: unknown): Subject | null {
   return {
     id: raw.id,
     name: raw.name,
-    shortName: optText(raw.shortName),
+    // Sin abreviatura, se deriva del nombre: igual que al crear una asignatura
+    // desde la interfaz, para que ninguna insignia se quede vacía.
+    shortName: optText(raw.shortName) ?? deriveShortName(raw.name),
     color: (SUBJECT_COLORS as readonly string[]).includes(raw.color as string)
       ? (raw.color as Subject['color'])
       : 'slate',
     teacher: optText(raw.teacher),
     room: optText(raw.room),
     weight: clampNum(raw.weight, 0, 100, 1),
-    targetGrade: optNum(raw.targetGrade),
+    targetGrade: isNum(raw.targetGrade) && raw.targetGrade >= 0 ? raw.targetGrade : undefined,
     schedule: Array.isArray(raw.schedule)
       ? raw.schedule.map(parseSlot).filter((s): s is ScheduleSlot => s !== null)
       : [],
@@ -159,6 +162,9 @@ export function parseGrade(raw: unknown): GradeEntry | null {
   // en lugar de dejar entrar un registro que falsearía la media.
   if (!isRow(raw) || !isId(raw.id) || !isId(raw.subjectId)) return null
   if (!isNum(raw.score) || !isNum(raw.maxScore) || raw.maxScore <= 0) return null
+  // Una nota por encima de su propia escala (17/10) es imposible: no se
+  // recorta, porque recortarla inventaría una nota que nadie sacó.
+  if (raw.score > raw.maxScore) return null
 
   return {
     id: raw.id,

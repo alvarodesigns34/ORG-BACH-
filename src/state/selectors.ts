@@ -117,8 +117,14 @@ export function useTaskSummary(): TaskSummary {
           return d > 0 && d <= 7
         }),
       ),
+      // El día natural sale de la hora local, no de recortar el ISO: una
+      // tarea completada a las 00:30 en España puede llevar fecha del día
+      // anterior en UTC, y `slice` la dejaría fuera de la semana equivocada.
       completedThisWeek: data.tasks.filter(
-        (t) => t.status === 'completada' && t.completedAt && t.completedAt.slice(0, 10) >= weekStart,
+        (t) =>
+          t.status === 'completada' &&
+          t.completedAt &&
+          toDay(new Date(t.completedAt)) >= weekStart,
       ),
     }
   }, [data.tasks, data.settings.weekStartsOn, today])
@@ -175,8 +181,11 @@ export function useStudyStats(): StudyStats {
       const day = dayOf(session.startedAt)
       totalMinutes += session.minutes
       if (day === today) todayMinutes += session.minutes
-      if (day >= weekStart) weekMinutes += session.minutes
-      if (day >= monthStart) monthMinutes += session.minutes
+      // "Esta semana"/"este mes" son lo estudiado hasta ahora: una sesión con
+      // fecha futura (solo posible con datos importados o manipulados) no
+      // debe engordar un total que todavía no ha llegado.
+      if (day >= weekStart && day <= today) weekMinutes += session.minutes
+      if (day >= monthStart && day <= today) monthMinutes += session.minutes
       perDay.set(day, (perDay.get(day) ?? 0) + session.minutes)
       perSubject.set(session.subjectId, (perSubject.get(session.subjectId) ?? 0) + session.minutes)
     }

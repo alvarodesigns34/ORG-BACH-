@@ -21,10 +21,18 @@ import {
   wasOnTime,
   EMPTY_FILTERS,
 } from '../src/domain/tasks.ts'
+import { parseDay } from '../src/domain/dates.ts'
 import { taskStats } from '../src/domain/stats.ts'
 import type { Task } from '../src/domain/types.ts'
 
 const TODAY = '2026-10-14'
+
+/** Timestamp de hoy a una hora concreta, para fijar el «ahora» en las pruebas. */
+function todayAt(hours: number, minutes = 0): number {
+  const date = parseDay(TODAY)
+  date.setHours(hours, minutes, 0, 0)
+  return date.getTime()
+}
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
@@ -52,6 +60,37 @@ describe('bucketOf', () => {
     const task = makeTask({ dueDate: '2026-01-01', status: 'completada' })
     assert.equal(bucketOf(task, TODAY), 'completada')
     assert.equal(isOverdue(task, TODAY), false)
+  })
+
+  it('con hora límite, hoy pasa a atrasada en cuanto vence', () => {
+    // Antes esto se quedaba en "hoy" hasta que cambiaba el día natural,
+    // aunque hubieran pasado horas del plazo: la ficha decía "Hoy" y la
+    // pestaña "Atrasadas" no la listaba.
+    const task = makeTask({ dueDate: TODAY, dueTime: '10:00' })
+    assert.equal(bucketOf(task, TODAY, todayAt(9, 0)), 'hoy')
+    assert.equal(bucketOf(task, TODAY, todayAt(11, 0)), 'atrasada')
+  })
+})
+
+describe('isOverdue', () => {
+  it('pendiente hoy a las 09:00 con plazo a las 10:00 no está atrasada', () => {
+    const task = makeTask({ dueDate: TODAY, dueTime: '10:00' })
+    assert.equal(isOverdue(task, TODAY, todayAt(9, 0)), false)
+  })
+
+  it('pendiente hoy a las 11:00 con plazo a las 10:00 sí está atrasada', () => {
+    const task = makeTask({ dueDate: TODAY, dueTime: '10:00' })
+    assert.equal(isOverdue(task, TODAY, todayAt(11, 0)), true)
+  })
+
+  it('pendiente hoy sin hora no está atrasada hasta acabar el día', () => {
+    const task = makeTask({ dueDate: TODAY })
+    assert.equal(isOverdue(task, TODAY, todayAt(23, 0)), false)
+  })
+
+  it('un día ya pasado está atrasado sin mirar la hora', () => {
+    const task = makeTask({ dueDate: '2026-10-13' })
+    assert.equal(isOverdue(task, TODAY, todayAt(0, 1)), true)
   })
 })
 
