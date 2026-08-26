@@ -12,6 +12,11 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  # Necesario solo para que configure-pages pueda activar Pages la primera
+  # vez (con enablement: true, más abajo). Si el token no tuviera permiso
+  # suficiente, ese paso fallará igual y habrá que activarlo a mano en
+  # Settings → Pages → Source: GitHub Actions.
+  administration: write
 
 # Si llega un push mientras hay un despliegue en marcha, se cancela el
 # anterior en vez de encolarlos: solo importa que quede publicado lo último.
@@ -40,6 +45,10 @@ jobs:
           GITHUB_PAGES: 'true'
 
       - uses: actions/configure-pages@v5
+        with:
+          # Primer despliegue: el repositorio aún no tiene Pages activado.
+          # Con esto, la propia acción lo activa en lugar de fallar.
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
