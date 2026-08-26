@@ -1,0 +1,359 @@
+@import 'tailwindcss';
+@import './fonts.css';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* ==========================================================================
+   TOKENS
+   Se declaran como variables CSS crudas (--c-*) para poder reasignarlas por
+   tema, y se exponen a Tailwind con `@theme inline`, que emite `var(--c-*)`
+   en lugar de copiar el valor. Un solo sitio donde cambiar el color.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* --- Superficies: papel calido, nunca blanco puro --- */
+  --c-canvas: #f6f4f0;
+  --c-surface: #fcfbf9;
+  --c-raised: #ffffff;
+  --c-sunken: #ece9e3;
+
+  /* --- Tinta: negro calido, nunca #000 ni grises puros --- */
+  --c-ink: #1b1917;
+  --c-ink-2: #57514a;
+  --c-ink-3: #7a7269;
+
+  /* --- Lineas de 1px: casi siempre mejor que una sombra --- */
+  --c-hairline: #e4e0d8;
+  --c-hairline-strong: #d4cec3;
+
+  /* --- UN acento: azul tinta sobre papel --- */
+  --c-accent: #2c4a8f;
+  --c-accent-strong: #233c77;
+  --c-accent-ink: #ffffff;
+  --c-accent-quiet: #e7ecf7;
+
+  /* --- Estados. Solo para significado, nunca decorativos --- */
+  --c-danger: #af382a;
+  --c-danger-quiet: #f7e8e5;
+  --c-warn: #96590f;
+  --c-warn-quiet: #f6eedf;
+  --c-ok: #3c6a49;
+  --c-ok-quiet: #e5efe8;
+
+  /* --- Paleta de asignaturas: apagada, distinguible, 10 tonos --- */
+  --sub-sky: #2e6e9e;
+  --sub-sky-quiet: #e3edf4;
+  --sub-sage: #4f7a57;
+  --sub-sage-quiet: #e7eee7;
+  --sub-amber: #8f6410;
+  --sub-amber-quiet: #f4ecdb;
+  --sub-terracotta: #a24c36;
+  --sub-terracotta-quiet: #f4e7e1;
+  --sub-plum: #75467b;
+  --sub-plum-quiet: #efe6f1;
+  --sub-teal: #216b66;
+  --sub-teal-quiet: #e0eeed;
+  --sub-indigo: #464f9a;
+  --sub-indigo-quiet: #e8e9f5;
+  --sub-moss: #63722a;
+  --sub-moss-quiet: #eef0df;
+  --sub-clay: #83553f;
+  --sub-clay-quiet: #f1e8e2;
+  --sub-slate: #505b69;
+  --sub-slate-quiet: #e8ebee;
+
+  /* --- Profundidad: por capas, no una sombra uniforme para todo --- */
+  --shadow-xs: 0 1px 2px rgb(27 25 23 / 0.05);
+  --shadow-sm: 0 1px 2px rgb(27 25 23 / 0.04), 0 2px 6px rgb(27 25 23 / 0.05);
+  --shadow-md: 0 2px 4px rgb(27 25 23 / 0.04), 0 8px 20px rgb(27 25 23 / 0.07);
+  --shadow-lg: 0 4px 10px rgb(27 25 23 / 0.06), 0 24px 56px rgb(27 25 23 / 0.14);
+
+  --scrim: rgb(27 25 23 / 0.32);
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --c-canvas: #121110;
+  --c-surface: #1a1917;
+  --c-raised: #221f1d;
+  --c-sunken: #0c0b0a;
+
+  --c-ink: #f2efe9;
+  --c-ink-2: #a9a196;
+  --c-ink-3: #837b70;
+
+  --c-hairline: #2c2926;
+  --c-hairline-strong: #3c3833;
+
+  --c-accent: #8ba7e9;
+  --c-accent-strong: #a5bcf0;
+  --c-accent-ink: #0f1320;
+  --c-accent-quiet: #1b2134;
+
+  --c-danger: #e58573;
+  --c-danger-quiet: #2b1a16;
+  --c-warn: #dfa45c;
+  --c-warn-quiet: #2a2114;
+  --c-ok: #82b592;
+  --c-ok-quiet: #16241b;
+
+  --sub-sky: #7fb4d8;
+  --sub-sky-quiet: #15242e;
+  --sub-sage: #8fb795;
+  --sub-sage-quiet: #17251a;
+  --sub-amber: #d6aa5e;
+  --sub-amber-quiet: #292013;
+  --sub-terracotta: #de9078;
+  --sub-terracotta-quiet: #2c1b15;
+  --sub-plum: #c093c6;
+  --sub-plum-quiet: #241827;
+  --sub-teal: #6fb5af;
+  --sub-teal-quiet: #112524;
+  --sub-indigo: #949cdc;
+  --sub-indigo-quiet: #1a1d2e;
+  --sub-moss: #b0bc72;
+  --sub-moss-quiet: #20250f;
+  --sub-clay: #c79a82;
+  --sub-clay-quiet: #2a1e17;
+  --sub-slate: #9aa6b4;
+  --sub-slate-quiet: #1c2026;
+
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4), 0 2px 6px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 2px 4px rgb(0 0 0 / 0.35), 0 8px 20px rgb(0 0 0 / 0.45);
+  --shadow-lg: 0 4px 10px rgb(0 0 0 / 0.4), 0 24px 56px rgb(0 0 0 / 0.6);
+
+  --scrim: rgb(0 0 0 / 0.62);
+}
+
+@theme inline {
+  --font-display: 'Newsreader', ui-serif, Georgia, 'Times New Roman', serif;
+  --font-sans: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --color-canvas: var(--c-canvas);
+  --color-surface: var(--c-surface);
+  --color-raised: var(--c-raised);
+  --color-sunken: var(--c-sunken);
+
+  --color-ink: var(--c-ink);
+  --color-ink-2: var(--c-ink-2);
+  --color-ink-3: var(--c-ink-3);
+
+  --color-hairline: var(--c-hairline);
+  --color-hairline-strong: var(--c-hairline-strong);
+
+  --color-accent: var(--c-accent);
+  --color-accent-strong: var(--c-accent-strong);
+  --color-accent-ink: var(--c-accent-ink);
+  --color-accent-quiet: var(--c-accent-quiet);
+
+  --color-danger: var(--c-danger);
+  --color-danger-quiet: var(--c-danger-quiet);
+  --color-warn: var(--c-warn);
+  --color-warn-quiet: var(--c-warn-quiet);
+  --color-ok: var(--c-ok);
+  --color-ok-quiet: var(--c-ok-quiet);
+
+  /* Radios distintos por tamano de superficie: sin variacion no hay
+     jerarquia de profundidad. */
+  --radius-xs: 4px;
+  --radius-sm: 7px;
+  --radius-md: 11px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  /* Entrar rapido y frenar despacio. Nada de ease-in-out simetrico. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-std: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* ==========================================================================
+   BASE
+   ========================================================================== */
+
+@layer base {
+  * {
+    border-color: var(--c-hairline);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    margin: 0;
+    background: var(--c-canvas);
+    color: var(--c-ink);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Cuanto mas grande el texto, mas apretado el tracking. */
+  h1,
+  h2,
+  h3 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  /* Los numeros no deben bailar al actualizarse. */
+  input[type='number'] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background: var(--c-accent-quiet);
+    color: var(--c-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+
+  /* El scroll de la app vive en el area de contenido, no en el body. */
+  ::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--c-hairline-strong);
+    border: 3px solid var(--c-canvas);
+    border-radius: 99px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--c-ink-3);
+  }
+}
+
+/* ==========================================================================
+   UTILIDADES DE PROYECTO
+   ========================================================================== */
+
+@utility display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-optical-sizing: auto;
+}
+
+/* Cifras academicas: serif, tabulares y con altura de linea corta. */
+@utility numeral {
+  font-family: var(--font-display);
+  font-variant-numeric: lining-nums tabular-nums;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+@utility eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  color: var(--c-ink-3);
+}
+
+@utility hairline-t {
+  border-top: 1px solid var(--c-hairline);
+}
+
+/* Franja deslizable sin barra visible: la barra en una tira de cifras
+   estorba más de lo que orienta. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--radius-lg);
+}
+
+/* ==========================================================================
+   MOVIMIENTO
+   Recorridos cortos, salidas mas rapidas que entradas, y estado final
+   directo cuando el sistema pide menos movimiento.
+   ========================================================================== */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility animate-rise {
+  animation: rise 340ms var(--ease-out) both;
+}
+
+@utility animate-fade {
+  animation: fade 180ms var(--ease-std) both;
+}
+
+@utility animate-pop {
+  animation: pop 240ms var(--ease-out) both;
+}
+
+/* Stagger de 60ms: mas lento parece perezoso, sin stagger parece mecanico. */
+@utility stagger {
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
