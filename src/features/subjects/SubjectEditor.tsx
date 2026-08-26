@@ -4,6 +4,7 @@ import { Plus, Trash2, TriangleAlert, X } from 'lucide-react'
 import { defaultCategories } from '@/data/defaults'
 import { checkWeights } from '@/domain/grades'
 import { newId } from '@/domain/id'
+import { parseDecimal, parseDecimalOr, toDecimalInput } from '@/domain/number'
 import { SUBJECT_COLORS, colorVar, nextColor } from '@/domain/palette'
 import type { GradeCategory, Subject, SubjectColor } from '@/domain/types'
 import { useDispatch, useSettings } from '@/state/StoreProvider'
@@ -41,8 +42,8 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
     setColor(subject?.color ?? nextColor(existing.map((s) => s.color)))
     setTeacher(subject?.teacher ?? '')
     setRoom(subject?.room ?? '')
-    setWeight(String(subject?.weight ?? 4))
-    setTarget(subject?.targetGrade !== undefined ? String(subject.targetGrade) : '')
+    setWeight(toDecimalInput(subject?.weight ?? 4))
+    setTarget(toDecimalInput(subject?.targetGrade))
     setCategories(subject ? subject.categories.map((c) => ({ ...c })) : defaultCategories())
     setError(null)
     // `existing` cambia con cada guardado; incluirlo reiniciaría el formulario
@@ -61,8 +62,8 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
       return
     }
 
-    const parsedWeight = Number.parseFloat(weight.replace(',', '.'))
-    const parsedTarget = Number.parseFloat(target.replace(',', '.'))
+    const parsedWeight = parseDecimal(weight)
+    const parsedTarget = parseDecimal(target)
 
     const payload = {
       name: name.trim(),
@@ -256,7 +257,7 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
                           setCategories((prev) =>
                             prev.map((c) =>
                               c.id === category.id
-                                ? { ...c, weight: Number.parseFloat(e.target.value) || 0 }
+                                ? { ...c, weight: parseDecimalOr(e.target.value, 0) }
                                 : c,
                             ),
                           )

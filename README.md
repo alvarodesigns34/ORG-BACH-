@@ -16,6 +16,8 @@ npm run dev      # desarrollo en http://localhost:5173
 npm run build    # compila a dist/
 npm run preview  # sirve lo compilado
 npm run lint     # comprueba tipos (tsc --noEmit)
+npm test         # pruebas del motor de notas (runner de Node, sin dependencias)
+npm run check    # tipos + pruebas
 ```
 
 ## Estado por fases
@@ -24,13 +26,14 @@ npm run lint     # comprueba tipos (tsc --noEmit)
 |---|---|---|
 | 1 · Fundación | Arquitectura, sistema visual, temas, navegación, responsive, persistencia, alta inicial | Hecha |
 | 2 · Productividad | Tareas, subtareas, prioridades, calendario, exámenes, asignaturas | Hecha |
-| 3 · Académico | Notas, categorías de peso, medias ponderadas, calculadora de nota, evaluaciones | Pendiente |
+| 3 · Académico | Notas, categorías de peso, medias ponderadas, calculadora de nota, evaluaciones | Hecha |
 | 4 · Análisis | Estadísticas, gráficos, sesiones de estudio, objetivos | Pendiente |
 | 5 · Pulido | Microinteracciones, accesibilidad avanzada, optimización | Pendiente |
 
-El motor de cálculo de notas (`src/domain/grades.ts`) ya está escrito y probado
-contra los casos difíciles; lo que falta de la fase 3 es la interfaz para
-introducir las notas.
+El motor de cálculo (`src/domain/grades.ts`) está cubierto por 55 pruebas que
+recorren los casos que rompen este tipo de aplicaciones: pesos que no suman
+100, escalas distintas del 10, categorías todavía sin evaluar y objetivos
+imposibles.
 
 ## Arquitectura
 
@@ -44,6 +47,7 @@ src/
 │   ├── tasks.ts       Agrupación, orden, filtrado, progreso de subtareas
 │   ├── alerts.ts      Detección de situaciones que merecen aviso
 │   ├── dates.ts       Fechas en español, sin errores de zona horaria
+│   ├── number.ts      Lectura de números con coma decimal
 │   └── palette.ts     Claves de color de asignatura
 │
 ├── storage/       Persistencia. Único módulo que toca localStorage.
@@ -76,6 +80,20 @@ típicos de este tipo de aplicaciones:
 
 Cada asignatura define su propio reparto de categorías: no se asume que todas
 evalúen igual.
+
+**La calculadora** responde a las dos preguntas reales: «¿qué nota necesito en
+lo que queda para llegar a mi objetivo?» y «si saco un 8,5 en el próximo
+examen, ¿con qué media acabo?». Cuando el objetivo se sale de la escala lo dice
+en vez de devolver un número imposible, e indica a cuánto se llegaría como
+máximo.
+
+### La coma decimal
+
+En España se escribe «8,5», y `Number.parseFloat('8,5')` devuelve **8**: se
+come el decimal en silencio. Por eso los campos numéricos no usan
+`type="number"` —que además rechaza la coma en la mayoría de navegadores— sino
+`type="text"` con `inputMode="decimal"`, y todo lo tecleado pasa por
+`parseDecimal` (`src/domain/number.ts`).
 
 ## Datos
 

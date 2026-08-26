@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Download, RotateCcw, Upload } from 'lucide-react'
 
 import { createEmptyData } from '@/data/defaults'
+import { parseDecimalOr } from '@/domain/number'
 import { TERMS, type AverageMode, type TermId } from '@/domain/types'
 import { useDispatch, useSettings, useStore } from '@/state/StoreProvider'
 import * as storage from '@/storage/persistence'
@@ -160,7 +161,7 @@ export function SettingsView() {
                     update({
                       gradeScale: {
                         ...settings.gradeScale,
-                        max: Number.parseFloat(e.target.value) || 10,
+                        max: parseDecimalOr(e.target.value, 10),
                       },
                     })
                   }
@@ -179,7 +180,7 @@ export function SettingsView() {
                     update({
                       gradeScale: {
                         ...settings.gradeScale,
-                        pass: Number.parseFloat(e.target.value) || 5,
+                        pass: parseDecimalOr(e.target.value, 5),
                       },
                     })
                   }
@@ -251,7 +252,7 @@ export function SettingsView() {
                     className="max-w-[12rem]"
                     value={settings.examAlertDays}
                     onChange={(e) =>
-                      update({ examAlertDays: Number.parseInt(e.target.value, 10) || 7 })
+                      update({ examAlertDays: Math.round(parseDecimalOr(e.target.value, 7)) })
                     }
                   />
                 )}

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 
 import { today as todayISO } from '@/domain/dates'
+import { parseDecimal, toDecimalInput } from '@/domain/number'
 import { TERMS, type Exam, type TermId } from '@/domain/types'
 import { useDispatch, useSettings } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
@@ -53,7 +54,7 @@ export function ExamEditor({ open, onClose, exam, defaults }: ExamEditorProps) {
       date: source?.date ?? presets?.date ?? todayISO(),
       time: source?.time ?? '',
       topics: source?.topics ?? '',
-      weight: source?.weight ? String(source.weight) : '',
+      weight: source?.weight ? toDecimalInput(source.weight) : '',
       term: source?.term ?? activeTerm,
     }
   }
@@ -71,7 +72,7 @@ export function ExamEditor({ open, onClose, exam, defaults }: ExamEditorProps) {
       return
     }
 
-    const weight = Number.parseFloat(form.weight.replace(',', '.'))
+    const weight = parseDecimal(form.weight)
     const payload = {
       subjectId: form.subjectId,
       title: form.title.trim(),

@@ -5,7 +5,7 @@ import { daysUntil, formatShort } from '@/domain/dates'
 import { formatGrade, numeralTone } from '@/domain/grades'
 import { colorVar, quietVar } from '@/domain/palette'
 import { isDone } from '@/domain/tasks'
-import type { Subject } from '@/domain/types'
+import { hrefFor } from '@/router'
 import { useSettings, useStore, useToday } from '@/state/StoreProvider'
 import { useSubjectResults, useSubjects } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
@@ -19,7 +19,6 @@ export function SubjectsView() {
   const subjects = useSubjects()
   const results = useSubjectResults(settings.activeTerm)
 
-  const [editing, setEditing] = useState<Subject | null>(null)
   const [creating, setCreating] = useState(false)
 
   return (
@@ -65,10 +64,9 @@ export function SubjectsView() {
               .sort((a, b) => a.date.localeCompare(b.date))[0]
 
             return (
-              <button
+              <a
                 key={subject.id}
-                type="button"
-                onClick={() => setEditing(subject)}
+                href={hrefFor('asignaturas', { id: subject.id })}
                 style={{ '--i': i } as React.CSSProperties}
                 className={cx(
                   'animate-rise stagger group relative text-left',
@@ -165,14 +163,13 @@ export function SubjectsView() {
                     </div>
                   </dl>
                 </div>
-              </button>
+              </a>
             )
           })}
         </div>
       )}
 
       <SubjectEditor open={creating} onClose={() => setCreating(false)} />
-      <SubjectEditor open={!!editing} subject={editing} onClose={() => setEditing(null)} />
     </Page>
   )
 }

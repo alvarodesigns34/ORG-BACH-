@@ -51,7 +51,7 @@ export type Action =
   | { type: 'subtask/toggle'; taskId: ID; subtaskId: ID }
   | { type: 'subtask/rename'; taskId: ID; subtaskId: ID; title: string }
   | { type: 'subtask/remove'; taskId: ID; subtaskId: ID }
-  | { type: 'grade/add'; grade: New<GradeEntry> }
+  | { type: 'grade/add'; grade: New<GradeEntry>; linkExamId?: ID }
   | { type: 'grade/update'; id: ID; patch: Partial<GradeEntry> }
   | { type: 'grade/remove'; id: ID }
   | { type: 'exam/add'; exam: New<Exam> }
@@ -303,6 +303,11 @@ export function reducer(state: AppData, action: Action): AppData {
       return {
         ...state,
         grades: [...state.grades, grade],
+        // El enlace con el examen se resuelve aquí porque es aquí donde se
+        // genera el identificador: la vista no puede conocerlo de antemano.
+        exams: action.linkExamId
+          ? patchById(state.exams, action.linkExamId, { gradeEntryId: grade.id })
+          : state.exams,
         activity: logActivity(
           state,
           'nota_anadida',

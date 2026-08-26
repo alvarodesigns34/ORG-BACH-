@@ -7,6 +7,7 @@ import type {
 } from 'react'
 import { Check } from 'lucide-react'
 
+import { sanitizeNumericInput } from '@/domain/number'
 import { cx } from './primitives'
 
 /** Estilo común a todo control de formulario, para que no deriven entre sí. */
@@ -122,18 +123,36 @@ export function Select({
   )
 }
 
-/** Campo numérico con paso y unidad opcional a la derecha. */
+/**
+ * Campo numérico con unidad opcional a la derecha.
+ *
+ * Deliberadamente NO usa `type="number"`: ese control rechaza la coma decimal
+ * en la mayoría de navegadores, y en España «8,5» es la forma natural de
+ * escribir una nota. Con `type="text"` e `inputMode="decimal"` el teclado del
+ * móvil sigue siendo numérico, la coma se acepta y `parseDecimal` la entiende.
+ */
 export function NumberInput({
   className,
   suffix,
+  onChange,
+  // `step` solo tiene efecto en type="number"; se descarta para no dejar un
+  // atributo que promete un comportamiento que no existe.
+  step: _step,
   ...props
 }: InputHTMLAttributes<HTMLInputElement> & { suffix?: string }) {
   return (
     <div className="relative">
       <input
-        type="number"
+        type="text"
         inputMode="decimal"
+        autoComplete="off"
         className={cx(CONTROL, 'h-10 tabular-nums', suffix && 'pr-10', className)}
+        onChange={(event) => {
+          if (!onChange) return
+          const cleaned = sanitizeNumericInput(event.target.value)
+          if (cleaned !== event.target.value) event.target.value = cleaned
+          onChange(event)
+        }}
         {...props}
       />
       {suffix && (

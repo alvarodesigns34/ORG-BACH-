@@ -1,11 +1,11 @@
-import { ArrowRight, GraduationCap, Target, Timer, TrendingUp } from 'lucide-react'
+import { ArrowRight, Target, Timer, TrendingUp } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import { hrefFor, type RouteId } from '@/router'
 import { Page, PageHeader } from '@/layout/AppShell'
 import { Card, cx } from '@/ui/primitives'
 
-type UpcomingId = 'notas' | 'estadisticas' | 'estudio' | 'objetivos'
+type UpcomingId = 'estadisticas' | 'estudio' | 'objetivos'
 
 interface SectionSpec {
   title: string
@@ -27,21 +27,6 @@ interface SectionSpec {
  * no existe.
  */
 const SECTIONS: Record<UpcomingId, SectionSpec> = {
-  notas: {
-    title: 'Notas',
-    phase: 'Fase 3',
-    icon: GraduationCap,
-    summary:
-      'El registro de calificaciones con medias ponderadas y la calculadora de «qué nota necesito».',
-    features: [
-      'Registrar cada nota con su tipo, su peso y su evaluación',
-      'Media ponderada por asignatura, respetando el reparto que configures',
-      'Calculadora: qué nota necesitas en lo que queda para llegar a tu objetivo',
-      'Simulador: con qué media acabarías si sacas una nota concreta',
-      'Medias por evaluación y nota final del curso',
-    ],
-    meanwhile: { label: 'Configurar el reparto de pesos de cada asignatura', route: 'asignaturas' },
-  },
   estadisticas: {
     title: 'Estadísticas',
     phase: 'Fase 4',

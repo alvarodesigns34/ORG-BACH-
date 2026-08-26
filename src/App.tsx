@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSettings, useStore } from '@/state/StoreProvider'
 import { StoreProvider } from '@/state/StoreProvider'
 import { useTaskSummary } from '@/state/selectors'
-import { useRoute, type RouteId } from '@/router'
+import { useRoute, type Route, type RouteId } from '@/router'
 import { AppShell } from '@/layout/AppShell'
 import { TaskEditor } from '@/features/tasks/TaskEditor'
 import { Onboarding } from '@/features/onboarding/Onboarding'
@@ -11,6 +11,8 @@ import { DashboardView } from '@/views/DashboardView'
 import { TasksView } from '@/views/TasksView'
 import { CalendarView } from '@/views/CalendarView'
 import { SubjectsView } from '@/views/SubjectsView'
+import { SubjectDetailView } from '@/views/SubjectDetailView'
+import { GradesView } from '@/views/GradesView'
 import { SettingsView } from '@/views/SettingsView'
 import { UpcomingView } from '@/views/UpcomingView'
 
@@ -58,7 +60,7 @@ function Shell() {
   return (
     <>
       <AppShell current={route.id} onCreate={openCreate} badges={badges}>
-        {renderRoute(route.id, data.subjects.length)}
+        {renderRoute(route, data.subjects.length)}
       </AppShell>
 
       <TaskEditor open={creating} onClose={() => setCreating(false)} />
@@ -66,19 +68,23 @@ function Shell() {
   )
 }
 
-function renderRoute(id: RouteId, subjectCount: number) {
-  switch (id) {
+function renderRoute(route: Route, subjectCount: number) {
+  switch (route.id) {
     case 'tareas':
       return <TasksView />
     case 'calendario':
       return <CalendarView />
-    case 'asignaturas':
-      return <SubjectsView />
+    case 'asignaturas': {
+      // '#/asignaturas?id=…' abre la ficha de una asignatura concreta.
+      const id = route.params.get('id')
+      return id ? <SubjectDetailView subjectId={id} /> : <SubjectsView />
+    }
     case 'notas':
+      return <GradesView />
     case 'estadisticas':
     case 'estudio':
     case 'objetivos':
-      return <UpcomingView section={id} />
+      return <UpcomingView section={route.id} />
     case 'ajustes':
       return <SettingsView />
     case 'inicio':

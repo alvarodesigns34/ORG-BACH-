@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { GripVertical, Plus, Trash2, X } from 'lucide-react'
 
 import { newId } from '@/domain/id'
+import { parseDecimalOr } from '@/domain/number'
 import { PRIORITIES, TASK_STATUSES, type Priority, type Subtask, type Task, type TaskStatus } from '@/domain/types'
 import { useDispatch } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
@@ -88,7 +89,7 @@ export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
       return
     }
 
-    const minutes = Number.parseInt(form.estimatedMinutes, 10)
+    const minutes = Math.round(parseDecimalOr(form.estimatedMinutes, 0))
     const payload = {
       title,
       description: form.description.trim() || undefined,

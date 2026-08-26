@@ -9,6 +9,8 @@ interface ExamCardProps {
   subject?: Subject
   today: string
   onOpen?: (exam: Exam) => void
+  /** Dentro de la ficha de una asignatura, repetir su nombre sobra. */
+  hideSubject?: boolean
 }
 
 /**
@@ -19,7 +21,7 @@ interface ExamCardProps {
  * lista sin leer, y la urgencia se marca también con peso tipográfico, no
  * solo con color.
  */
-export function ExamCard({ exam, subject, today, onOpen }: ExamCardProps) {
+export function ExamCard({ exam, subject, today, onOpen, hideSubject }: ExamCardProps) {
   const days = daysUntil(exam.date, today)
   const urgent = days <= 2
   const soon = days <= 6
@@ -45,13 +47,15 @@ export function ExamCard({ exam, subject, today, onOpen }: ExamCardProps) {
       />
 
       <div className="flex-1 min-w-0">
-        <p
-          className="eyebrow truncate"
-          style={subject ? { color: colorVar(subject.color) } : undefined}
-        >
-          {subject?.name ?? 'Sin asignatura'}
-        </p>
-        <p className="text-[0.9375rem] text-ink font-medium leading-snug mt-1 truncate">
+        {!hideSubject && (
+          <p
+            className="eyebrow truncate"
+            style={subject ? { color: colorVar(subject.color) } : undefined}
+          >
+            {subject?.name ?? 'Sin asignatura'}
+          </p>
+        )}
+        <p className={cx('text-[0.9375rem] text-ink font-medium leading-snug truncate', !hideSubject && 'mt-1')}>
           {exam.title}
         </p>
         <p className="text-[0.75rem] text-ink-3 mt-1 tabular-nums">
