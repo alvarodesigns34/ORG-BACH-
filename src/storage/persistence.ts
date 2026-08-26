@@ -13,6 +13,7 @@
 
 import { createEmptyData, SCHEMA_VERSION, STORAGE_KEY } from '@/data/defaults'
 import { DEFAULT_SETTINGS } from '@/data/defaults'
+import type { TimerState } from '@/domain/study'
 import type { AppData } from '@/domain/types'
 
 export type LoadOutcome =
@@ -116,6 +117,40 @@ export function clear(): void {
     localStorage.removeItem(STORAGE_KEY)
   } catch {
     // Si no se puede borrar, el siguiente guardado sobrescribirá igualmente.
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Temporizador en marcha
+// ---------------------------------------------------------------------------
+
+/**
+ * El temporizador vive aparte de los datos académicos.
+ *
+ * Es estado efímero de una sesión concreta, no algo que tenga sentido exportar
+ * ni migrar. Guardarlo, en cambio, sí importa: recargar la página sin querer a
+ * los cuarenta minutos no debería perder la sesión.
+ */
+const TIMER_KEY = 'bachillerato-os:timer'
+
+export function loadTimer(): TimerState | null {
+  try {
+    const raw = localStorage.getItem(TIMER_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as TimerState
+    // Comprobación mínima: sin `mode` no es un temporizador utilizable.
+    return parsed && typeof parsed === 'object' && 'mode' in parsed ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+export function saveTimer(state: TimerState | null): void {
+  try {
+    if (state) localStorage.setItem(TIMER_KEY, JSON.stringify(state))
+    else localStorage.removeItem(TIMER_KEY)
+  } catch {
+    // Sin almacenamiento el temporizador sigue funcionando en memoria.
   }
 }
 

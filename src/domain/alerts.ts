@@ -6,11 +6,11 @@
  * arreglar hoy. Nada de "tienes 12 tareas" cuando 12 tareas es lo normal.
  */
 
-import { daysUntil, formatDuration, relativeDay } from './dates'
-import { formatGrade } from './grades'
-import type { SubjectResult } from './grades'
-import { isOverdue } from './tasks'
-import type { DateISO, Exam, GradeScale, Subject, Task } from './types'
+import { daysUntil, formatDuration, relativeDay } from './dates.ts'
+import { formatGrade } from './grades.ts'
+import type { SubjectResult } from './grades.ts'
+import { isOverdue } from './tasks.ts'
+import type { DateISO, Exam, GradeScale, Subject, Task } from './types.ts'
 
 export type AlertLevel = 'critico' | 'aviso' | 'info'
 

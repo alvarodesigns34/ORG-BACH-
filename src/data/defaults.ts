@@ -7,6 +7,7 @@
  */
 
 import { DEFAULT_SCALE } from '@/domain/grades'
+import { DEFAULT_POMODORO } from '@/domain/study'
 import type { AppData, GradeCategory, Settings, SubjectColor } from '@/domain/types'
 import { newId } from '@/domain/id'
 
@@ -35,6 +36,9 @@ export const DEFAULT_SETTINGS: Settings = {
   activeTerm: 'T1',
   alertsEnabled: true,
   examAlertDays: 7,
+  pomodoroMinutes: DEFAULT_POMODORO.workMinutes,
+  pomodoroBreakMinutes: DEFAULT_POMODORO.breakMinutes,
+  pomodoroSound: true,
   onboarded: false,
 }
 

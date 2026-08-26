@@ -13,8 +13,10 @@ import { CalendarView } from '@/views/CalendarView'
 import { SubjectsView } from '@/views/SubjectsView'
 import { SubjectDetailView } from '@/views/SubjectDetailView'
 import { GradesView } from '@/views/GradesView'
+import { StatsView } from '@/views/StatsView'
+import { StudyView } from '@/views/StudyView'
+import { GoalsView } from '@/views/GoalsView'
 import { SettingsView } from '@/views/SettingsView'
-import { UpcomingView } from '@/views/UpcomingView'
 
 export function App() {
   return (
@@ -82,9 +84,11 @@ function renderRoute(route: Route, subjectCount: number) {
     case 'notas':
       return <GradesView />
     case 'estadisticas':
+      return <StatsView />
     case 'estudio':
+      return <StudyView />
     case 'objetivos':
-      return <UpcomingView section={route.id} />
+      return <GoalsView />
     case 'ajustes':
       return <SettingsView />
     case 'inicio':

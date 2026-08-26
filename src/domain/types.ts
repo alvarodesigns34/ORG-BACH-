@@ -293,6 +293,12 @@ export interface Settings {
   alertsEnabled: boolean
   /** Dias de antelacion con los que avisar de un examen. */
   examAlertDays: number
+  /** Duración de un tramo de trabajo del pomodoro, en minutos. */
+  pomodoroMinutes: number
+  /** Duración del descanso entre pomodoros, en minutos. */
+  pomodoroBreakMinutes: number
+  /** Aviso sonoro al terminar un tramo del pomodoro. */
+  pomodoroSound: boolean
   onboarded: boolean
 }
 

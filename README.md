@@ -27,13 +27,13 @@ npm run check    # tipos + pruebas
 | 1 · Fundación | Arquitectura, sistema visual, temas, navegación, responsive, persistencia, alta inicial | Hecha |
 | 2 · Productividad | Tareas, subtareas, prioridades, calendario, exámenes, asignaturas | Hecha |
 | 3 · Académico | Notas, categorías de peso, medias ponderadas, calculadora de nota, evaluaciones | Hecha |
-| 4 · Análisis | Estadísticas, gráficos, sesiones de estudio, objetivos | Pendiente |
+| 4 · Análisis | Estadísticas, gráficos, sesiones de estudio, objetivos | Hecha |
 | 5 · Pulido | Microinteracciones, accesibilidad avanzada, optimización | Pendiente |
 
-El motor de cálculo (`src/domain/grades.ts`) está cubierto por 55 pruebas que
-recorren los casos que rompen este tipo de aplicaciones: pesos que no suman
-100, escalas distintas del 10, categorías todavía sin evaluar y objetivos
-imposibles.
+La lógica de dominio está cubierta por 88 pruebas que recorren los casos que
+rompen este tipo de aplicaciones: pesos que no suman 100, escalas distintas
+del 10, categorías todavía sin evaluar, objetivos imposibles, la coma decimal
+española y un temporizador que no se desvía en segundo plano.
 
 ## Arquitectura
 
@@ -48,6 +48,9 @@ src/
 │   ├── alerts.ts      Detección de situaciones que merecen aviso
 │   ├── dates.ts       Fechas en español, sin errores de zona horaria
 │   ├── number.ts      Lectura de números con coma decimal
+│   ├── study.ts       Temporizador y pomodoro
+│   ├── stats.ts       Evolución, rankings y reparto del tiempo
+│   ├── goals.ts       Progreso de objetivos
 │   └── palette.ts     Claves de color de asignatura
 │
 ├── storage/       Persistencia. Único módulo que toca localStorage.
@@ -94,6 +97,37 @@ come el decimal en silencio. Por eso los campos numéricos no usan
 `type="number"` —que además rechaza la coma en la mayoría de navegadores— sino
 `type="text"` con `inputMode="decimal"`, y todo lo tecleado pasa por
 `parseDecimal` (`src/domain/number.ts`).
+
+### El temporizador
+
+El estado guarda **marcas de tiempo**, no un contador que se incrementa. Un
+contador con `setInterval` se retrasa en cuanto la pestaña pasa a segundo plano
+—los navegadores lo estrangulan— y una sesión de 50 minutos acabaría
+registrando 35. Con marcas de reloj no hay desvío, el intervalo solo repinta, y
+recargar la página sin querer no pierde la sesión.
+
+Los descansos no cuentan como estudio, y la sesión se registra con su hora de
+**inicio**, para que caiga en el día en que se empezó aunque termine pasada la
+medianoche.
+
+### Los gráficos
+
+Dibujados a mano en SVG, sin librería. Una regla los gobierna: **el color no
+identifica nada**. La paleta de asignaturas está pensada para puntos pequeños
+en una interfaz densa y no separa lo suficiente como para distinguir diez
+series de un gráfico —lo confirma el validador de contraste—, así que cada
+barra lleva su nombre escrito al lado y todas comparten tono, salvo cuando el
+tono significa algo (aprobado, suspenso). Diez colores para diez barras ya
+etiquetadas serían diez colores que no informan.
+
+Cada gráfico incluye además una tabla equivalente para lectores de pantalla.
+
+### Los objetivos
+
+El progreso sale de los datos reales; solo los de tipo «manual» se actualizan a
+mano. Los de **nota media** muestran cuánto falta en lugar de un porcentaje:
+decir que un 8,09 es «el 90 %» de un objetivo de 9 da a entender que se parte
+de cero, cuando el punto de partida real es el aprobado.
 
 ## Datos
 

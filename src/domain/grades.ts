@@ -23,7 +23,7 @@ import type {
   ID,
   Subject,
   TermId,
-} from './types'
+} from './types.ts'
 
 export const DEFAULT_SCALE: GradeScale = { max: 10, pass: 5, decimals: 2 }
 

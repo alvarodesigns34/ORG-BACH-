@@ -7,7 +7,7 @@
  * `parseDay` construye la fecha componente a componente.
  */
 
-import type { DateISO, TimeHM } from './types'
+import type { DateISO, TimeHM } from './types.ts'
 
 export const WEEKDAYS_LONG = [
   'domingo',

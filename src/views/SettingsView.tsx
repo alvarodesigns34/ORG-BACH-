@@ -261,6 +261,53 @@ export function SettingsView() {
           </div>
         </Card>
 
+        {/* --- Estudio --- */}
+        <Card>
+          <SectionHeader
+            title="Temporizador de estudio"
+            hint="Duraciones del pomodoro."
+            className="mb-5"
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Tramo de trabajo">
+              {({ id }) => (
+                <NumberInput
+                  id={id}
+                  min={5}
+                  max={120}
+                  suffix="min"
+                  value={settings.pomodoroMinutes}
+                  onChange={(e) =>
+                    update({ pomodoroMinutes: Math.round(parseDecimalOr(e.target.value, 25)) })
+                  }
+                />
+              )}
+            </Field>
+            <Field label="Descanso">
+              {({ id }) => (
+                <NumberInput
+                  id={id}
+                  min={1}
+                  max={60}
+                  suffix="min"
+                  value={settings.pomodoroBreakMinutes}
+                  onChange={(e) =>
+                    update({ pomodoroBreakMinutes: Math.round(parseDecimalOr(e.target.value, 5)) })
+                  }
+                />
+              )}
+            </Field>
+          </div>
+          <div className="mt-5 pt-5 border-t border-hairline">
+            <Switch
+              checked={settings.pomodoroSound}
+              onChange={(pomodoroSound) => update({ pomodoroSound })}
+              label="Aviso sonoro al terminar un tramo"
+              description="Dos tonos cortos, para enterarte con la pestaña de fondo."
+            />
+          </div>
+        </Card>
+
         {/* --- Datos --- */}
         <Card>
           <SectionHeader

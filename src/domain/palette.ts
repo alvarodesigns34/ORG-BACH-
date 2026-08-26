@@ -6,7 +6,7 @@
  * no decora, y siempre va acompañado del nombre o la abreviatura.
  */
 
-import type { SubjectColor } from './types'
+import type { SubjectColor } from './types.ts'
 
 export const SUBJECT_COLORS: { id: SubjectColor; label: string }[] = [
   { id: 'indigo', label: 'Índigo' },

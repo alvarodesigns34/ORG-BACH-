@@ -3,9 +3,9 @@
  * Nada de esto se guarda: se calcula a partir de las tareas y de la fecha.
  */
 
-import { daysUntil, today as todayISO } from './dates'
-import type { DateISO, Priority, Task, TaskStatus } from './types'
-import { PRIORITIES } from './types'
+import { daysUntil, today as todayISO } from './dates.ts'
+import type { DateISO, Priority, Task, TaskStatus } from './types.ts'
+import { PRIORITIES } from './types.ts'
 
 export type TaskBucket = 'atrasada' | 'hoy' | 'manana' | 'proxima' | 'sin_fecha' | 'completada'
 
