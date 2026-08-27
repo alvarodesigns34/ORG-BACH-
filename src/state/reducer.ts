@@ -154,8 +154,32 @@ export function reducer(state: AppData, action: Action): AppData {
       return { ...state, subjects: [...state.subjects, ...subjects] }
     }
 
-    case 'subject/update':
-      return { ...state, subjects: patchById(state.subjects, action.id, action.patch) }
+    case 'subject/update': {
+      const patched = patchById(state.subjects, action.id, action.patch)
+      const updated = patched.find((s) => s.id === action.id)
+      if (!updated) return { ...state, subjects: patched }
+
+      // La abreviatura se deriva aquí igual que al crear. El editor manda ''
+      // cuando se deja el campo en blanco, y sin esto la insignia de la ficha
+      // se quedaba vacía: solo el alta la rellenaba.
+      const subjects = updated.shortName
+        ? patched
+        : patched.map((s) =>
+            s.id === action.id ? { ...s, shortName: deriveShortName(s.name) } : s,
+          )
+
+      // Si la edición se ha llevado categorías por delante, sus notas
+      // apuntaban a un id que ya no existe. Se sueltan a «sin categoría», que
+      // es un estado que el cálculo sabe tratar; un id fantasma, no.
+      const liveIds = new Set(updated.categories.map((c) => c.id))
+      const grades = state.grades.map((g) =>
+        g.subjectId === action.id && g.categoryId && !liveIds.has(g.categoryId)
+          ? { ...g, categoryId: null }
+          : g,
+      )
+
+      return { ...state, subjects, grades }
+    }
 
     case 'subject/remove':
       // Al borrar una asignatura se borra su rastro académico (notas y

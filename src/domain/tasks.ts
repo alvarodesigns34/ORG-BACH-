@@ -186,8 +186,8 @@ function matchesQuery(task: Task, query: string): boolean {
   return haystack.includes(needle)
 }
 
-function matchesView(task: Task, view: TaskView, today: DateISO): boolean {
-  const bucket = bucketOf(task, today)
+function matchesView(task: Task, view: TaskView, today: DateISO, now: number): boolean {
+  const bucket = bucketOf(task, today, now)
   switch (view) {
     case 'hoy':
       // "Hoy" incluye lo atrasado: si no, lo que se te pasó desaparece del radar.
@@ -208,9 +208,10 @@ export function filterTasks(
   tasks: Task[],
   filters: TaskFilters,
   today: DateISO = todayISO(),
+  now: number = Date.now(),
 ): Task[] {
   return tasks.filter((task) => {
-    if (!matchesView(task, filters.view, today)) return false
+    if (!matchesView(task, filters.view, today, now)) return false
     if (filters.subjectId && task.subjectId !== filters.subjectId) return false
     if (filters.priority && task.priority !== filters.priority) return false
     if (filters.status && task.status !== filters.status) return false
@@ -219,13 +220,17 @@ export function filterTasks(
   })
 }
 
-export function countByView(tasks: Task[], today: DateISO = todayISO()): Record<TaskView, number> {
+export function countByView(
+  tasks: Task[],
+  today: DateISO = todayISO(),
+  now: number = Date.now(),
+): Record<TaskView, number> {
   return {
-    todas: tasks.filter((t) => matchesView(t, 'todas', today)).length,
-    hoy: tasks.filter((t) => matchesView(t, 'hoy', today)).length,
-    proximas: tasks.filter((t) => matchesView(t, 'proximas', today)).length,
-    atrasadas: tasks.filter((t) => matchesView(t, 'atrasadas', today)).length,
-    completadas: tasks.filter((t) => matchesView(t, 'completadas', today)).length,
+    todas: tasks.filter((t) => matchesView(t, 'todas', today, now)).length,
+    hoy: tasks.filter((t) => matchesView(t, 'hoy', today, now)).length,
+    proximas: tasks.filter((t) => matchesView(t, 'proximas', today, now)).length,
+    atrasadas: tasks.filter((t) => matchesView(t, 'atrasadas', today, now)).length,
+    completadas: tasks.filter((t) => matchesView(t, 'completadas', today, now)).length,
   }
 }
 

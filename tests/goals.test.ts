@@ -234,3 +234,61 @@ describe('casos límite', () => {
     assert.equal(progress.percent, 100)
   })
 })
+
+describe('objetivo de media que fija su evaluación', () => {
+  const resultFor = (average: number) =>
+    new Map([
+      [
+        'mat',
+        {
+          subjectId: 'mat',
+          average,
+          evaluatedPercent: 100,
+          categories: [],
+          entryCount: 1,
+          warnings: [],
+          weightsDeclared: true,
+        },
+      ],
+    ])
+
+  const ctx = makeContext({
+    // La activa es la segunda, y va peor que la primera.
+    results: resultFor(4),
+    globalAverage: 4,
+    termResults: (term) =>
+      term === 'T1'
+        ? { results: resultFor(9), average: 9 }
+        : { results: resultFor(4), average: 4 },
+  })
+
+  it('mide la suya, no la que esté activa en Ajustes', () => {
+    // Sin esto, cambiar de evaluación reescribía en silencio lo que medían
+    // TODOS los objetivos trimestrales ya creados.
+    const goal = makeGoal({ kind: 'media', scope: 'trimestral', target: 8, term: 'T1' })
+    assert.equal(goalProgress(goal, ctx).current, 9)
+    assert.equal(goalProgress(goal, ctx).done, true)
+  })
+
+  it('sin evaluación fijada sigue a la activa', () => {
+    const goal = makeGoal({ kind: 'media', scope: 'trimestral', target: 8 })
+    assert.equal(goalProgress(goal, ctx).current, 4)
+  })
+
+  it('también con una asignatura concreta', () => {
+    const goal = makeGoal({
+      kind: 'media',
+      scope: 'trimestral',
+      target: 8,
+      term: 'T1',
+      subjectId: 'mat',
+    })
+    assert.equal(goalProgress(goal, ctx).current, 9)
+  })
+
+  it('un objetivo de curso ignora la evaluación fijada', () => {
+    const anual = makeGoal({ kind: 'media', scope: 'anual', target: 8, term: 'T1' })
+    const withCourse = makeContext({ ...ctx, courseAverage: 6.5 })
+    assert.equal(goalProgress(anual, withCourse).current, 6.5)
+  })
+})

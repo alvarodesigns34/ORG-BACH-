@@ -35,6 +35,8 @@ export function Modal({
   size = 'md',
 }: ModalProps) {
   const panel = useRef<HTMLDivElement>(null)
+  const content = useRef<HTMLDivElement>(null)
+  const actions = useRef<HTMLElement>(null)
   const restoreFocus = useRef<HTMLElement | null>(null)
   const titleId = useId()
   const descId = useId()
@@ -46,7 +48,17 @@ export function Modal({
 
     const node = panel.current
     if (node) {
-      const first = node.querySelector<HTMLElement>(FOCUSABLE)
+      // El orden importa. El botón de cerrar vive en la cabecera, así que es
+      // el primer elemento enfocable del panel y se llevaba el foco siempre:
+      // abrir «Nueva tarea» y empezar a escribir no escribía en ningún sitio,
+      // y el `autoFocus` del primer campo no servía de nada porque este efecto
+      // corre después. Se busca primero en el cuerpo (el primer campo del
+      // formulario) y luego en las acciones (en una confirmación, «Cancelar»,
+      // que es la salida segura). Cerrar queda como último recurso.
+      const first =
+        content.current?.querySelector<HTMLElement>(FOCUSABLE) ??
+        actions.current?.querySelector<HTMLElement>(FOCUSABLE) ??
+        node.querySelector<HTMLElement>(FOCUSABLE)
       // Sin nada enfocable, el propio panel recibe el foco para que las
       // teclas de navegación no se queden actuando sobre la página de detrás.
       ;(first ?? node).focus({ preventScroll: true })
@@ -150,10 +162,13 @@ export function Modal({
           </IconButton>
         </header>
 
-        <div className="overflow-y-auto px-5 sm:px-6 py-5 grow">{children}</div>
+        <div ref={content} className="overflow-y-auto px-5 sm:px-6 py-5 grow">
+          {children}
+        </div>
 
         {footer && (
           <footer
+            ref={actions}
             className={cx(
               'flex items-center justify-end gap-2 px-5 sm:px-6 py-4 shrink-0',
               'border-t border-hairline bg-surface',
@@ -207,7 +222,7 @@ export function ConfirmDialog({
             Cancelar
           </Button>
           <Button
-            variant={destructive ? 'primary' : 'primary'}
+            variant="primary"
             onClick={onConfirm}
             className={destructive ? 'bg-danger hover:bg-danger text-white hover:brightness-110' : undefined}
           >

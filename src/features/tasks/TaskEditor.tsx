@@ -57,13 +57,20 @@ export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
 
   // Al abrir con otra tarea (o al pasar de editar a crear) el formulario se
   // rehace: reutilizar el estado anterior mostraría datos de la tarea previa.
+  // `defaults` llega casi siempre como objeto literal en la llamada
+  // (`defaults={{ date: … }}`), así que cambia de identidad en CADA render del
+  // proveedor. Si entrara en las dependencias tal cual, cualquier tic del
+  // estado —o el cambio de día a medianoche— reiniciaría el formulario y
+  // borraría lo que se estuviera escribiendo. Se compara su CONTENIDO.
+  const defaultsKey = JSON.stringify(defaults ?? null)
+
   useEffect(() => {
     if (open) {
       setForm(toForm(task, defaults))
       setError(null)
       setNewSubtask('')
     }
-  }, [open, task, defaults])
+  }, [open, task, defaultsKey])
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }))

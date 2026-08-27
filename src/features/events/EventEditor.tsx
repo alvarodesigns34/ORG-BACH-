@@ -31,6 +31,13 @@ export function EventEditor({ open, onClose, event, defaults }: EventEditorProps
   const [timeError, setTimeError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
+  // `defaults` llega casi siempre como objeto literal en la llamada
+  // (`defaults={{ date: … }}`), así que cambia de identidad en CADA render del
+  // proveedor. Si entrara en las dependencias tal cual, cualquier tic del
+  // estado —o el cambio de día a medianoche— reiniciaría el formulario y
+  // borraría lo que se estuviera escribiendo. Se compara su CONTENIDO.
+  const defaultsKey = JSON.stringify(defaults ?? null)
+
   useEffect(() => {
     if (!open) return
     setTitle(event?.title ?? '')
@@ -42,7 +49,7 @@ export function EventEditor({ open, onClose, event, defaults }: EventEditorProps
     setNotes(event?.notes ?? '')
     setError(null)
     setTimeError(null)
-  }, [open, event, defaults])
+  }, [open, event, defaultsKey])
 
   const submit = () => {
     if (!title.trim()) {

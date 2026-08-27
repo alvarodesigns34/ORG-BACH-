@@ -73,6 +73,13 @@ export function GradeEditor({ open, onClose, grade, defaults }: GradeEditorProps
     }
   }
 
+  // `defaults` llega casi siempre como objeto literal en la llamada
+  // (`defaults={{ date: … }}`), así que cambia de identidad en CADA render del
+  // proveedor. Si entrara en las dependencias tal cual, cualquier tic del
+  // estado —o el cambio de día a medianoche— reiniciaría el formulario y
+  // borraría lo que se estuviera escribiendo. Se compara su CONTENIDO.
+  const defaultsKey = JSON.stringify(defaults ?? null)
+
   useEffect(() => {
     if (!open) return
     if (grade) {
@@ -104,7 +111,7 @@ export function GradeEditor({ open, onClose, grade, defaults }: GradeEditorProps
     // `subjects` se recalcula en cada render del proveedor; incluirlo reiniciaría
     // el formulario mientras se escribe.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, grade, defaults, settings.gradeScale.max, settings.activeTerm])
+  }, [open, grade, defaultsKey, settings.gradeScale.max, settings.activeTerm])
 
   const subject = subjects.find((s) => s.id === form.subjectId)
   const categories = subject?.categories ?? []

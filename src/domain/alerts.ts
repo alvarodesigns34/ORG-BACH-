@@ -31,6 +31,8 @@ export interface AlertInput {
   scale: GradeScale
   today: DateISO
   examAlertDays: number
+  /** Hora exacta. Aparte de `today` para poder fijarla en las pruebas. */
+  now?: number
 }
 
 /** Umbral por encima del cual la acumulación de tareas es señal, no ruido. */
@@ -38,10 +40,11 @@ const TASK_PILEUP_THRESHOLD = 6
 
 export function detectAlerts(input: AlertInput): Alert[] {
   const { tasks, exams, subjects, results, scale, today, examAlertDays } = input
+  const now = input.now ?? Date.now()
   const alerts: Alert[] = []
 
   // --- Tareas atrasadas ---
-  const overdue = tasks.filter((t) => isOverdue(t, today))
+  const overdue = tasks.filter((t) => isOverdue(t, today, now))
   if (overdue.length > 0) {
     const oldest = overdue.reduce((a, b) => ((a.dueDate ?? '') < (b.dueDate ?? '') ? a : b))
     alerts.push({
@@ -123,10 +126,14 @@ export function detectAlerts(input: AlertInput): Alert[] {
   }
 
   // --- Acumulación de trabajo esta semana ---
+  // El recuento arranca MAÑANA, no hoy, para que cuadre con la pantalla a la
+  // que enlaza: '?vista=proximas' es «mañana o más adelante», así que incluir
+  // lo de hoy prometía tareas que esa pantalla no enseña. Lo de hoy ya tiene
+  // su sitio en el bloque «Hoy» y en el aviso de atrasadas.
   const thisWeek = tasks.filter((t) => {
     if (t.status === 'completada' || !t.dueDate) return false
     const d = daysUntil(t.dueDate, today)
-    return d >= 0 && d <= 6
+    return d >= 1 && d <= 7
   })
   if (thisWeek.length >= TASK_PILEUP_THRESHOLD) {
     const minutes = thisWeek.reduce((sum, t) => sum + (t.estimatedMinutes ?? 0), 0)

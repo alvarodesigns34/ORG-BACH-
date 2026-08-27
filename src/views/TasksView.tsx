@@ -3,6 +3,7 @@ import { ArrowUpDown, ListChecks, Plus, Search, X } from 'lucide-react'
 
 import {
   EMPTY_FILTERS,
+  bucketOf,
   countByView,
   filterTasks,
   sortTasks,
@@ -10,7 +11,7 @@ import {
   type TaskSort,
   type TaskView,
 } from '@/domain/tasks'
-import { daysUntil, formatDuration, relativeDay } from '@/domain/dates'
+import { daysUntil, formatDuration } from '@/domain/dates'
 import { PRIORITIES, type Priority, type Task } from '@/domain/types'
 import { useRoute } from '@/router'
 import { useStore, useToday } from '@/state/StoreProvider'
@@ -304,6 +305,12 @@ interface TaskGroup {
  *
  * «Atrasadas / Hoy / Mañana / Esta semana / Más adelante» responde a la
  * pregunta real —¿qué me aprieta?— mucho mejor que una lista de fechas.
+ *
+ * La clasificación sale de `bucketOf`, la misma que usan la fila de tarea, la
+ * portada y los recuentos de las pestañas. Cuando esto comparaba fechas por su
+ * cuenta, una tarea de hoy con la hora ya pasada salía bajo el epígrafe «Hoy»
+ * DENTRO de la pestaña «Atrasadas»: la pestaña decía una cosa y el epígrafe la
+ * contraria sobre la misma tarea.
  */
 function groupByDay(tasks: Task[], today: string): TaskGroup[] {
   const groups: Record<string, TaskGroup> = {
@@ -317,23 +324,28 @@ function groupByDay(tasks: Task[], today: string): TaskGroup[] {
   }
 
   for (const task of tasks) {
-    if (task.status === 'completada') {
-      groups.hechas.tasks.push(task)
-      continue
-    }
-    if (!task.dueDate) {
-      groups.sinFecha.tasks.push(task)
-      continue
-    }
-    const relative = relativeDay(task.dueDate, today)
-    if (task.dueDate < today) groups.atrasadas.tasks.push(task)
-    else if (relative === 'Hoy') groups.hoy.tasks.push(task)
-    else if (relative === 'Mañana') groups.manana.tasks.push(task)
-    else {
-      // Nunca `new Date(dayString)` directamente: interpretaría la cadena
-      // como UTC. `daysUntil` construye las fechas componente a componente.
-      if (daysUntil(task.dueDate, today) <= 7) groups.semana.tasks.push(task)
-      else groups.despues.tasks.push(task)
+    switch (bucketOf(task, today)) {
+      case 'completada':
+        groups.hechas.tasks.push(task)
+        break
+      case 'sin_fecha':
+        groups.sinFecha.tasks.push(task)
+        break
+      case 'atrasada':
+        groups.atrasadas.tasks.push(task)
+        break
+      case 'hoy':
+        groups.hoy.tasks.push(task)
+        break
+      case 'manana':
+        groups.manana.tasks.push(task)
+        break
+      default:
+        // «Próxima» se parte en dos para leerla mejor. Nunca
+        // `new Date(dayString)` directamente: interpretaría la cadena como
+        // UTC. `daysUntil` construye las fechas componente a componente.
+        if (daysUntil(task.dueDate!, today) <= 7) groups.semana.tasks.push(task)
+        else groups.despues.tasks.push(task)
     }
   }
 

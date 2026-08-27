@@ -138,9 +138,13 @@ export interface TaskStats {
   withDueDate: number
 }
 
-export function taskStats(tasks: Task[], today: DateISO): TaskStats {
+export function taskStats(
+  tasks: Task[],
+  today: DateISO,
+  now: number = Date.now(),
+): TaskStats {
   const completed = tasks.filter(isDone)
-  const overdue = tasks.filter((t) => isOverdue(t, today))
+  const overdue = tasks.filter((t) => isOverdue(t, today, now))
 
   // Solo se puede juzgar la puntualidad de lo que tenía fecha y ya está hecho.
   // La comparación es al instante, no al día: una tarea con hora límite a las

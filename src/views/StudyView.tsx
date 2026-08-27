@@ -167,7 +167,7 @@ export function StudyView() {
                   setNow(Date.now())
                 }}
                 onNextPhase={() => {
-                  setTimer(nextPhase(timer))
+                  setTimer(nextPhase(timer, config))
                   setNow(Date.now())
                 }}
                 onFinish={finish}

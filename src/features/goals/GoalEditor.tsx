@@ -8,7 +8,7 @@ import {
   suggestTitle,
 } from '@/domain/goals'
 import { parseDecimal, parseDecimalOr, toDecimalInput } from '@/domain/number'
-import type { Goal, GoalKind, GoalScope } from '@/domain/types'
+import { TERMS, type Goal, type GoalKind, type GoalScope, type TermId } from '@/domain/types'
 import { useDispatch, useSettings } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
 import { Field, Input, NumberInput, Select } from '@/ui/fields'
@@ -36,6 +36,8 @@ export function GoalEditor({ open, onClose, goal }: GoalEditorProps) {
 
   const [kind, setKind] = useState<GoalKind>('media')
   const [scope, setScope] = useState<GoalScope>('trimestral')
+  /** '' = la evaluación que esté activa en Ajustes. */
+  const [term, setTerm] = useState<'' | TermId>('')
   const [target, setTarget] = useState('')
   const [subjectId, setSubjectId] = useState('')
   const [title, setTitle] = useState('')
@@ -48,6 +50,7 @@ export function GoalEditor({ open, onClose, goal }: GoalEditorProps) {
     if (!open) return
     setKind(goal?.kind ?? 'media')
     setScope(goal?.scope ?? 'trimestral')
+    setTerm(goal?.term ?? '')
     setTarget(goal ? toDecimalInput(goal.target) : '')
     setSubjectId(goal?.subjectId ?? '')
     setTitle(goal?.title ?? '')
@@ -87,6 +90,8 @@ export function GoalEditor({ open, onClose, goal }: GoalEditorProps) {
       scope,
       target: parsedTarget,
       subjectId: subjectId || undefined,
+      // Solo tiene sentido en un objetivo de media por evaluación.
+      term: kind === 'media' && scope === 'trimestral' && term ? term : undefined,
       manualProgress: kind === 'manual' ? parseDecimalOr(progress, 0) : undefined,
     }
 
@@ -153,6 +158,37 @@ export function GoalEditor({ open, onClose, goal }: GoalEditorProps) {
               )}
             </Field>
           </div>
+
+          {/* Fijar la evaluación es opcional, pero cambia mucho: sin fijarla,
+              el objetivo mide la que esté activa en Ajustes y se mueve con
+              ella. Con ella fijada, sigue midiendo la misma en marzo. */}
+          {kind === 'media' && scope === 'trimestral' && (
+            <Field
+              label="Evaluación que mide"
+              hint={
+                term
+                  ? 'Seguirá midiendo esta evaluación aunque cambies la activa.'
+                  : 'Se moverá contigo: mide siempre la evaluación activa en Ajustes.'
+              }
+            >
+              {({ id, describedBy }) => (
+                <Select
+                  id={id}
+                  aria-describedby={describedBy}
+                  className="max-w-[20rem]"
+                  value={term}
+                  onChange={(e) => setTerm(e.target.value as '' | TermId)}
+                >
+                  <option value="">La evaluación activa</option>
+                  {TERMS.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Meta" required hint={spec.hint}>

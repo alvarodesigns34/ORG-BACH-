@@ -3,7 +3,7 @@ import { Check, Plus, Target } from 'lucide-react'
 
 import { KIND_LABEL, SCOPE_LABEL, goalProgress, type GoalContext } from '@/domain/goals'
 import { colorVar } from '@/domain/palette'
-import type { Goal } from '@/domain/types'
+import type { Goal, TermId } from '@/domain/types'
 import { useSettings, useStore, useToday } from '@/state/StoreProvider'
 import { useGlobalAverage, useSubjectMap, useSubjectResults } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
@@ -20,6 +20,17 @@ export function GoalsView() {
   const courseResults = useSubjectResults('todas')
   const courseAverage = useGlobalAverage('todas')
 
+  // Las tres evaluaciones, para los objetivos que fijan la suya con
+  // `goal.term`. Se calculan siempre —los hooks no pueden ir tras un `if`— y
+  // salen de la misma función que el resto de medias, así que no pueden
+  // discrepar de lo que enseña Notas.
+  const t1 = useSubjectResults('T1')
+  const t2 = useSubjectResults('T2')
+  const t3 = useSubjectResults('T3')
+  const avg1 = useGlobalAverage('T1')
+  const avg2 = useGlobalAverage('T2')
+  const avg3 = useGlobalAverage('T3')
+
   const [editing, setEditing] = useState<Goal | null>(null)
   const [creating, setCreating] = useState(false)
 
@@ -32,6 +43,12 @@ export function GoalsView() {
       globalAverage,
       courseResults,
       courseAverage,
+      termResults: (term: TermId) =>
+        term === 'T1'
+          ? { results: t1, average: avg1 }
+          : term === 'T2'
+            ? { results: t2, average: avg2 }
+            : { results: t3, average: avg3 },
       scale: settings.gradeScale,
       today,
       weekStartsOn: settings.weekStartsOn,
@@ -44,6 +61,12 @@ export function GoalsView() {
       globalAverage,
       courseResults,
       courseAverage,
+      t1,
+      t2,
+      t3,
+      avg1,
+      avg2,
+      avg3,
       settings,
       today,
     ],

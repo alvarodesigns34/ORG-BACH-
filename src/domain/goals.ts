@@ -21,6 +21,7 @@ import type {
   StudySession,
   Subject,
   Task,
+  TermId,
 } from './types.ts'
 
 export interface GoalContext {
@@ -33,6 +34,15 @@ export interface GoalContext {
   /** Resultados de TODO el curso. Los usa el alcance «anual». */
   courseResults: Map<ID, SubjectResult>
   courseAverage: number | null
+  /**
+   * Resultados de una evaluación concreta, para los objetivos que fijan la
+   * suya con `goal.term`.
+   *
+   * Sin esto, un objetivo «media de la 1.ª evaluación» seguía a la evaluación
+   * activa: cambiarla en Ajustes reescribía en silencio lo que medían TODOS
+   * los objetivos trimestrales ya creados.
+   */
+  termResults?: (term: TermId) => { results: Map<ID, SubjectResult>; average: number | null }
   scale: GradeScale
   today: DateISO
   weekStartsOn: 0 | 1
@@ -106,9 +116,15 @@ export function goalProgress(goal: Goal, ctx: GoalContext): GoalProgress {
       // «Este curso» tiene que mirar el curso entero. Usar los resultados de
       // la evaluación activa haría que un objetivo anual midiera en realidad
       // un trimestre, sin que nada en la interfaz lo delatara.
+      //
+      // Y un objetivo que fija su evaluación (`goal.term`) mide ESA, no la que
+      // esté activa en Ajustes: si no, cambiar de evaluación reescribía lo que
+      // medían todos los objetivos trimestrales de golpe.
       const annual = goal.scope === 'anual'
-      const source = annual ? ctx.courseResults : ctx.results
-      const overall = annual ? ctx.courseAverage : ctx.globalAverage
+      const fixed = !annual && goal.term && ctx.termResults ? ctx.termResults(goal.term) : null
+
+      const source = annual ? ctx.courseResults : (fixed?.results ?? ctx.results)
+      const overall = annual ? ctx.courseAverage : (fixed ? fixed.average : ctx.globalAverage)
 
       const average = goal.subjectId ? (source.get(goal.subjectId)?.average ?? null) : overall
 

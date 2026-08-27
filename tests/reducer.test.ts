@@ -275,3 +275,56 @@ describe('el reductor no muta el estado que recibe', () => {
     assert.equal(JSON.stringify(state), snapshot)
   })
 })
+
+describe('editar una asignatura', () => {
+  it('rellena la abreviatura cuando el campo se deja en blanco', () => {
+    // El editor manda '' al vaciar el campo. Antes solo el alta derivaba la
+    // abreviatura, así que la insignia de la ficha se quedaba vacía.
+    const next = reducer(baseState(), {
+      type: 'subject/update',
+      id: 'mat',
+      patch: { shortName: '' },
+    })
+    assert.equal(next.subjects.find((s) => s.id === 'mat')?.shortName, 'MI')
+  })
+
+  it('respeta la abreviatura que se escribe a mano', () => {
+    const next = reducer(baseState(), {
+      type: 'subject/update',
+      id: 'mat',
+      patch: { shortName: 'MAT1' },
+    })
+    assert.equal(next.subjects.find((s) => s.id === 'mat')?.shortName, 'MAT1')
+  })
+
+  it('suelta las notas cuya categoría desaparece en la edición', () => {
+    // Quitar una categoría dejaba sus notas apuntando a un id inexistente.
+    // «Sin categoría» es un estado que el cálculo sabe tratar; un id
+    // fantasma, no.
+    const next = reducer(baseState(), {
+      type: 'subject/update',
+      id: 'mat',
+      patch: { categories: [{ id: 'c2', name: 'Trabajos', weight: 100 }] },
+    })
+    assert.equal(next.grades.find((g) => g.id === 'g1')?.categoryId, null)
+  })
+
+  it('no toca las notas de otras asignaturas', () => {
+    const next = reducer(baseState(), {
+      type: 'subject/update',
+      id: 'mat',
+      patch: { categories: [] },
+    })
+    assert.equal(next.grades.find((g) => g.id === 'g2')?.categoryId, null)
+    assert.equal(next.grades.find((g) => g.id === 'g2')?.subjectId, 'fis')
+  })
+
+  it('conserva la categoría si sigue existiendo', () => {
+    const next = reducer(baseState(), {
+      type: 'subject/update',
+      id: 'mat',
+      patch: { name: 'Matemáticas II' },
+    })
+    assert.equal(next.grades.find((g) => g.id === 'g1')?.categoryId, 'c1')
+  })
+})

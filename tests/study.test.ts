@@ -84,15 +84,15 @@ describe('fases del pomodoro', () => {
   })
 
   it('al pasar a descanso cuenta un pomodoro', () => {
-    const timer = nextPhase(startedAt(T0), T0 + 25 * MIN)
+    const timer = nextPhase(startedAt(T0), DEFAULT_POMODORO, T0 + 25 * MIN)
     assert.equal(timer.phase, 'descanso')
     assert.equal(timer.completed, 1)
     assert.equal(timer.accumulatedMs, 0)
   })
 
   it('volver del descanso no cuenta otro pomodoro', () => {
-    const afterWork = nextPhase(startedAt(T0), T0 + 25 * MIN)
-    const afterBreak = nextPhase(afterWork, T0 + 30 * MIN)
+    const afterWork = nextPhase(startedAt(T0), DEFAULT_POMODORO, T0 + 25 * MIN)
+    const afterBreak = nextPhase(afterWork, DEFAULT_POMODORO, T0 + 30 * MIN)
     assert.equal(afterBreak.phase, 'trabajo')
     assert.equal(afterBreak.completed, 1)
   })
@@ -106,21 +106,62 @@ describe('minutesToLog', () => {
 
   it('el descanso no cuenta como estudio', () => {
     // Un pomodoro terminado (25 min) y 4 minutos de descanso.
-    const timer = nextPhase(startedAt(T0), T0 + 25 * MIN)
+    const timer = nextPhase(startedAt(T0), DEFAULT_POMODORO, T0 + 25 * MIN)
     assert.equal(minutesToLog(timer, DEFAULT_POMODORO, T0 + 29 * MIN), 25)
   })
 
   it('suma los pomodoros completados al tramo en curso', () => {
-    let timer = nextPhase(startedAt(T0), T0 + 25 * MIN) // trabajo hecho
-    timer = nextPhase(timer, T0 + 30 * MIN) // vuelta al trabajo
+    let timer = nextPhase(startedAt(T0), DEFAULT_POMODORO, T0 + 25 * MIN) // trabajo hecho
+    timer = nextPhase(timer, DEFAULT_POMODORO, T0 + 30 * MIN) // vuelta al trabajo
     // 25 del primero + 10 del que está corriendo.
     assert.equal(minutesToLog(timer, DEFAULT_POMODORO, T0 + 40 * MIN), 35)
   })
 
   it('respeta unas duraciones personalizadas', () => {
     const config = { workMinutes: 50, breakMinutes: 10 }
-    const timer = nextPhase(startedAt(T0), T0 + 50 * MIN)
+    const timer = nextPhase(startedAt(T0), config, T0 + 50 * MIN)
     assert.equal(minutesToLog(timer, config, T0 + 55 * MIN), 50)
+  })
+
+  it('cambiar la duración a mitad de sesión no reescribe lo ya hecho', () => {
+    // Antes los minutos salían de «pomodoros × duración configurada AHORA»,
+    // así que pasar el pomodoro de 25 a 50 minutos duplicaba de golpe todo lo
+    // trabajado antes del cambio.
+    const veinticinco = { workMinutes: 25, breakMinutes: 5 }
+    const cincuenta = { workMinutes: 50, breakMinutes: 10 }
+    let timer = createTimer('pomodoro', undefined, undefined, T0)
+    timer = nextPhase(timer, veinticinco, T0 + 25 * MIN) // un tramo real de 25
+    // El alumno cambia los ajustes durante el descanso.
+    assert.equal(minutesToLog(timer, cincuenta, T0 + 27 * MIN), 25)
+  })
+
+  it('los minutos de más de un tramo alargado no se pierden al cambiar de fase', () => {
+    // `nextPhase` reinicia el contador de la fase. Si los minutos finales
+    // salieran de multiplicar pomodoros por la duración, un tramo de 25 que se
+    // alarga hasta 32 se registraría como 25: siete minutos de estudio a la
+    // basura por pulsar «empezar descanso» en vez de «terminar».
+    let timer = createTimer('pomodoro', undefined, undefined, T0)
+    timer = nextPhase(timer, DEFAULT_POMODORO, T0 + 32 * MIN)
+    assert.equal(minutesToLog(timer, DEFAULT_POMODORO, T0 + 33 * MIN), 32)
+  })
+
+  it('un temporizador de una versión anterior conserva lo ya hecho', () => {
+    // Sin `workedMs` no hay dato real: se recurre a la fórmula de entonces en
+    // vez de tirar los tramos ya completados.
+    const legacy = parseTimerState(
+      {
+        mode: 'pomodoro',
+        phase: 'descanso',
+        runningSince: T0,
+        accumulatedMs: 0,
+        sessionStartedAt: T0 - 60 * MIN,
+        completed: 2,
+      },
+      T0,
+    )
+    assert.ok(legacy)
+    assert.equal(legacy.workedMs, undefined)
+    assert.equal(minutesToLog(legacy, DEFAULT_POMODORO, T0), 50)
   })
 })
 
@@ -143,8 +184,8 @@ describe('inicio de la sesión completa', () => {
     // 10 más de trabajo. `elapsedMs` solo conoce los últimos 10, así que
     // reconstruir el inicio restándolos daría una hora 40 minutos tarde.
     let timer = startedAt(T0)
-    timer = nextPhase(timer, T0 + 25 * MIN)
-    timer = nextPhase(timer, T0 + 30 * MIN)
+    timer = nextPhase(timer, DEFAULT_POMODORO, T0 + 25 * MIN)
+    timer = nextPhase(timer, DEFAULT_POMODORO, T0 + 30 * MIN)
 
     assert.equal(timer.sessionStartedAt, T0)
     assert.notEqual(timer.sessionStartedAt, T0 + 40 * MIN - elapsedMs(timer, T0 + 40 * MIN))
@@ -161,7 +202,7 @@ describe('inicio de la sesión completa', () => {
     // Empieza a las 23:40 y termina pasada la medianoche.
     const night = new Date(2026, 9, 14, 23, 40).getTime()
     let timer = createTimer('pomodoro', undefined, undefined, night)
-    timer = nextPhase(timer, night + 25 * MIN) // ya es día 15
+    timer = nextPhase(timer, DEFAULT_POMODORO, night + 25 * MIN) // ya es día 15
     assert.equal(new Date(timer.sessionStartedAt).getDate(), 14)
   })
 })

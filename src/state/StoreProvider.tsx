@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react'
 
+import { STORAGE_KEY } from '@/data/defaults'
 import { today as todayISO } from '@/domain/dates'
 import type { AppData, DateISO, ThemePreference } from '@/domain/types'
 import * as storage from '@/storage/persistence'
@@ -112,6 +113,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', flush)
       window.removeEventListener('pagehide', flush)
     }
+  }, [])
+
+  // --- Otras pestañas ---------------------------------------------------
+  // La aplicación vive en el navegador todo el día y es normal acabar con dos
+  // pestañas abiertas. Sin esto, la última en guardar pisaba a la otra sin que
+  // nadie se enterara.
+  //
+  // Si aquí no hay nada sin guardar, se adopta lo que ha escrito la otra
+  // pestaña: es más reciente y no se pierde nada. Si SÍ hay algo a medias, no
+  // se toca —perder lo que se está escribiendo sería peor— y se avisa, que es
+  // lo único honesto cuando dos versiones han divergido de verdad.
+  useEffect(() => {
+    const onExternalWrite = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEY || event.newValue === null) return
+      if (pendingWrite.current) {
+        setStorageNotice({
+          level: 'aviso',
+          text: 'Has cambiado algo en otra pestaña. Para no perder lo que estás escribiendo aquí, esos cambios no se han cargado: recarga la página cuando termines.',
+        })
+        return
+      }
+      const outcome = storage.load()
+      if (outcome.status === 'recuperado') return
+      lastPersisted.current = outcome.data
+      dispatch({ type: 'data/replace', data: outcome.data })
+    }
+    window.addEventListener('storage', onExternalWrite)
+    return () => window.removeEventListener('storage', onExternalWrite)
   }, [])
 
   // --- Tema -------------------------------------------------------------

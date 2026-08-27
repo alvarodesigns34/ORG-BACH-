@@ -50,6 +50,10 @@ function Shell() {
       if (event.metaKey || event.ctrlKey || event.altKey) return
       const target = event.target as HTMLElement | null
       if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
+      // Con un diálogo abierto, «c» abría OTRO editor encima. Basta con tener
+      // el foco en Cerrar, Guardar o Eliminar —que no son campos de texto— y
+      // pulsar la tecla: en Tareas llegaban a convivir dos editores.
+      if (document.querySelector('[aria-modal="true"]')) return
       if (event.key === 'c' || event.key === 'C') {
         event.preventDefault()
         setCreating(true)

@@ -34,6 +34,20 @@ export interface TimerState {
   topic?: string
   /** Pomodoros de trabajo completados desde que empezó. */
   completed: number
+  /**
+   * Milisegundos REALES de trabajo ya cerrados, sumando los tramos
+   * terminados.
+   *
+   * Sin esto, los minutos de la sesión salían de `completed × duración
+   * configurada AHORA`, y eso reescribe el pasado: cambiar el pomodoro de 25
+   * a 50 minutos a mitad de sesión duplicaba lo ya hecho. Además, `nextPhase`
+   * reinicia el contador de la fase, así que los minutos de más de un tramo
+   * que se alargaba se perdían al pulsar «empezar descanso».
+   *
+   * Opcional porque un temporizador guardado por una versión anterior no lo
+   * trae; ahí se recurre a la fórmula vieja en vez de inventar minutos.
+   */
+  workedMs?: number
 }
 
 export interface PomodoroConfig {
@@ -58,6 +72,7 @@ export function createTimer(
     subjectId,
     topic,
     completed: 0,
+    workedMs: 0,
   }
 }
 
@@ -109,12 +124,31 @@ export function isPhaseComplete(
 }
 
 /**
+ * Trabajo ya cerrado, en milisegundos.
+ *
+ * Para un temporizador guardado por una versión anterior no hay dato real, así
+ * que se recurre a la fórmula de entonces —pomodoros × duración configurada—.
+ * Es una aproximación, pero perder los tramos ya hechos sería peor.
+ */
+function finishedWorkMs(state: TimerState, config: PomodoroConfig): number {
+  if (state.workedMs !== undefined) return state.workedMs
+  return state.mode === 'pomodoro' ? state.completed * config.workMinutes * 60_000 : 0
+}
+
+/**
  * Pasa a la siguiente fase del pomodoro.
  *
  * El contador de pomodoros solo sube al terminar un tramo de TRABAJO: los
- * descansos no cuentan como estudio.
+ * descansos no cuentan como estudio. Y lo trabajado en el tramo que se cierra
+ * se guarda TAL CUAL, con sus minutos de más si se ha alargado: antes se
+ * perdían, porque el contador de la fase se reiniciaba aquí y los minutos
+ * finales salían de multiplicar pomodoros por la duración configurada.
  */
-export function nextPhase(state: TimerState, now = Date.now()): TimerState {
+export function nextPhase(
+  state: TimerState,
+  config: PomodoroConfig,
+  now = Date.now(),
+): TimerState {
   const wasWork = state.phase === 'trabajo'
   return {
     ...state,
@@ -122,15 +156,14 @@ export function nextPhase(state: TimerState, now = Date.now()): TimerState {
     runningSince: now,
     accumulatedMs: 0,
     completed: state.completed + (wasWork ? 1 : 0),
+    workedMs: finishedWorkMs(state, config) + (wasWork ? elapsedMs(state, now) : 0),
   }
 }
 
 /** Minutos de estudio que registrar al cerrar. Los descansos no cuentan. */
 export function minutesToLog(state: TimerState, config: PomodoroConfig, now = Date.now()): number {
-  const currentPhaseMinutes =
-    state.phase === 'trabajo' ? Math.round(elapsedMs(state, now) / 60_000) : 0
-  const finishedPomodoros = state.mode === 'pomodoro' ? state.completed * config.workMinutes : 0
-  return currentPhaseMinutes + finishedPomodoros
+  const currentMs = state.phase === 'trabajo' ? elapsedMs(state, now) : 0
+  return Math.round((finishedWorkMs(state, config) + currentMs) / 60_000)
 }
 
 /** '25:00' — el formato que se lee de un vistazo en un temporizador. */
@@ -204,6 +237,14 @@ export function parseTimerState(raw: unknown, now = Date.now()): TimerState | nu
   const subjectId = typeof input.subjectId === 'string' ? input.subjectId : undefined
   const topic = typeof input.topic === 'string' ? input.topic : undefined
 
+  // Si falta o viene roto se deja sin definir, no a cero: `finishedWorkMs`
+  // sabe recurrir entonces a la fórmula antigua, que es una aproximación pero
+  // conserva los tramos ya hechos.
+  const workedMs =
+    typeof input.workedMs === 'number' && Number.isFinite(input.workedMs) && input.workedMs >= 0
+      ? input.workedMs
+      : undefined
+
   return {
     mode: input.mode as TimerMode,
     phase: input.phase as TimerPhase,
@@ -213,5 +254,6 @@ export function parseTimerState(raw: unknown, now = Date.now()): TimerState | nu
     completed,
     subjectId,
     topic,
+    workedMs,
   }
 }
