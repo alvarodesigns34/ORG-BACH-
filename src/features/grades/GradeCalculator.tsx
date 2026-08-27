@@ -47,14 +47,22 @@ export function GradeCalculator({ open, onClose, subjectId }: GradeCalculatorPro
   const [assumed, setAssumed] = useState('')
   const [assumedOver, setAssumedOver] = useState('')
 
-  /** Carga los datos reales de una asignatura en el formulario. */
+  /**
+   * Carga los datos reales de una asignatura en el formulario.
+   *
+   * El «ya evaluado» solo se rellena si las notas declaran pesos. Si no los
+   * declaran, `evaluatedPercent` vale 100 por convención —«lo que hay es todo
+   * lo que hay»— y colarlo aquí hacía que la calculadora respondiera «ya está
+   * todo evaluado» con una sola nota apuntada. `SubjectGrades` ya respeta esa
+   * distinción escondiendo el porcentaje; esta pantalla no lo hacía.
+   */
   const loadSubject = (id: string) => {
     setSelected(id)
     const result = results.get(id)
     const subject = subjects.find((s) => s.id === id)
     if (result?.average !== null && result?.average !== undefined) {
       setCurrent(toDecimalInput(round(result.average, 2)))
-      setEvaluated(toDecimalInput(round(result.evaluatedPercent, 1)))
+      setEvaluated(result.weightsDeclared ? toDecimalInput(round(result.evaluatedPercent, 1)) : '')
     } else {
       setCurrent('')
       setEvaluated('')
@@ -62,6 +70,9 @@ export function GradeCalculator({ open, onClose, subjectId }: GradeCalculatorPro
     setTarget(toDecimalInput(subject?.targetGrade))
     setAssumedOver('')
   }
+
+  /** La asignatura elegida no dice cuánto pesa cada nota. */
+  const weightsUnknown = selected ? results.get(selected)?.weightsDeclared === false : false
 
   useEffect(() => {
     if (!open) return
@@ -181,7 +192,13 @@ export function GradeCalculator({ open, onClose, subjectId }: GradeCalculatorPro
 
           <Field
             label="Ya evaluado"
-            hint={remaining !== null ? `Queda ${formatPercent(remaining)}.` : undefined}
+            hint={
+              weightsUnknown
+                ? 'Tus notas no llevan peso, así que esto no se puede deducir: escríbelo tú.'
+                : remaining !== null
+                  ? `Queda ${formatPercent(remaining)}.`
+                  : undefined
+            }
           >
             {({ id, describedBy }) => (
               <NumberInput

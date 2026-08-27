@@ -100,24 +100,41 @@ export function normalizeScore(entry: GradeEntry, scale: GradeScale): number {
  *
  * Si ninguna declara peso, cae en media aritmética: es lo que espera alguien
  * que solo quiere apuntar notas sin configurar nada.
+ *
+ * Y si SOLO ALGUNAS lo declaran, las demás se reparten a partes iguales el
+ * hueco que queda hasta el 100 %. Antes desaparecían: al ponderar por la suma
+ * declarada, una nota de peso 0 aportaba 0 arriba y 0 abajo, así que apuntar
+ * la primera nota sin peso y la segunda con un 40 % hacía que la primera
+ * dejara de existir. El hueco es justo lo que el propio editor enseña como
+ * «queda un 60 % libre».
  */
 export function averageOfEntries(
   entries: GradeEntry[],
   scale: GradeScale,
-): { average: number | null; declaredWeight: number } {
-  if (entries.length === 0) return { average: null, declaredWeight: 0 }
+): { average: number | null; declaredWeight: number; undeclared: number } {
+  if (entries.length === 0) return { average: null, declaredWeight: 0, undeclared: 0 }
 
   const declaredWeight = entries.reduce((sum, e) => sum + (e.weight || 0), 0)
+  const undeclared = entries.filter((e) => !e.weight).length
 
   if (declaredWeight <= 0) {
     const total = entries.reduce((sum, e) => sum + normalizeScore(e, scale), 0)
-    return { average: total / entries.length, declaredWeight: 0 }
+    return { average: total / entries.length, declaredWeight: 0, undeclared }
   }
+
+  // Lo que no está repartido se divide entre las notas sin peso. Si no queda
+  // hueco, se quedan a cero —y de eso avisa `subjectResult`, para que no sea
+  // en silencio—.
+  const share = undeclared > 0 ? Math.max(0, 100 - declaredWeight) / undeclared : 0
+  const effective = (entry: GradeEntry) => entry.weight || share
 
   // Normalizar por la suma real de pesos, no por 100: así una evaluación a
   // medias devuelve la media de lo hecho, no una fracción de ella.
-  const weighted = entries.reduce((sum, e) => sum + normalizeScore(e, scale) * (e.weight || 0), 0)
-  return { average: weighted / declaredWeight, declaredWeight }
+  const totalWeight = entries.reduce((sum, e) => sum + effective(e), 0)
+  if (totalWeight <= 0) return { average: null, declaredWeight, undeclared }
+
+  const weighted = entries.reduce((sum, e) => sum + normalizeScore(e, scale) * effective(e), 0)
+  return { average: weighted / totalWeight, declaredWeight, undeclared }
 }
 
 // ---------------------------------------------------------------------------
@@ -128,25 +145,38 @@ function buildBreakdown(
   category: GradeCategory | null,
   entries: GradeEntry[],
   scale: GradeScale,
+  /**
+   * Peso del cubo cuando no lo dicta una categoría. Lo usa el cubo de notas
+   * huérfanas: dejarle el 100 % por defecto lo haría valer más que todas las
+   * categorías juntas.
+   */
+  weightOverride?: number,
 ): CategoryBreakdown {
-  const { average, declaredWeight } = averageOfEntries(entries, scale)
+  const { average, declaredWeight, undeclared } = averageOfEntries(entries, scale)
 
   // Si las notas declaran pesos, la cobertura es cuánto de la categoría
-  // suman. Si no los declaran, no hay forma de saberlo: se asume que lo
-  // presente es todo lo evaluado hasta ahora.
+  // suman. Si alguna no lo declara, esa absorbe el hueco restante y la
+  // categoría queda cubierta. Y si no los declara ninguna, no hay forma de
+  // saberlo: se asume que lo presente es todo lo evaluado hasta ahora.
   const coverage =
-    entries.length === 0 ? 0 : declaredWeight > 0 ? clamp(declaredWeight / 100, 0, 1) : 1
+    entries.length === 0
+      ? 0
+      : declaredWeight > 0 && undeclared === 0
+        ? clamp(declaredWeight / 100, 0, 1)
+        : 1
 
   return {
     categoryId: category?.id ?? null,
     name: category?.name ?? 'Notas',
-    weight: category?.weight ?? 100,
+    weight: category?.weight ?? weightOverride ?? 100,
     entries,
     average,
     declaredWeight,
     coverage,
   }
 }
+
+const ALL_TERMS: TermId[] = ['T1', 'T2', 'T3']
 
 /**
  * Calcula la nota de una asignatura en una evaluación concreta.
@@ -159,8 +189,61 @@ export function subjectResult(
   scale: GradeScale,
   term: TermId | 'todas' = 'todas',
 ): SubjectResult {
+  if (term === 'todas') return courseResult(subject, allGrades, scale)
+  return termResult(subject, allGrades, scale, term)
+}
+
+/**
+ * Nota del curso: media de las evaluaciones que ya tienen nota.
+ *
+ * NO es la media de todas las notas metidas en el mismo saco. Con cuatro
+ * exámenes de 8 en la primera evaluación y uno de 4 en la segunda, el saco
+ * único da 7,2 y el boletín da 6 —porque cada evaluación vale lo mismo,
+ * tenga cuatro notas o una—. La cifra que el alumno reconoce como «la nota
+ * del curso» es la segunda.
+ *
+ * Las evaluaciones sin ninguna nota no participan: a mitad de curso, la nota
+ * es la media de lo que ya se ha evaluado, no una fracción arrastrada por dos
+ * trimestres vacíos.
+ */
+function courseResult(
+  subject: Subject,
+  allGrades: GradeEntry[],
+  scale: GradeScale,
+): SubjectResult {
+  const perTerm = ALL_TERMS.map((t) => termResult(subject, allGrades, scale, t))
+  const scored = perTerm.filter((r) => r.average !== null)
+
+  // El desglose por categorías sigue saliendo del conjunto de notas: es lo
+  // que la interfaz enseña para explicar de dónde vienen. La media, en
+  // cambio, es la de las evaluaciones.
+  const pooled = termResult(subject, allGrades, scale, null)
+
+  const average =
+    scored.length === 0
+      ? null
+      : round(scored.reduce((sum, r) => sum + (r.average as number), 0) / scored.length, 4)
+
+  // Cuánto del CURSO se ha evaluado: cada evaluación aporta un tercio, y las
+  // que aún no han empezado cuentan como cero. Un curso con la primera
+  // evaluación cerrada y nada más lleva un 33 %, no un 100 %.
+  const evaluatedPercent = round(
+    perTerm.reduce((sum, r) => sum + r.evaluatedPercent, 0) / ALL_TERMS.length,
+    2,
+  )
+
+  return { ...pooled, average, evaluatedPercent }
+}
+
+function termResult(
+  subject: Subject,
+  allGrades: GradeEntry[],
+  scale: GradeScale,
+  /** null = todas las notas en el mismo saco, solo para el desglose. */
+  term: TermId | null,
+): SubjectResult {
   const entries = allGrades.filter(
-    (g) => g.subjectId === subject.id && (term === 'todas' || g.term === term),
+    (g) => g.subjectId === subject.id && (term === null || g.term === term),
   )
 
   const warnings: WeightWarning[] = []
@@ -176,18 +259,54 @@ export function subjectResult(
       )
     : [buildBreakdown(null, entries, scale)]
 
-  // Las notas cuya categoría fue borrada no deben desaparecer del cálculo.
+  // Las notas cuya categoría fue borrada —o que se apuntaron «sin categoría»—
+  // no deben desaparecer del cálculo, pero tampoco pueden valer un 100 %
+  // aparte: con Exámenes 70 / Trabajos 20 / Actitud 10, una sola nota suelta
+  // pesaba más que todos los exámenes juntos (8×70 + 9×100 sobre 170).
+  //
+  // El peso del cubo suelto sale de tres casos, en este orden:
+  //
+  //  1. Queda hueco sin repartir → ese hueco. Al borrar «Trabajos 20 %», sus
+  //     notas heredan justo el 20 % que quedó libre, que es lo correcto.
+  //  2. No queda hueco, pero ninguna categoría viva tiene notas → el 100 %.
+  //     Es lo único que hay: negarle la media dejaría la asignatura sin nota
+  //     teniendo notas apuntadas.
+  //  3. No queda hueco y alguna categoría viva sí tiene notas → cero, con
+  //     aviso. Aquí es donde estaba el fallo, y donde callar sería peor.
+  const declaredCategoryWeight = subject.categories.reduce((acc, c) => acc + (c.weight || 0), 0)
+  const freeWeight = round(Math.max(0, 100 - declaredCategoryWeight), 2)
+  let crowdedOut = 0
+
   if (hasCategories) {
     const knownIds = new Set(subject.categories.map((c) => c.id))
     const orphans = entries.filter((e) => !e.categoryId || !knownIds.has(e.categoryId))
     if (orphans.length > 0) {
-      breakdowns.push(buildBreakdown(null, orphans, scale))
+      const liveHaveEntries = breakdowns.some((b) => b.entries.length > 0)
+      const weight = freeWeight > 0 ? freeWeight : liveHaveEntries ? 0 : 100
+      if (weight <= 0) crowdedOut = orphans.length
+      breakdowns.push(buildBreakdown(null, orphans, scale, weight))
     }
+  }
+
+  // --- Aviso: notas sueltas sin sitio donde contar ---
+  // Si las categorías ya se reparten el 100 % y las demás sí tienen notas, una
+  // nota suelta no tiene hueco y no entra en la media. Es defendible, pero no
+  // puede ser silencioso.
+  if (crowdedOut > 0) {
+    warnings.push({
+      scope: 'categoria',
+      label: 'Notas',
+      sum: 0,
+      message:
+        crowdedOut === 1
+          ? 'Hay 1 nota sin categoría y las categorías ya reparten el 100 %, así que no cuenta en la media. Asígnale una categoría o deja hueco libre.'
+          : `Hay ${crowdedOut} notas sin categoría y las categorías ya reparten el 100 %, así que no cuentan en la media. Asígnales una categoría o deja hueco libre.`,
+    })
   }
 
   // --- Aviso: los pesos de las categorías deben sumar 100 % ---
   if (hasCategories) {
-    const sum = subject.categories.reduce((acc, c) => acc + (c.weight || 0), 0)
+    const sum = declaredCategoryWeight
     if (Math.abs(sum - 100) > 0.01) {
       warnings.push({
         scope: 'asignatura',

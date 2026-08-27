@@ -28,6 +28,8 @@ interface GradeEditorProps {
     name?: string
     date?: string
     kind?: GradeKind
+    /** Peso de partida, en %. Lo trae el examen del que sale la nota. */
+    weight?: number
     /** Examen del que sale esta nota; al guardar queda enlazado. */
     examId?: string
   }
@@ -95,6 +97,7 @@ export function GradeEditor({ open, onClose, grade, defaults }: GradeEditorProps
         name: defaults?.name ?? '',
         kind: defaults?.kind ?? 'examen',
         date: defaults?.date ?? base.date,
+        weight: defaults?.weight !== undefined ? toDecimalInput(defaults.weight) : base.weight,
       })
     }
     setErrors({})
@@ -363,11 +366,14 @@ export function GradeEditor({ open, onClose, grade, defaults }: GradeEditorProps
 
             <Field
               label="Peso"
+              // Dejarlo vacío no es «no cuenta»: la nota se reparte el hueco
+              // libre. Decirlo aquí evita que el alumno crea que ha guardado
+              // un peso y luego no entienda de dónde sale la media.
               hint={
                 remainingWeight !== null && remainingWeight > 0
-                  ? `Queda ${formatPercent(remainingWeight)} libre.`
+                  ? `Vacío = se lleva el ${formatPercent(remainingWeight)} libre.`
                   : remainingWeight !== null
-                    ? 'Ya está todo repartido.'
+                    ? 'Ya está todo repartido: si lo dejas vacío, esta nota no contará.'
                     : undefined
               }
               className="col-span-2 sm:col-span-1"

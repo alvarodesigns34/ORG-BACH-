@@ -110,6 +110,139 @@ describe('averageOfEntries', () => {
     const { average } = averageOfEntries([], DEFAULT_SCALE)
     assert.equal(average, null)
   })
+
+  it('una nota sin peso se lleva el hueco libre en vez de desaparecer', () => {
+    // Este era el fallo: al ponderar por la suma declarada, la nota de peso 0
+    // aportaba 0 arriba y 0 abajo. Apuntabas la primera sin peso, la segunda
+    // con un 40 %, y la primera dejaba de existir.
+    const s = makeSubject()
+    const entries = [makeGrade(s.id, 10, 0), makeGrade(s.id, 5, 40)]
+    const { average } = averageOfEntries(entries, DEFAULT_SCALE)
+    // La suelta se lleva el 60 % libre: 10×60 + 5×40 = 800 → 8.
+    assert.equal(round(average!, 4), 8)
+  })
+
+  it('varias sin peso se reparten el hueco a partes iguales', () => {
+    const s = makeSubject()
+    const entries = [makeGrade(s.id, 10, 0), makeGrade(s.id, 4, 0), makeGrade(s.id, 7, 40)]
+    const { average } = averageOfEntries(entries, DEFAULT_SCALE)
+    // 30 % cada una: 10×30 + 4×30 + 7×40 = 700 → 7.
+    assert.equal(round(average!, 4), 7)
+  })
+
+  it('sin hueco que repartir, la nota sin peso no inventa uno', () => {
+    const s = makeSubject()
+    const entries = [makeGrade(s.id, 10, 0), makeGrade(s.id, 5, 100)]
+    const { average } = averageOfEntries(entries, DEFAULT_SCALE)
+    assert.equal(round(average!, 4), 5)
+  })
+})
+
+describe('la nota del curso es la media de las evaluaciones', () => {
+  // Con una sola nota por evaluación, el saco único y el boletín coinciden y
+  // el caso real queda ciego. Estos casos los separan.
+
+  it('cada evaluación vale lo mismo, tenga cuatro notas o una', () => {
+    const subject = makeSubject()
+    const grades = [
+      makeGrade(subject.id, 8, 0, { term: 'T1' }),
+      makeGrade(subject.id, 8, 0, { term: 'T1' }),
+      makeGrade(subject.id, 8, 0, { term: 'T1' }),
+      makeGrade(subject.id, 8, 0, { term: 'T1' }),
+      makeGrade(subject.id, 4, 0, { term: 'T2' }),
+    ]
+    // Saco único: (8+8+8+8+4)/5 = 7,2. Boletín: (8+4)/2 = 6.
+    assert.equal(round(subjectResult(subject, grades, DEFAULT_SCALE, 'todas').average!, 4), 6)
+  })
+
+  it('una evaluación sin notas no arrastra la media hacia abajo', () => {
+    const subject = makeSubject()
+    const grades = [makeGrade(subject.id, 7, 0, { term: 'T1' })]
+    assert.equal(round(subjectResult(subject, grades, DEFAULT_SCALE, 'todas').average!, 4), 7)
+  })
+
+  it('mide lo evaluado sobre el curso entero, no sobre lo que ya hay', () => {
+    // Con la primera evaluación cerrada y las otras dos sin empezar, el curso
+    // va por un tercio: decir «100 % evaluado» cerraría la calculadora en
+    // noviembre.
+    const subject = makeSubject()
+    const grades = [makeGrade(subject.id, 7, 100, { term: 'T1' })]
+    const result = subjectResult(subject, grades, DEFAULT_SCALE, 'todas')
+    assert.ok(
+      result.evaluatedPercent > 30 && result.evaluatedPercent < 40,
+      `evaluado=${result.evaluatedPercent}`,
+    )
+  })
+
+  it('sin ninguna nota no hay nota de curso', () => {
+    assert.equal(subjectResult(makeSubject(), [], DEFAULT_SCALE, 'todas').average, null)
+  })
+
+  it('conserva el desglose de todas las notas del curso', () => {
+    const subject = makeSubject()
+    const grades = [
+      makeGrade(subject.id, 8, 0, { term: 'T1' }),
+      makeGrade(subject.id, 4, 0, { term: 'T2' }),
+    ]
+    assert.equal(subjectResult(subject, grades, DEFAULT_SCALE, 'todas').entryCount, 2)
+  })
+})
+
+describe('notas sin categoría en una asignatura que sí tiene categorías', () => {
+  const withCategories = () =>
+    makeSubject({
+      categories: [
+        { id: 'ex', name: 'Exámenes', weight: 70 },
+        { id: 'tr', name: 'Trabajos', weight: 20 },
+        { id: 'ac', name: 'Actitud', weight: 10 },
+      ],
+    })
+
+  it('una nota suelta no puede pesar más que todas las categorías juntas', () => {
+    // Este era el fallo: el cubo de sueltas se quedaba un 100 % propio, y un 9
+    // suelto se comía un 8 de exámenes —(8×70 + 9×100)/170 = 8,59—.
+    const subject = withCategories()
+    const grades = [
+      makeGrade(subject.id, 8, 0, { categoryId: 'ex' }),
+      makeGrade(subject.id, 9, 0, { categoryId: null }),
+    ]
+    const result = subjectResult(subject, grades, DEFAULT_SCALE, 'T1')
+    // Las categorías ya reparten el 100 %: la suelta no cabe.
+    assert.equal(round(result.average!, 2), 8)
+  })
+
+  it('y avisa de que no cuenta, en vez de callárselo', () => {
+    const subject = withCategories()
+    const grades = [
+      makeGrade(subject.id, 8, 0, { categoryId: 'ex' }),
+      makeGrade(subject.id, 9, 0, { categoryId: null }),
+    ]
+    const result = subjectResult(subject, grades, DEFAULT_SCALE, 'T1')
+    assert.ok(
+      result.warnings.some((w) => /sin categoría/.test(w.message)),
+      'falta el aviso de nota sin categoría',
+    )
+  })
+
+  it('si queda hueco libre, la suelta se lo lleva', () => {
+    // Categorías al 80 %: el 20 % que falta es exactamente donde cabe. Es el
+    // caso de borrar «Trabajos 20 %» y que sus notas hereden ese hueco.
+    const subject = makeSubject({ categories: [{ id: 'ex', name: 'Exámenes', weight: 80 }] })
+    const grades = [
+      makeGrade(subject.id, 5, 0, { categoryId: 'ex' }),
+      makeGrade(subject.id, 10, 0, { categoryId: null }),
+    ]
+    const result = subjectResult(subject, grades, DEFAULT_SCALE, 'T1')
+    assert.equal(round(result.average!, 2), 6) // 5×80 + 10×20 = 600 → 6
+  })
+
+  it('si ninguna categoría viva tiene notas, la suelta es lo único que hay', () => {
+    // Borrar la categoría de una nota no puede dejar la asignatura sin media
+    // teniendo notas apuntadas.
+    const subject = makeSubject({ categories: [{ id: 'ex', name: 'Exámenes', weight: 100 }] })
+    const grades = [makeGrade(subject.id, 5, 0, { categoryId: 'borrada' })]
+    assert.equal(round(subjectResult(subject, grades, DEFAULT_SCALE, 'T1').average!, 2), 5)
+  })
 })
 
 describe('subjectResult', () => {

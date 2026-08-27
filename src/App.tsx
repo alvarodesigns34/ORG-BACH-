@@ -33,9 +33,12 @@ function Shell() {
   const summary = useTaskSummary()
   const [creating, setCreating] = useState(false)
 
+  // `summary.today` ya incluye lo atrasado (es la lista real del día), así que
+  // sumarle `overdue` contaba dos veces cada tarea pasada de fecha: una sola
+  // tarea atrasada enseñaba un 2 en la insignia.
   const badges = useMemo<Partial<Record<RouteId, number>>>(
-    () => ({ tareas: summary.overdue.length + summary.today.length }),
-    [summary.overdue.length, summary.today.length],
+    () => ({ tareas: summary.today.length }),
+    [summary.today.length],
   )
 
   const openCreate = useCallback(() => setCreating(true), [])

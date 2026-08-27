@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { CircleCheck, ClipboardPen, Trash2 } from 'lucide-react'
 
 import { today as todayISO } from '@/domain/dates'
 import { parseDecimal, toDecimalInput } from '@/domain/number'
 import { TERMS, type Exam, type TermId } from '@/domain/types'
 import { useDispatch, useSettings } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
+import { GradeEditor } from '@/features/grades/GradeEditor'
 import { Field, Input, NumberInput, Select, Textarea } from '@/ui/fields'
 import { ConfirmDialog, Modal } from '@/ui/Modal'
 import { Button } from '@/ui/primitives'
@@ -35,6 +36,23 @@ export function ExamEditor({ open, onClose, exam, defaults }: ExamEditorProps) {
   const [form, setForm] = useState<FormState>(() => toForm(exam, defaults, settings.activeTerm))
   const [errors, setErrors] = useState<{ subjectId?: string; title?: string; date?: string }>({})
   const [confirmDelete, setConfirmDelete] = useState(false)
+  /**
+   * Valores de partida de la nota que sale de este examen.
+   *
+   * Se guardan en estado en lugar de leerlos del examen al pintar porque al
+   * abrir el editor de notas se cierra el del examen, y entonces `exam` ya es
+   * null. Además, al ser un objeto estable, no reinicia el formulario de
+   * notas en cada render.
+   */
+  const [gradeFrom, setGradeFrom] = useState<{
+    subjectId: string
+    examId: string
+    name: string
+    date: string
+    term: TermId
+    kind: 'examen'
+    weight?: number
+  } | null>(null)
 
   useEffect(() => {
     if (open) {
@@ -235,8 +253,55 @@ export function ExamEditor({ open, onClose, exam, defaults }: ExamEditorProps) {
               />
             )}
           </Field>
+
+          {/* Puente examen → nota. Sin esto, el «Peso 30 %» de un examen era
+              un número con pinta de contar que no contaba en ninguna media:
+              al pasar por aquí, ese peso viaja a la nota, que sí pondera. */}
+          {exam && (
+            <div className="pt-4 border-t border-hairline">
+              {exam.gradeEntryId ? (
+                <p className="flex items-start gap-2 text-[0.8125rem] text-ok bg-ok-quiet rounded-sm px-3 py-2">
+                  <CircleCheck className="size-4 shrink-0 mt-px" />
+                  <span>Este examen ya tiene su nota apuntada.</span>
+                </p>
+              ) : (
+                <>
+                  <Button
+                    onClick={() => {
+                      setGradeFrom({
+                        subjectId: form.subjectId,
+                        examId: exam.id,
+                        name: form.title.trim() || exam.title,
+                        date: form.date,
+                        term: form.term,
+                        kind: 'examen',
+                        weight: (() => {
+                          const w = parseDecimal(form.weight)
+                          return Number.isFinite(w) && w > 0 ? w : undefined
+                        })(),
+                      })
+                      onClose()
+                    }}
+                  >
+                    <ClipboardPen className="size-4" />
+                    Apuntar la nota de este examen
+                  </Button>
+                  <p className="text-[0.75rem] text-ink-3 mt-2 leading-relaxed">
+                    Crea la nota con el nombre, la fecha, la evaluación y el peso de este examen ya
+                    puestos, y los deja enlazados.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </Modal>
+
+      <GradeEditor
+        open={!!gradeFrom}
+        defaults={gradeFrom ?? undefined}
+        onClose={() => setGradeFrom(null)}
+      />
 
       <ConfirmDialog
         open={confirmDelete}
