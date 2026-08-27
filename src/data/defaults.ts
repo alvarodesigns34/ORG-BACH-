@@ -8,8 +8,7 @@
 
 import { DEFAULT_SCALE } from '../domain/grades.ts'
 import { DEFAULT_POMODORO } from '../domain/study.ts'
-import type { AppData, GradeCategory, Settings, SubjectColor } from '../domain/types.ts'
-import { newId } from '../domain/id.ts'
+import type { AppData, Settings, SubjectColor } from '../domain/types.ts'
 
 /** Versión del esquema guardado. Súbela al cambiar la forma de los datos. */
 export const SCHEMA_VERSION = 1
@@ -55,22 +54,6 @@ export function createEmptyData(): AppData {
     goals: [],
     activity: [],
   }
-}
-
-// ---------------------------------------------------------------------------
-// Reparto de pesos por defecto
-// ---------------------------------------------------------------------------
-
-/**
- * Reparto habitual en Bachillerato. Es solo un punto de partida: cada
- * asignatura puede reconfigurarlo entero, porque no todas evalúan igual.
- */
-export function defaultCategories(): GradeCategory[] {
-  return [
-    { id: newId('cat'), name: 'Exámenes', weight: 70 },
-    { id: newId('cat'), name: 'Trabajos y prácticas', weight: 20 },
-    { id: newId('cat'), name: 'Actitud y participación', weight: 10 },
-  ]
 }
 
 // ---------------------------------------------------------------------------

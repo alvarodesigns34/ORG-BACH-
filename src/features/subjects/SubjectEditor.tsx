@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus, Trash2, TriangleAlert, X } from 'lucide-react'
 
-import { defaultCategories } from '@/data/defaults'
 import { checkWeights } from '@/domain/grades'
 import { newId } from '@/domain/id'
 import { parseDecimal, toDecimalInput } from '@/domain/number'
@@ -44,7 +43,13 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
     setRoom(subject?.room ?? '')
     setWeight(toDecimalInput(subject?.weight ?? 4))
     setTarget(toDecimalInput(subject?.targetGrade))
-    setCategories(subject ? subject.categories.map((c) => ({ ...c })) : defaultCategories())
+    // Una asignatura nueva empieza SIN categorías: cada nota pondera
+    // directamente sobre el 100 % de la asignatura hasta que el alumno decida
+    // repartirla él mismo en «Cómo se evalúa». Antes se rellenaba con un
+    // reparto de ejemplo (Exámenes 70 / Trabajos 20 / Actitud 10) que nadie
+    // había pedido, y una nota con peso propio (25 %, por ejemplo) se
+    // calculaba sobre ese reparto ajeno en vez de sobre el total.
+    setCategories(subject ? subject.categories.map((c) => ({ ...c })) : [])
     setError(null)
     // `existing` cambia con cada guardado; incluirlo reiniciaría el formulario
     // en mitad de la edición.

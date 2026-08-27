@@ -260,19 +260,19 @@ function termResult(
     : [buildBreakdown(null, entries, scale)]
 
   // Las notas cuya categoría fue borrada —o que se apuntaron «sin categoría»—
-  // no deben desaparecer del cálculo, pero tampoco pueden valer un 100 %
-  // aparte: con Exámenes 70 / Trabajos 20 / Actitud 10, una sola nota suelta
-  // pesaba más que todos los exámenes juntos (8×70 + 9×100 sobre 170).
+  // no desaparecen del cálculo, pero solo pueden ocupar el hueco que las
+  // categorías dejan sin repartir. Ni más ni menos.
   //
-  // El peso del cubo suelto sale de tres casos, en este orden:
+  // Al borrar «Trabajos 20 %», sus notas heredan justo ese 20 %, que es lo
+  // correcto. Y si las categorías ya se reparten el 100 %, no queda sitio: el
+  // cubo suelto vale cero y se avisa.
   //
-  //  1. Queda hueco sin repartir → ese hueco. Al borrar «Trabajos 20 %», sus
-  //     notas heredan justo el 20 % que quedó libre, que es lo correcto.
-  //  2. No queda hueco, pero ninguna categoría viva tiene notas → el 100 %.
-  //     Es lo único que hay: negarle la media dejaría la asignatura sin nota
-  //     teniendo notas apuntadas.
-  //  3. No queda hueco y alguna categoría viva sí tiene notas → cero, con
-  //     aviso. Aquí es donde estaba el fallo, y donde callar sería peor.
+  // Aquí hubo dos intentos fallidos. El primero le daba el 100 % siempre, y
+  // una nota suelta pesaba más que todas las categorías juntas. El segundo le
+  // daba el 100 % cuando ninguna categoría viva tenía notas, y eso hinchaba el
+  // DENOMINADOR: con las categorías sumando 100 y el cubo suelto otros 100, la
+  // asignatura pasaba a valer 200 % de sí misma y «lo evaluado» salía a mitad
+  // de precio —un examen del 25 % se enseñaba como «12,5 % evaluado»—.
   const declaredCategoryWeight = subject.categories.reduce((acc, c) => acc + (c.weight || 0), 0)
   const freeWeight = round(Math.max(0, 100 - declaredCategoryWeight), 2)
   let crowdedOut = 0
@@ -281,10 +281,8 @@ function termResult(
     const knownIds = new Set(subject.categories.map((c) => c.id))
     const orphans = entries.filter((e) => !e.categoryId || !knownIds.has(e.categoryId))
     if (orphans.length > 0) {
-      const liveHaveEntries = breakdowns.some((b) => b.entries.length > 0)
-      const weight = freeWeight > 0 ? freeWeight : liveHaveEntries ? 0 : 100
-      if (weight <= 0) crowdedOut = orphans.length
-      breakdowns.push(buildBreakdown(null, orphans, scale, weight))
+      if (freeWeight <= 0) crowdedOut = orphans.length
+      breakdowns.push(buildBreakdown(null, orphans, scale, freeWeight))
     }
   }
 

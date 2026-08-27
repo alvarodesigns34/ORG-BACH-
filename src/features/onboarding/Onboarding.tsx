@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, Plus } from 'lucide-react'
 
-import { SUBJECT_CATALOG, defaultCategories, type CatalogSubject } from '@/data/defaults'
+import { SUBJECT_CATALOG, type CatalogSubject } from '@/data/defaults'
 import { nextColor } from '@/domain/palette'
 import type { SubjectColor } from '@/domain/types'
 import { useDispatch, useSettings } from '@/state/StoreProvider'
@@ -70,7 +70,12 @@ export function Onboarding() {
             color,
             weight: preset?.weight ?? 4,
             schedule: [],
-            categories: defaultCategories(),
+            // Sin categorías: cada nota pondera directamente sobre el 100 %
+            // de la asignatura hasta que el alumno decida repartirla él mismo
+            // desde la ficha. Un reparto de ejemplo (70/20/10) que nadie pidió
+            // hacía que un peso puesto a mano se calculara sobre esa plantilla
+            // en vez de sobre el total.
+            categories: [],
           }
         }),
       })

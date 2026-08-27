@@ -236,12 +236,49 @@ describe('notas sin categoría en una asignatura que sí tiene categorías', () 
     assert.equal(round(result.average!, 2), 6) // 5×80 + 10×20 = 600 → 6
   })
 
-  it('si ninguna categoría viva tiene notas, la suelta es lo único que hay', () => {
-    // Borrar la categoría de una nota no puede dejar la asignatura sin media
-    // teniendo notas apuntadas.
+  it('sin hueco libre, la suelta no cuenta aunque sea la única nota', () => {
+    // Antes esto le daba el 100 % «porque es lo único que hay», pero ese 100 %
+    // se sumaba AL LADO del 100 % ya declarado por «Exámenes»: la asignatura
+    // pasaba a valer 200 % de sí misma, y «lo evaluado» salía a mitad de
+    // precio (un examen que vale un 25 % se enseñaba como «12,5 % evaluado»,
+    // el caso real que destapó esto). No hay forma de darle sitio a la suelta
+    // sin inflar ese denominador, así que se queda sin contar y se avisa.
     const subject = makeSubject({ categories: [{ id: 'ex', name: 'Exámenes', weight: 100 }] })
     const grades = [makeGrade(subject.id, 5, 0, { categoryId: 'borrada' })]
-    assert.equal(round(subjectResult(subject, grades, DEFAULT_SCALE, 'T1').average!, 2), 5)
+    const result = subjectResult(subject, grades, DEFAULT_SCALE, 'T1')
+    assert.equal(result.average, null)
+    assert.ok(result.warnings.some((w) => /sin categoría/.test(w.message)))
+  })
+
+  it('el denominador nunca pasa de 100, tenga o no notas cada categoría', () => {
+    const subject = withCategories() // 70 + 20 + 10 = 100
+    const grades = [
+      makeGrade(subject.id, 8, 0, { categoryId: 'ex' }),
+      makeGrade(subject.id, 9, 0, { categoryId: null }), // sin sitio: no cuenta
+    ]
+    const result = subjectResult(subject, grades, DEFAULT_SCALE, 'T1')
+    const totalWeight = result.categories.reduce((sum, c) => sum + c.weight, 0)
+    assert.equal(totalWeight, 100)
+  })
+})
+
+describe('una asignatura sin categorías: cada nota pesa sobre el 100 % directo', () => {
+  // Es el caso por defecto de cualquier asignatura nueva: sin repartos que el
+  // alumno no ha pedido, un peso puesto a mano es un peso sobre el total.
+  it('el peso de la nota es directamente el porcentaje evaluado', () => {
+    const subject = makeSubject({ categories: [] })
+    const grade = makeGrade(subject.id, 9.35, 25) // 9,35 con un peso del 25 %
+    const result = subjectResult(subject, [grade], DEFAULT_SCALE, 'T1')
+    assert.equal(round(result.average!, 4), 9.35)
+    assert.equal(result.evaluatedPercent, 25)
+  })
+
+  it('dos notas con peso se reparten ese mismo total', () => {
+    const subject = makeSubject({ categories: [] })
+    const grades = [makeGrade(subject.id, 8, 25), makeGrade(subject.id, 6, 25)]
+    const result = subjectResult(subject, grades, DEFAULT_SCALE, 'T1')
+    assert.equal(round(result.average!, 4), 7) // (8+6)/2, pesos iguales
+    assert.equal(result.evaluatedPercent, 50)
   })
 })
 
@@ -331,13 +368,23 @@ describe('subjectResult', () => {
     assert.equal(round(result.average!, 4), 7.25)
   })
 
-  it('no pierde las notas cuya categoría se ha borrado', () => {
+  it('no pierde de vista las notas cuya categoría se ha borrado, aunque no siempre puedan contar', () => {
+    // 'c9' ya no existe en la asignatura. La nota sigue apareciendo en el
+    // desglose —`entryCount` la cuenta— pero no puede pesar por su cuenta:
+    // «Exámenes» ya reclama el 100 %, así que no queda hueco donde meterla.
+    //
+    // Antes esto devolvía 5, dándole a la suelta el 100 % PORQUE Exámenes no
+    // tenía notas. Pero ese 100 % se sumaba al 100 % que Exámenes ya reclama
+    // —tenga o no notas dentro—, y la asignatura pasaba a valer el 200 % de sí
+    // misma. Es el mismo fallo que reportó un caso real: un examen con un
+    // peso puesto a mano se enseñaba evaluado a mitad de precio porque el
+    // denominador se había duplicado en silencio.
     const subject = makeSubject({ categories: [{ id: 'c1', name: 'Exámenes', weight: 100 }] })
-    // 'c9' ya no existe en la asignatura.
     const grades = [makeGrade(subject.id, 5, 100, { categoryId: 'c9' })]
     const result = subjectResult(subject, grades, DEFAULT_SCALE)
     assert.equal(result.entryCount, 1)
-    assert.equal(round(result.average!, 4), 5)
+    assert.equal(result.average, null)
+    assert.ok(result.warnings.some((w) => /sin categoría/.test(w.message)))
   })
 
   it('separa las evaluaciones', () => {
