@@ -16,7 +16,7 @@ import {
   today as todayFn,
 } from '@/domain/dates'
 import { colorVar } from '@/domain/palette'
-import type { Subject } from '@/domain/types'
+import type { CalendarEvent, Exam, Subject, Task } from '@/domain/types'
 import { useStore, useSettings, useToday } from '@/state/StoreProvider'
 import { useCalendarIndex, useSubjectMap, type DayItem } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
@@ -38,6 +38,7 @@ const KIND_STYLE: Record<DayItem['kind'], { label: string; shape: string }> = {
 export function CalendarView() {
   const settings = useSettings()
   const today = useToday()
+  const { data } = useStore()
   const index = useCalendarIndex()
   const subjects = useSubjectMap()
 
@@ -45,6 +46,29 @@ export function CalendarView() {
   const [cursor, setCursor] = useState(today)
   const [selected, setSelected] = useState(today)
   const [creating, setCreating] = useState<'tarea' | 'examen' | 'evento' | null>(null)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [editingExam, setEditingExam] = useState<Exam | null>(null)
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
+
+  /**
+   * Abre lo que se ha pulsado en el panel del día.
+   *
+   * El índice del calendario guarda solo lo justo para pintar (`DayItem`), así
+   * que hay que recuperar la entidad real antes de editarla. Las sesiones de
+   * estudio se quedan fuera a propósito: se gestionan desde Estudio, no aquí.
+   */
+  const openItem = (item: DayItem) => {
+    if (item.kind === 'tarea') {
+      const task = data.tasks.find((t) => t.id === item.id)
+      if (task) setEditingTask(task)
+    } else if (item.kind === 'examen') {
+      const exam = data.exams.find((e) => e.id === item.id)
+      if (exam) setEditingExam(exam)
+    } else if (item.kind === 'evento') {
+      const event = data.events.find((e) => e.id === item.id)
+      if (event) setEditingEvent(event)
+    }
+  }
 
   const goToday = () => {
     setCursor(todayFn())
@@ -155,6 +179,7 @@ export function CalendarView() {
               items={index.get(cursor) ?? []}
               subjects={subjects}
               onCreate={setCreating}
+              onOpen={openItem}
               expanded
             />
           )}
@@ -168,6 +193,7 @@ export function CalendarView() {
               items={index.get(selected) ?? []}
               subjects={subjects}
               onCreate={setCreating}
+              onOpen={openItem}
             />
           </div>
         )}
@@ -187,6 +213,16 @@ export function CalendarView() {
         open={creating === 'evento'}
         onClose={() => setCreating(null)}
         defaults={{ date: mode === 'dia' ? cursor : selected }}
+      />
+
+      {/* Edición de lo que ya existe. Van aparte de los de alta para no
+          mezclar «crear con esta fecha» con «abrir esto concreto». */}
+      <TaskEditor open={!!editingTask} task={editingTask} onClose={() => setEditingTask(null)} />
+      <ExamEditor open={!!editingExam} exam={editingExam} onClose={() => setEditingExam(null)} />
+      <EventEditor
+        open={!!editingEvent}
+        event={editingEvent}
+        onClose={() => setEditingEvent(null)}
       />
     </Page>
   )
@@ -383,6 +419,7 @@ function DayPanel({
   items,
   subjects,
   onCreate,
+  onOpen,
   expanded,
 }: {
   day: string
@@ -390,6 +427,7 @@ function DayPanel({
   items: DayItem[]
   subjects: Map<string, Subject>
   onCreate: (kind: 'tarea' | 'examen' | 'evento') => void
+  onOpen: (item: DayItem) => void
   expanded?: boolean
 }) {
   const { data } = useStore()
@@ -417,9 +455,13 @@ function DayPanel({
             const subject = subjects.get(item.subjectId ?? '')
             const color = subject ? colorVar(subject.color) : 'var(--c-ink-3)'
             const exam = item.kind === 'examen' ? data.exams.find((e) => e.id === item.id) : null
+            // Las sesiones de estudio no se editan desde aquí: no hay editor
+            // para ellas, y una fila que parece pulsable y no hace nada es
+            // peor que una fila que ya se ve como texto.
+            const editable = item.kind !== 'estudio'
 
-            return (
-              <li key={item.id} className="flex items-start gap-3 px-5 py-3.5">
+            const body = (
+              <>
                 <span
                   aria-hidden
                   className={cx('mt-1.5 size-2 shrink-0', KIND_STYLE[item.kind].shape)}
@@ -444,6 +486,23 @@ function DayPanel({
                     <p className="text-[0.75rem] text-ink-2 mt-1.5 leading-relaxed">{exam.topics}</p>
                   )}
                 </div>
+              </>
+            )
+
+            return (
+              <li key={item.id}>
+                {editable ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpen(item)}
+                    aria-label={`Editar ${KIND_STYLE[item.kind].label.toLowerCase()}: ${item.title}`}
+                    className="w-full text-left flex items-start gap-3 px-5 py-3.5 hover:bg-sunken/50 transition-colors duration-150"
+                  >
+                    {body}
+                  </button>
+                ) : (
+                  <div className="flex items-start gap-3 px-5 py-3.5">{body}</div>
+                )}
               </li>
             )
           })}

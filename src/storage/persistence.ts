@@ -30,7 +30,8 @@ import {
 
 export type LoadOutcome =
   | { status: 'nuevo'; data: AppData }
-  | { status: 'cargado'; data: AppData }
+  /** `warning` != null cuando la carga descartó registros rotos. */
+  | { status: 'cargado'; data: AppData; warning: string | null }
   | { status: 'recuperado'; data: AppData; error: string }
 
 const COLLECTIONS = [
@@ -143,8 +144,22 @@ export function migrateWithReport(raw: unknown): MigrateReport {
   return { data, dropped, totalDropped }
 }
 
-function migrate(raw: unknown): AppData {
-  return migrateWithReport(raw).data
+const COLLECTION_NAMES: Record<string, string> = {
+  subjects: 'asignaturas',
+  tasks: 'tareas',
+  grades: 'notas',
+  exams: 'exámenes',
+  events: 'eventos',
+  sessions: 'sesiones de estudio',
+  goals: 'objetivos',
+  activity: 'entradas de actividad',
+}
+
+/** «2 asignaturas, 1 nota» — el detalle de lo descartado, en cristiano. */
+function describeDropped(dropped: MigrateReport['dropped']): string {
+  return Object.entries(dropped)
+    .map(([key, count]) => `${count} ${COLLECTION_NAMES[key] ?? key}`)
+    .join(', ')
 }
 
 export function load(): LoadOutcome {
@@ -164,12 +179,28 @@ export function load(): LoadOutcome {
   if (!raw) return { status: 'nuevo', data: createEmptyData() }
 
   try {
-    return { status: 'cargado', data: migrate(JSON.parse(raw)) }
+    // Al arrancar se valida igual que al importar. Antes se usaba `migrate()`,
+    // que tira el informe: un registro que el validador ya no acepta
+    // desaparecía en el siguiente guardado sin que nadie se enterara. Importar
+    // sí avisaba; abrir la aplicación, no.
+    const report = migrateWithReport(JSON.parse(raw))
+    return {
+      status: 'cargado',
+      data: report.data,
+      warning:
+        report.totalDropped === 0
+          ? null
+          : `Al abrir se descartaron ${report.totalDropped} registros con datos incompletos (${describeDropped(report.dropped)}). El resto se ha cargado con normalidad.`,
+    }
   } catch (error) {
+    // El contenido ilegible se aparta antes de seguir. No se puede leer, pero
+    // tampoco se tira: es lo único que queda del curso y quizá se pueda
+    // rescatar a mano. Ver `readBackup()`.
+    backupRaw(raw)
     return {
       status: 'recuperado',
       data: createEmptyData(),
-      error: `Los datos guardados no se pudieron leer (${describe(error)}).`,
+      error: `Los datos guardados no se pudieron leer (${describe(error)}). Se ha guardado una copia del contenido original por si se puede recuperar; no se sobrescribirá hasta que hagas algún cambio.`,
     }
   }
 }
@@ -196,6 +227,37 @@ export function clear(): void {
     localStorage.removeItem(STORAGE_KEY)
   } catch {
     // Si no se puede borrar, el siguiente guardado sobrescribirá igualmente.
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Copia del contenido ilegible
+// ---------------------------------------------------------------------------
+
+/**
+ * Dónde se aparta un contenido que no se pudo interpretar.
+ *
+ * No es una copia de seguridad periódica: solo se escribe cuando el JSON
+ * guardado resulta ilegible al arrancar, y precisamente para que el arranque
+ * en vacío no sea lo último que le pasa a esos datos.
+ */
+const BACKUP_KEY = `${STORAGE_KEY}.bak`
+
+function backupRaw(raw: string): void {
+  try {
+    localStorage.setItem(BACKUP_KEY, raw)
+  } catch {
+    // Si no hay hueco para la copia, al menos el original sigue en su clave:
+    // el guardado tampoco lo pisará mientras no haya cambios.
+  }
+}
+
+/** Contenido apartado por ilegible, si lo hay. Para recuperarlo a mano. */
+export function readBackup(): string | null {
+  try {
+    return localStorage.getItem(BACKUP_KEY)
+  } catch {
+    return null
   }
 }
 
@@ -267,17 +329,6 @@ export type ImportResult =
     }
   | { ok: false; error: string }
 
-const COLLECTION_NAMES: Record<string, string> = {
-  subjects: 'asignaturas',
-  tasks: 'tareas',
-  grades: 'notas',
-  exams: 'exámenes',
-  events: 'eventos',
-  sessions: 'sesiones de estudio',
-  goals: 'objetivos',
-  activity: 'entradas de actividad',
-}
-
 export function importJSON(text: string): ImportResult {
   let parsed: unknown
   try {
@@ -302,9 +353,7 @@ export function importJSON(text: string): ImportResult {
   // Importar sustituye TODO lo que había. Si el archivo traía registros
   // corruptos, el alumno tiene que enterarse en ese momento: descubrir tres
   // meses después que faltan notas, sin saber por qué, es mucho peor.
-  const detail = Object.entries(report.dropped)
-    .map(([key, count]) => `${count} ${COLLECTION_NAMES[key] ?? key}`)
-    .join(', ')
+  const detail = describeDropped(report.dropped)
 
   return {
     ok: true,

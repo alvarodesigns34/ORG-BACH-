@@ -16,9 +16,44 @@ interface AppShellProps {
   children: ReactNode
 }
 
-export function AppShell({ current, onCreate, badges, children }: AppShellProps) {
-  const { storageError, dismissStorageError } = useStore()
+/**
+ * Aviso del almacenamiento, en su propia franja.
+ *
+ * Vive fuera de `AppShell` porque el caso que más importa —los datos guardados
+ * no se pueden leer— deja la aplicación en estado vacío, y con el estado vacío
+ * se pinta el alta en lugar del shell. Si el aviso viviera solo aquí dentro,
+ * el único momento en que hay algo grave que contar sería justo el momento en
+ * que nadie lo vería.
+ */
+export function StorageBanner() {
+  const { storageNotice, dismissStorageNotice } = useStore()
+  if (!storageNotice) return null
 
+  const isError = storageNotice.level === 'error'
+
+  return (
+    <div
+      // 'alert' interrumpe al lector de pantalla; 'status' espera a que termine
+      // lo que estaba leyendo. Un fallo de guardado merece lo primero; unos
+      // registros descartados al abrir, no.
+      role={isError ? 'alert' : 'status'}
+      className={cx(
+        'flex items-start gap-3 px-4 sm:px-6 py-3 border-b',
+        isError ? 'bg-danger-quiet border-danger/25' : 'bg-warn-quiet border-warn/25',
+      )}
+    >
+      <TriangleAlert
+        className={cx('size-4 shrink-0 mt-0.5', isError ? 'text-danger' : 'text-warn')}
+      />
+      <p className="text-[0.8125rem] text-ink-2 flex-1 min-w-0">{storageNotice.text}</p>
+      <IconButton label="Descartar aviso" size="sm" onClick={dismissStorageNotice}>
+        <X className="size-4" />
+      </IconButton>
+    </div>
+  )
+}
+
+export function AppShell({ current, onCreate, badges, children }: AppShellProps) {
   return (
     <div className="flex min-h-dvh">
       <Sidebar current={current} onCreate={onCreate} badges={badges} />
@@ -38,18 +73,7 @@ export function AppShell({ current, onCreate, badges, children }: AppShellProps)
           <ThemeToggle />
         </header>
 
-        {storageError && (
-          <div
-            role="alert"
-            className="flex items-start gap-3 px-4 sm:px-6 py-3 bg-danger-quiet border-b border-danger/25"
-          >
-            <TriangleAlert className="size-4 text-danger shrink-0 mt-0.5" />
-            <p className="text-[0.8125rem] text-ink-2 flex-1 min-w-0">{storageError}</p>
-            <IconButton label="Descartar aviso" size="sm" onClick={dismissStorageError}>
-              <X className="size-4" />
-            </IconButton>
-          </div>
-        )}
+        <StorageBanner />
 
         <main
           id="contenido"

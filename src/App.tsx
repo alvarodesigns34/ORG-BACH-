@@ -4,7 +4,7 @@ import { useSettings, useStore } from '@/state/StoreProvider'
 import { StoreProvider } from '@/state/StoreProvider'
 import { useTaskSummary } from '@/state/selectors'
 import { useRoute, type Route, type RouteId } from '@/router'
-import { AppShell } from '@/layout/AppShell'
+import { AppShell, StorageBanner } from '@/layout/AppShell'
 import { TaskEditor } from '@/features/tasks/TaskEditor'
 import { Onboarding } from '@/features/onboarding/Onboarding'
 import { DashboardView } from '@/views/DashboardView'
@@ -57,7 +57,17 @@ function Shell() {
   }, [])
 
   // El alta bloquea el resto: sin nombre ni asignaturas no hay nada que mostrar.
-  if (!settings.onboarded) return <Onboarding />
+  // El aviso del almacenamiento sí pasa por encima: si se ha llegado aquí
+  // porque los datos guardados eran ilegibles, esto parece un primer arranque
+  // sin serlo, y es justo entonces cuando hay algo importante que contar.
+  if (!settings.onboarded) {
+    return (
+      <>
+        <StorageBanner />
+        <Onboarding />
+      </>
+    )
+  }
 
   return (
     <>

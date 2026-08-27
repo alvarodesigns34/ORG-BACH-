@@ -15,14 +15,27 @@ import type { AppData, DateISO, ThemePreference } from '@/domain/types'
 import * as storage from '@/storage/persistence'
 import { reducer, type Action } from './reducer'
 
+/**
+ * Aviso sobre el almacenamiento.
+ *
+ * El nivel importa: «no se puede guardar» y «se han descartado dos notas al
+ * abrir» no son lo mismo. Pintar el segundo en rojo de error enseña al alumno
+ * a ignorar el banner, que es justo lo que no queremos el día que salga el
+ * primero.
+ */
+export interface StorageNotice {
+  level: 'error' | 'aviso'
+  text: string
+}
+
 interface StoreValue {
   data: AppData
   dispatch: (action: Action) => void
   /** Día actual. Se refresca solo: la app puede quedarse abierta toda la noche. */
   today: DateISO
-  /** Mensaje si el almacenamiento falla; null si todo va bien. */
-  storageError: string | null
-  dismissStorageError: () => void
+  /** Aviso del almacenamiento; null si no hay nada que contar. */
+  storageNotice: StorageNotice | null
+  dismissStorageNotice: () => void
 }
 
 const StoreContext = createContext<StoreValue | null>(null)
@@ -33,25 +46,48 @@ const SAVE_DEBOUNCE_MS = 350
 export function StoreProvider({ children }: { children: ReactNode }) {
   const initial = useMemo(() => storage.load(), [])
   const [data, dispatch] = useReducer(reducer, initial.data)
-  const [storageError, setStorageError] = useState<string | null>(
-    initial.status === 'recuperado' ? initial.error : null,
-  )
+  const [storageNotice, setStorageNotice] = useState<StorageNotice | null>(() => {
+    if (initial.status === 'recuperado') return { level: 'error', text: initial.error }
+    if (initial.status === 'cargado' && initial.warning) {
+      return { level: 'aviso', text: initial.warning }
+    }
+    return null
+  })
   const [today, setToday] = useState<DateISO>(() => todayISO())
 
   // --- Guardado ---------------------------------------------------------
-  // El primer render no debe escribir: acabamos de leer justo estos datos.
-  const isFirstRender = useRef(true)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /**
+   * Último estado que se sabe escrito en disco.
+   *
+   * Se compara POR REFERENCIA, no con un booleano de «primer render». El
+   * reductor solo devuelve un objeto nuevo cuando de verdad cambia algo, así
+   * que esta igualdad responde exactamente a la pregunta «¿hay algo que
+   * guardar?» —y, a diferencia del booleano, no se gasta: en desarrollo
+   * StrictMode vuelve a montar los efectos, consumía el «primer render» y el
+   * segundo montaje escribía datos que nadie había tocado.
+   *
+   * Que no escriba de más importa sobre todo cuando la carga ha fallado: si el
+   * JSON guardado era ilegible, arrancamos en vacío, y volcar ese vacío
+   * destruiría lo único que quedaba del curso —justo después de decirle al
+   * alumno que quizá se pueda recuperar—.
+   */
+  const lastPersisted = useRef(data)
+  /** Hay un cambio del alumno todavía sin escribir. */
+  const pendingWrite = useRef(false)
 
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false
-      return
-    }
+    if (data === lastPersisted.current) return
+    pendingWrite.current = true
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(() => {
       const result = storage.save(data)
-      setStorageError(result.ok ? null : result.error)
+      pendingWrite.current = false
+      if (result.ok) lastPersisted.current = data
+      // Un guardado correcto retira el aviso de arranque: si había registros
+      // descartados, ya se ha escrito el estado bueno y contarlo otra vez
+      // sobra.
+      setStorageNotice(result.ok ? null : { level: 'error', text: result.error })
     }, SAVE_DEBOUNCE_MS)
 
     return () => {
@@ -61,11 +97,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // Cerrar la pestaña justo después de escribir no debe perder el último
   // cambio: se fuerza el guardado pendiente antes de que la página se oculte.
+  // Solo el pendiente: sin cambios que salvar no se escribe nada.
   const latest = useRef(data)
   latest.current = data
   useEffect(() => {
     const flush = () => {
-      if (document.visibilityState === 'hidden') storage.save(latest.current)
+      if (document.visibilityState !== 'hidden' || !pendingWrite.current) return
+      if (storage.save(latest.current).ok) lastPersisted.current = latest.current
+      pendingWrite.current = false
     }
     document.addEventListener('visibilitychange', flush)
     window.addEventListener('pagehide', flush)
@@ -100,11 +139,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const dismissStorageError = useCallback(() => setStorageError(null), [])
+  const dismissStorageNotice = useCallback(() => setStorageNotice(null), [])
 
   const value = useMemo<StoreValue>(
-    () => ({ data, dispatch, today, storageError, dismissStorageError }),
-    [data, today, storageError, dismissStorageError],
+    () => ({ data, dispatch, today, storageNotice, dismissStorageNotice }),
+    [data, today, storageNotice, dismissStorageNotice],
   )
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>

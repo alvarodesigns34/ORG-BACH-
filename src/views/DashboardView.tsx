@@ -11,7 +11,7 @@ import {
 
 import { formatDuration, formatLongDate, greeting } from '@/domain/dates'
 import { formatGrade, numeralTone } from '@/domain/grades'
-import type { Task } from '@/domain/types'
+import type { Exam, Task } from '@/domain/types'
 import { hrefFor } from '@/router'
 import { useSettings, useStore, useToday } from '@/state/StoreProvider'
 import {
@@ -43,6 +43,7 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
 
   const [editing, setEditing] = useState<Task | null>(null)
   const [creatingExam, setCreatingExam] = useState(false)
+  const [editingExam, setEditingExam] = useState<Exam | null>(null)
 
   const firstName = settings.userName.split(' ')[0]
 
@@ -168,6 +169,7 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
                     exam={exam}
                     subject={subjects.get(exam.subjectId)}
                     today={today}
+                    onOpen={setEditingExam}
                   />
                 ))}
               </div>
@@ -182,6 +184,11 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
 
       <TaskEditor open={!!editing} task={editing} onClose={() => setEditing(null)} />
       <ExamEditor open={creatingExam} onClose={() => setCreatingExam(false)} />
+      <ExamEditor
+        open={!!editingExam}
+        exam={editingExam}
+        onClose={() => setEditingExam(null)}
+      />
     </Page>
   )
 }

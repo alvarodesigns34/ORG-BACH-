@@ -4,7 +4,7 @@ import { ArrowLeft, CalendarPlus, ListChecks, Pencil, Plus } from 'lucide-react'
 import { formatGrade, formatPercent, numeralTone } from '@/domain/grades'
 import { colorVar, quietVar } from '@/domain/palette'
 import { isDone, sortTasks } from '@/domain/tasks'
-import { TERMS, type GradeEntry, type Task } from '@/domain/types'
+import { TERMS, type Exam, type GradeEntry, type Task } from '@/domain/types'
 import { hrefFor } from '@/router'
 import { useSettings, useStore, useToday } from '@/state/StoreProvider'
 import { useSubjectResults } from '@/state/selectors'
@@ -34,6 +34,7 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [creatingTask, setCreatingTask] = useState(false)
   const [creatingExam, setCreatingExam] = useState(false)
+  const [editingExam, setEditingExam] = useState<Exam | null>(null)
   const [calculatorOpen, setCalculatorOpen] = useState(false)
 
   const tasks = useMemo(
@@ -188,7 +189,14 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
             ) : (
               <div className="px-2 pb-3">
                 {exams.map((exam) => (
-                  <ExamCard key={exam.id} exam={exam} subject={subject} today={today} hideSubject />
+                  <ExamCard
+                    key={exam.id}
+                    exam={exam}
+                    subject={subject}
+                    today={today}
+                    onOpen={setEditingExam}
+                    hideSubject
+                  />
                 ))}
               </div>
             )}
@@ -255,6 +263,11 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
         open={creatingExam}
         onClose={() => setCreatingExam(false)}
         defaults={{ subjectId: subject.id }}
+      />
+      <ExamEditor
+        open={!!editingExam}
+        exam={editingExam}
+        onClose={() => setEditingExam(null)}
       />
       <GradeCalculator
         open={calculatorOpen}
