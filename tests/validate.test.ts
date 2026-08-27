@@ -11,6 +11,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import { DEFAULT_SETTINGS } from '../src/data/defaults.ts'
+import { today as todayISO } from '../src/domain/dates.ts'
 import { importJSON, migrateWithReport } from '../src/storage/persistence.ts'
 import {
   parseCollection,
@@ -123,9 +124,17 @@ describe('parseGrade', () => {
     assert.equal(parseGrade({ ...valid, term: 'T9' })?.term, 'T1')
   })
 
-  it('rechaza fechas que no existen', () => {
+  it('sustituye una fecha que no existe por hoy, sin tirar la nota', () => {
     // El 31 de febrero pasa una comprobación de forma pero no es un día real.
-    assert.notEqual(parseGrade({ ...valid, date: '2026-02-31' })?.date, '2026-02-31')
+    // La nota se conserva —tiene asignatura y puntuación, que es lo que entra
+    // en la media— y la fecha pasa a ser hoy. Se comprueba el valor EXACTO: el
+    // `notEqual` anterior daba por bueno tirarla, recortarla o cualquier otra
+    // sustitución, y tapaba que la que había fuera en UTC.
+    assert.equal(parseGrade({ ...valid, date: '2026-02-31' })?.date, todayISO())
+  })
+
+  it('rechaza una nota negativa igual que una por encima del máximo', () => {
+    assert.equal(parseGrade({ ...valid, score: -3 }), null)
   })
 })
 
@@ -234,16 +243,22 @@ describe('parseCollection', () => {
 describe('sanitizeSettings', () => {
   it('no deja el aprobado por encima del máximo', () => {
     const settings = sanitizeSettings({ gradeScale: { max: 10, pass: 50 } }, DEFAULT_SETTINGS)
-    assert.ok(settings.gradeScale.pass <= settings.gradeScale.max)
+    assert.equal(settings.gradeScale.max, 10)
+    assert.equal(settings.gradeScale.pass, 10)
   })
 
-  it('recorta valores fuera de rango', () => {
+  it('recorta valores fuera de rango al límite exacto', () => {
+    // Con `assert.ok(x <= 365)` pasaba cualquier recorte, incluido uno que
+    // dejara el aviso en un día. Se fija el valor.
     const settings = sanitizeSettings(
       { examAlertDays: 5000, pomodoroMinutes: 0 },
       DEFAULT_SETTINGS,
     )
-    assert.ok(settings.examAlertDays <= 365)
-    assert.ok(settings.pomodoroMinutes >= 1)
+    assert.equal(settings.examAlertDays, 365)
+    // Al MÍNIMO del rango (1), no al valor por defecto (25): el recorte
+    // acerca al límite, no repone el ajuste. El `assert.ok(x >= 1)` anterior
+    // daba por buenas las dos lecturas.
+    assert.equal(settings.pomodoroMinutes, 1)
   })
 
   it('con ajustes ilegibles devuelve los de por defecto', () => {
@@ -263,6 +278,52 @@ describe('importJSON', () => {
   it('rechaza un JSON que no es una copia de la aplicación', () => {
     const result = importJSON('{"cualquier":"cosa"}')
     assert.equal(result.ok, false)
+  })
+
+  it('rechaza una colección conocida pero vacía', () => {
+    // Antes bastaba con que el archivo trajera una clave conocida, aunque no
+    // tuviera nada dentro: un `{"tasks": []}` cualquiera vaciaba el curso.
+    assert.equal(importJSON('{"tasks":[]}').ok, false)
+    assert.equal(importJSON('{"subjects":[],"grades":[]}').ok, false)
+  })
+
+  it('acepta una copia de la aplicación aunque venga sin contenido', () => {
+    // Con versión y ajustes sí es una copia nuestra: exportar un curso recién
+    // empezado y volver a importarlo tiene que funcionar.
+    const vacia = JSON.stringify({ version: 1, settings: DEFAULT_SETTINGS, subjects: [] })
+    assert.equal(importJSON(vacia).ok, true)
+  })
+
+  it('acepta un archivo suelto si trae datos de verdad', () => {
+    const suelto = JSON.stringify({
+      subjects: [
+        { id: 'mat', name: 'Matemáticas I', color: 'indigo', weight: 4, schedule: [], categories: [] },
+      ],
+    })
+    assert.equal(importJSON(suelto).ok, true)
+  })
+
+  it('no deja la aplicación en la pantalla de alta con datos dentro', () => {
+    // Sin `onboarded: true`, el alta se pintaba ENCIMA de lo recién importado
+    // y terminarla añadía asignaturas sobre las que ya estaban: curso
+    // duplicado por importar una copia.
+    const suelto = JSON.stringify({
+      subjects: [
+        { id: 'mat', name: 'Matemáticas I', color: 'indigo', weight: 4, schedule: [], categories: [] },
+      ],
+    })
+    const result = importJSON(suelto)
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    assert.equal(result.data.settings.onboarded, true)
+  })
+
+  it('pero no marca el alta si la copia viene sin asignaturas', () => {
+    const vacia = JSON.stringify({ version: 1, settings: DEFAULT_SETTINGS, subjects: [] })
+    const result = importJSON(vacia)
+    assert.equal(result.ok, true)
+    if (!result.ok) return
+    assert.equal(result.data.settings.onboarded, false)
   })
 
   it('acepta una copia sana sin descartar nada', () => {

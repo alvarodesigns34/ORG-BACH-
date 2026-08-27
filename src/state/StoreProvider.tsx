@@ -191,10 +191,6 @@ export function useStore(): StoreValue {
   return value
 }
 
-export function useData(): AppData {
-  return useStore().data
-}
-
 export function useDispatch(): (action: Action) => void {
   return useStore().dispatch
 }

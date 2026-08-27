@@ -39,5 +39,5 @@ export const NAV_GROUPS: { id: NavItem['group']; label: string }[] = [
   { id: 'sistema', label: 'Seguimiento' },
 ]
 
-/** Las cinco secciones de la barra inferior en móvil; el resto va en «Más». */
+/** Las cuatro secciones de la barra inferior en móvil; el resto va en «Más». */
 export const MOBILE_PRIMARY: RouteId[] = ['inicio', 'tareas', 'calendario', 'notas']

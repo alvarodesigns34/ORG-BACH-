@@ -12,7 +12,7 @@ export function cx(...parts: (string | false | null | undefined)[]): string {
 // Botones
 // ---------------------------------------------------------------------------
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'quiet'
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
 type ButtonSize = 'sm' | 'md' | 'lg'
 
 const VARIANTS: Record<ButtonVariant, string> = {
@@ -21,7 +21,6 @@ const VARIANTS: Record<ButtonVariant, string> = {
   secondary:
     'bg-surface text-ink border border-hairline-strong hover:bg-raised hover:border-ink-3/40 active:translate-y-px',
   ghost: 'bg-transparent text-ink-2 border border-transparent hover:bg-sunken hover:text-ink',
-  quiet: 'bg-accent-quiet text-accent border border-transparent hover:brightness-97',
   danger: 'bg-transparent text-danger border border-transparent hover:bg-danger-quiet',
 }
 
@@ -147,50 +146,6 @@ export function SectionHeader({ title, hint, action, className }: SectionHeaderP
 // ---------------------------------------------------------------------------
 // Etiquetas
 // ---------------------------------------------------------------------------
-
-type BadgeTone = 'neutral' | 'accent' | 'ok' | 'warn' | 'danger'
-
-const BADGE_TONES: Record<BadgeTone, string> = {
-  neutral: 'bg-sunken text-ink-2',
-  accent: 'bg-accent-quiet text-accent',
-  ok: 'bg-ok-quiet text-ok',
-  warn: 'bg-warn-quiet text-warn',
-  danger: 'bg-danger-quiet text-danger',
-}
-
-export function Badge({
-  children,
-  tone = 'neutral',
-  className,
-}: {
-  children: ReactNode
-  tone?: BadgeTone
-  className?: string
-}) {
-  return (
-    <span
-      className={cx(
-        'inline-flex items-center gap-1 rounded-xs px-1.5 py-0.5',
-        'text-[0.6875rem] font-semibold tracking-[0.01em] whitespace-nowrap',
-        BADGE_TONES[tone],
-        className,
-      )}
-    >
-      {children}
-    </span>
-  )
-}
-
-/** Punto de color de una asignatura. Siempre acompaña a un texto, nunca solo. */
-export function SubjectDot({ subject, className }: { subject?: Subject; className?: string }) {
-  return (
-    <span
-      aria-hidden
-      className={cx('inline-block size-2 rounded-full shrink-0', className)}
-      style={{ background: subject ? colorVar(subject.color) : 'var(--c-ink-3)' }}
-    />
-  )
-}
 
 export function SubjectTag({ subject, className }: { subject?: Subject; className?: string }) {
   if (!subject) {

@@ -373,8 +373,9 @@ describe('globalAverage', () => {
   })
 
   it('las asignaturas sin notas quedan fuera de la media', () => {
-    // Si 'c' contara como 0, la aritmética sería 5, no 7,5.
-    assert.notEqual(globalAverage([a, b, c], results, 'aritmetica'), 5)
+    // Si 'c' contara como 0, la aritmética sería 5. Se fija el valor exacto:
+    // un `notEqual(…, 5)` lo daba por bueno con casi cualquier número.
+    assert.equal(globalAverage([a, b, c], results, 'aritmetica'), 7.5)
   })
 
   it('sin ninguna nota devuelve null', () => {

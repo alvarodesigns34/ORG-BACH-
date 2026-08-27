@@ -7,7 +7,7 @@
  * `parseDay` construye la fecha componente a componente.
  */
 
-import type { DateISO, TimeHM } from './types.ts'
+import type { DateISO } from './types.ts'
 
 export const WEEKDAYS_LONG = [
   'domingo',
@@ -78,10 +78,6 @@ export function addMonths(day: DateISO, amount: number): DateISO {
 export function daysUntil(day: DateISO, from: DateISO = today()): number {
   const ms = parseDay(day).getTime() - parseDay(from).getTime()
   return Math.round(ms / 86_400_000)
-}
-
-export function isPast(day: DateISO, from: DateISO = today()): boolean {
-  return daysUntil(day, from) < 0
 }
 
 export function isToday(day: DateISO, from: DateISO = today()): boolean {
@@ -178,12 +174,6 @@ export function formatDuration(minutes: number): string {
 }
 
 /** Minutos transcurridos entre dos horas 'HH:MM'. */
-export function minutesBetween(start: TimeHM, end: TimeHM): number {
-  const [sh, sm] = start.split(':').map(Number)
-  const [eh, em] = end.split(':').map(Number)
-  return eh * 60 + em - (sh * 60 + sm)
-}
-
 /** Saludo segun la hora del sistema. */
 export function greeting(date: Date = new Date()): string {
   const h = date.getHours()

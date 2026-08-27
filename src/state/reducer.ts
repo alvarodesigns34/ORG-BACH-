@@ -21,7 +21,6 @@ import type {
   Settings,
   StudySession,
   Subject,
-  Subtask,
   Task,
 } from '../domain/types.ts'
 
@@ -38,7 +37,6 @@ type New<T extends { id: ID; createdAt: string }> = Omit<T, 'id' | 'createdAt'>
 export type Action =
   | { type: 'settings/update'; patch: Partial<Settings> }
   | { type: 'data/replace'; data: AppData }
-  | { type: 'data/removeDemo' }
   | { type: 'subject/add'; subject: New<Subject> }
   | { type: 'subject/addMany'; subjects: New<Subject>[] }
   | { type: 'subject/update'; id: ID; patch: Partial<Subject> }
@@ -47,10 +45,6 @@ export type Action =
   | { type: 'task/update'; id: ID; patch: Partial<Task> }
   | { type: 'task/remove'; id: ID }
   | { type: 'task/toggle'; id: ID }
-  | { type: 'subtask/add'; taskId: ID; title: string }
-  | { type: 'subtask/toggle'; taskId: ID; subtaskId: ID }
-  | { type: 'subtask/rename'; taskId: ID; subtaskId: ID; title: string }
-  | { type: 'subtask/remove'; taskId: ID; subtaskId: ID }
   | { type: 'grade/add'; grade: New<GradeEntry>; linkExamId?: ID }
   | { type: 'grade/update'; id: ID; patch: Partial<GradeEntry> }
   | { type: 'grade/remove'; id: ID }
@@ -108,25 +102,6 @@ export function reducer(state: AppData, action: Action): AppData {
 
     case 'data/replace':
       return action.data
-
-    case 'data/removeDemo': {
-      // Se filtra colección por colección para no arrastrar referencias
-      // huérfanas: una nota de ejemplo apuntando a una asignatura ya borrada
-      // dejaría la media descuadrada.
-      const demoSubjects = new Set(state.subjects.filter((s) => s.demo).map((s) => s.id))
-      const keepSubject = (id?: ID) => !id || !demoSubjects.has(id)
-      return {
-        ...state,
-        subjects: state.subjects.filter((s) => !s.demo),
-        tasks: state.tasks.filter((t) => !t.demo && keepSubject(t.subjectId)),
-        grades: state.grades.filter((g) => !g.demo && keepSubject(g.subjectId)),
-        exams: state.exams.filter((e) => !e.demo && keepSubject(e.subjectId)),
-        events: state.events.filter((e) => !e.demo && keepSubject(e.subjectId)),
-        sessions: state.sessions.filter((s) => !s.demo && keepSubject(s.subjectId)),
-        goals: state.goals.filter((g) => !g.demo && keepSubject(g.subjectId)),
-        activity: [],
-      }
-    }
 
     // --- Asignaturas ---
 
@@ -276,56 +251,6 @@ export function reducer(state: AppData, action: Action): AppData {
     }
 
     // --- Subtareas ---
-
-    case 'subtask/add': {
-      const subtask: Subtask = { id: newId('st'), title: action.title, done: false }
-      return {
-        ...state,
-        tasks: state.tasks.map((t) =>
-          t.id === action.taskId ? { ...t, subtasks: [...t.subtasks, subtask] } : t,
-        ),
-      }
-    }
-
-    case 'subtask/toggle':
-      return {
-        ...state,
-        tasks: state.tasks.map((t) =>
-          t.id === action.taskId
-            ? {
-                ...t,
-                subtasks: t.subtasks.map((s) =>
-                  s.id === action.subtaskId ? { ...s, done: !s.done } : s,
-                ),
-              }
-            : t,
-        ),
-      }
-
-    case 'subtask/rename':
-      return {
-        ...state,
-        tasks: state.tasks.map((t) =>
-          t.id === action.taskId
-            ? {
-                ...t,
-                subtasks: t.subtasks.map((s) =>
-                  s.id === action.subtaskId ? { ...s, title: action.title } : s,
-                ),
-              }
-            : t,
-        ),
-      }
-
-    case 'subtask/remove':
-      return {
-        ...state,
-        tasks: state.tasks.map((t) =>
-          t.id === action.taskId
-            ? { ...t, subtasks: t.subtasks.filter((s) => s.id !== action.subtaskId) }
-            : t,
-        ),
-      }
 
     // --- Notas ---
 

@@ -341,14 +341,36 @@ export function importJSON(text: string): ImportResult {
     return { ok: false, error: 'El archivo no tiene el formato esperado.' }
   }
 
-  // Un JSON cualquiera pasaría la comprobación anterior: exigimos al menos una
-  // colección conocida para no vaciar los datos del alumno por un archivo suelto.
-  const hasKnownShape = COLLECTIONS.some((key) => Array.isArray((parsed as Record<string, unknown>)[key]))
-  if (!hasKnownShape) {
-    return { ok: false, error: 'El archivo no parece una copia de Bachillerato OS.' }
+  // Importar SUSTITUYE el curso entero, así que el listón para aceptar un
+  // archivo tiene que ser alto. Antes bastaba con que trajera una colección
+  // conocida, aunque estuviera vacía: un `{"tasks": []}` cualquiera vaciaba
+  // los datos del alumno. Se acepta si es una copia de la aplicación (trae
+  // versión y ajustes) o si al menos trae contenido real que importar.
+  const input = parsed as Record<string, unknown>
+  const looksLikeExport =
+    typeof input.version === 'number' && !!input.settings && typeof input.settings === 'object'
+  const hasContent = COLLECTIONS.some((key) => {
+    const value = input[key]
+    return Array.isArray(value) && value.length > 0
+  })
+
+  if (!looksLikeExport && !hasContent) {
+    return {
+      ok: false,
+      error:
+        'El archivo no parece una copia de Bachillerato OS, o no trae ningún dato que importar.',
+    }
   }
 
   const report = migrateWithReport(parsed)
+
+  // Un archivo con datos dentro no puede dejar la aplicación en la pantalla de
+  // alta: si `onboarded` no venía a true, se pintaba el alta ENCIMA de lo
+  // recién importado, y terminarla añadía asignaturas sobre las que ya
+  // estaban. Curso duplicado por importar una copia.
+  if (!report.data.settings.onboarded && report.data.subjects.length > 0) {
+    report.data.settings = { ...report.data.settings, onboarded: true }
+  }
 
   // Importar sustituye TODO lo que había. Si el archivo traía registros
   // corruptos, el alumno tiene que enterarse en ese momento: descubrir tres

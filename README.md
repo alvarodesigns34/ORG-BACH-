@@ -40,11 +40,17 @@ con los objetivos de una asignatura borrada, se arregló la entrada de decimales
 en Ajustes, se hizo consistente la confirmación al borrar y se ajustó el
 contraste de los textos secundarios en ambos temas.
 
-La lógica está cubierta por 164 pruebas que recorren los casos que rompen este
-tipo de aplicaciones: pesos que no suman 100, escalas distintas del 10,
-categorías todavía sin evaluar, objetivos imposibles, la coma decimal española,
-un temporizador que no se desvía en segundo plano, los efectos en cadena de
-borrar una asignatura y archivos de importación corruptos.
+Hay **214 pruebas** sobre el dominio, el reductor y la persistencia. Recorren
+los casos que rompen este tipo de aplicaciones: pesos que no suman 100, notas
+sin peso junto a notas con peso, escalas distintas del 10, la nota del curso
+frente al saco único de notas, la coma decimal española, un temporizador que no
+se desvía en segundo plano ni al cambiar los ajustes a mitad de sesión, los
+efectos en cadena de borrar o editar una asignatura, y archivos de importación
+corruptos o ajenos.
+
+No cubren la interfaz: no hay pruebas de componentes. Lo que se ha verificado de
+la interfaz se ha hecho conduciendo la aplicación real en un navegador, no con
+aserciones automatizadas, así que no protege contra regresiones futuras.
 
 El dominio, el estado y la persistencia usan **rutas relativas con extensión**
 en sus importaciones. No es un capricho: permite que Node los ejecute
@@ -174,6 +180,15 @@ Cosas decididas a conciencia, no olvidos:
   los datos, se separan por curso o se empieza de cero exportando antes.
 - **El catálogo de asignaturas del alta es genérico de LOMLOE**, sin distinguir
   optativas ni particularidades de cada comunidad autónoma.
+- **El horario semanal no existe todavía.** El modelo guarda las franjas
+  (`subject.schedule`) y la importación las valida, pero no hay ninguna pantalla
+  para crearlas ni verlas: el campo llega siempre vacío. Se conserva en el tipo
+  para no romper las copias que ya lo traigan.
+- **El enlace entre un examen y su nota solo se crea al apuntar la nota** desde
+  el propio examen. No hay forma de enlazar después una nota ya existente con un
+  examen, ni de cambiar el enlace.
+- **Las sesiones de estudio no se pueden editar**, solo crear desde el
+  temporizador y borrar desde la lista.
 
 ## Datos
 

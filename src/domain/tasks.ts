@@ -37,10 +37,6 @@ export function isOverdue(task: Task, today: DateISO = todayISO(), now: number =
   return due !== null && due.getTime() < now
 }
 
-export function isDueToday(task: Task, today: DateISO = todayISO()): boolean {
-  return !isDone(task) && task.dueDate === today
-}
-
 /**
  * Instante exacto en que vence una tarea.
  *
@@ -234,7 +230,3 @@ export function countByView(
   }
 }
 
-/** Minutos estimados de un conjunto de tareas sin completar. */
-export function estimatedMinutes(tasks: Task[]): number {
-  return tasks.filter((t) => !isDone(t)).reduce((sum, t) => sum + (t.estimatedMinutes ?? 0), 0)
-}

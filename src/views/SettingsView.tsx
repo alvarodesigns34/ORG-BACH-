@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Download, RotateCcw, Upload } from 'lucide-react'
 
 import { createEmptyData } from '@/data/defaults'
+import { today as todayISO } from '@/domain/dates'
 import { TERMS, type AverageMode, type TermId } from '@/domain/types'
 import { useDispatch, useSettings, useStore } from '@/state/StoreProvider'
 import * as storage from '@/storage/persistence'
@@ -21,6 +22,10 @@ export function SettingsView() {
     null,
   )
   const [confirmReset, setConfirmReset] = useState(false)
+  /** Copia ya leída y validada, a la espera de que el alumno confirme. */
+  const [pendingImport, setPendingImport] = useState<
+    Extract<ReturnType<typeof storage.importJSON>, { ok: true }> | null
+  >(null)
 
   const update = (patch: Parameters<typeof dispatch>[0] extends never ? never : Partial<typeof settings>) =>
     dispatch({ type: 'settings/update', patch })
@@ -31,7 +36,9 @@ export function SettingsView() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `bachillerato-os-${new Date().toISOString().slice(0, 10)}.json`
+    // Día local, no el `slice` del ISO en UTC: entre medianoche y las dos de
+    // la madrugada el archivo salía fechado el día anterior.
+    link.download = `bachillerato-os-${todayISO()}.json`
     link.click()
     // Liberar el objeto en cuanto el navegador ha tomado la descarga.
     setTimeout(() => URL.revokeObjectURL(url), 1000)
@@ -39,6 +46,11 @@ export function SettingsView() {
   }
 
   // --- Importar ---
+  // Se lee y se valida el archivo, pero NO se aplica todavía: importar borra
+  // el curso entero, igual que «Empezar de cero», y era la única acción
+  // destructiva que no pedía confirmación. Con el archivo ya leído se puede
+  // además decir cuántas asignaturas y notas van a entrar, que es lo que
+  // permite darse cuenta de que uno se ha equivocado de copia.
   const importFile = async (file: File) => {
     const text = await file.text()
     const result = storage.importJSON(text)
@@ -46,12 +58,18 @@ export function SettingsView() {
       setNotice({ tone: 'danger', text: result.error })
       return
     }
-    dispatch({ type: 'data/replace', data: result.data })
+    setPendingImport(result)
+  }
+
+  const applyImport = () => {
+    if (!pendingImport) return
+    dispatch({ type: 'data/replace', data: pendingImport.data })
     setNotice(
-      result.warning
-        ? { tone: 'warn', text: `Datos importados. ${result.warning}` }
+      pendingImport.warning
+        ? { tone: 'warn', text: `Datos importados. ${pendingImport.warning}` }
         : { tone: 'ok', text: 'Datos importados. Se ha sustituido todo el contenido anterior.' },
     )
+    setPendingImport(null)
   }
 
   const counts = [
@@ -378,6 +396,26 @@ export function SettingsView() {
           </p>
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={!!pendingImport}
+        onCancel={() => setPendingImport(null)}
+        onConfirm={applyImport}
+        title="Importar esta copia"
+        message={
+          pendingImport
+            ? `Se sustituirá TODO lo que tienes ahora por el contenido de la copia: ` +
+              `${pendingImport.data.subjects.length} asignaturas, ` +
+              `${pendingImport.data.grades.length} notas, ` +
+              `${pendingImport.data.tasks.length} tareas y ` +
+              `${pendingImport.data.exams.length} exámenes.` +
+              (pendingImport.warning ? ` ${pendingImport.warning}` : '') +
+              ' Esta acción no se puede deshacer.'
+            : ''
+        }
+        confirmLabel="Importar y sustituir"
+        destructive
+      />
 
       <ConfirmDialog
         open={confirmReset}

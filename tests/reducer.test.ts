@@ -226,46 +226,6 @@ describe('notas y exámenes', () => {
   })
 })
 
-describe('datos de ejemplo', () => {
-  it('se van sin arrastrar nada real', () => {
-    const state = baseState()
-    state.subjects.push({
-      id: 'demo1',
-      name: 'Asignatura de ejemplo',
-      color: 'plum',
-      weight: 3,
-      schedule: [],
-      categories: [],
-      createdAt: '2026-09-01T00:00:00.000Z',
-      demo: true,
-    })
-    state.tasks.push({
-      id: 'demo-task',
-      title: 'Tarea de ejemplo',
-      subjectId: 'demo1',
-      priority: 'baja',
-      status: 'pendiente',
-      tags: [],
-      subtasks: [],
-      createdAt: '2026-09-01T00:00:00.000Z',
-      demo: true,
-    })
-
-    const next = reducer(state, { type: 'data/removeDemo' })
-    assert.equal(
-      next.subjects.some((s) => s.demo),
-      false,
-    )
-    assert.equal(
-      next.tasks.some((t) => t.id === 'demo-task'),
-      false,
-    )
-    // Lo real sigue intacto.
-    assert.equal(next.tasks.some((t) => t.id === 't1'), true)
-    assert.equal(next.grades.length, 2)
-  })
-})
-
 describe('el reductor no muta el estado que recibe', () => {
   it('deja el original sin tocar', () => {
     const state = baseState()

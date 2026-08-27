@@ -11,6 +11,7 @@
  * y decir cuántas se han quedado fuera que perderlo todo.
  */
 
+import { today as todayISO } from '../domain/dates.ts'
 import { deriveShortName } from '../domain/palette.ts'
 import { DEFAULT_POMODORO } from '../domain/study.ts'
 import type {
@@ -162,9 +163,10 @@ export function parseGrade(raw: unknown): GradeEntry | null {
   // en lugar de dejar entrar un registro que falsearía la media.
   if (!isRow(raw) || !isId(raw.id) || !isId(raw.subjectId)) return null
   if (!isNum(raw.score) || !isNum(raw.maxScore) || raw.maxScore <= 0) return null
-  // Una nota por encima de su propia escala (17/10) es imposible: no se
-  // recorta, porque recortarla inventaría una nota que nadie sacó.
-  if (raw.score > raw.maxScore) return null
+  // Una nota fuera de su propia escala —un 17/10, o un −3— es imposible. No se
+  // recorta, porque recortarla inventaría una nota que nadie sacó. Antes el
+  // negativo sí se recortaba a 0, lo que era incoherente con rechazar el 17.
+  if (raw.score > raw.maxScore || raw.score < 0) return null
 
   return {
     id: raw.id,
@@ -175,10 +177,14 @@ export function parseGrade(raw: unknown): GradeEntry | null {
     kind: oneOf('examen', 'trabajo', 'practica', 'oral', 'participacion', 'otro')(raw.kind)
       ? raw.kind
       : 'otro',
-    score: Math.max(0, raw.score),
+    score: raw.score,
     maxScore: raw.maxScore,
     weight: clampNum(raw.weight, 0, 1000, 0),
-    date: isDay(raw.date) ? raw.date : new Date().toISOString().slice(0, 10),
+    // Una fecha imposible (el 31 de febrero) no tira la nota entera: la nota
+    // sigue teniendo asignatura y puntuación, que es lo que entra en la media.
+    // Se sustituye por hoy en día LOCAL, no por el `slice` del ISO en UTC:
+    // importar de madrugada estampaba el día anterior.
+    date: isDay(raw.date) ? raw.date : todayISO(),
     comment: optText(raw.comment),
     createdAt: isStamp(raw.createdAt) ? raw.createdAt : new Date().toISOString(),
     demo: raw.demo === true,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { GripVertical, Plus, Trash2, X } from 'lucide-react'
+import { Plus, Trash2, X } from 'lucide-react'
 
 import { newId } from '@/domain/id'
 import { parseDecimalOr } from '@/domain/number'
@@ -287,7 +287,6 @@ export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
                     key={subtask.id}
                     className="flex items-center gap-2.5 px-2.5 py-2 border-b border-hairline last:border-b-0 bg-raised"
                   >
-                    <GripVertical className="size-3.5 text-ink-3/50 shrink-0" aria-hidden />
                     <Checkbox
                       size="sm"
                       checked={subtask.done}
