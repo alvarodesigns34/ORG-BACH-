@@ -31,7 +31,7 @@ comprobación de tipos, y ahora se llama por lo que hace.
 | 2 · Productividad | Tareas, subtareas, prioridades, calendario, exámenes, asignaturas | Hecha |
 | 3 · Académico | Notas, categorías de peso, medias ponderadas, calculadora de nota, evaluaciones | Hecha |
 | 4 · Análisis | Estadísticas, gráficos, sesiones de estudio, objetivos | Hecha |
-| 5 · Pulido | Microinteracciones, accesibilidad avanzada, optimización | Parcial |
+| 5 · Pulido | Microinteracciones, accesibilidad avanzada, optimización, instalable sin conexión | Parcial |
 
 Tras una auditoría externa se hizo una **ronda de endurecimiento**: se corrigió
 el registro del inicio de las sesiones de estudio, se añadió validación campo a
@@ -40,7 +40,7 @@ con los objetivos de una asignatura borrada, se arregló la entrada de decimales
 en Ajustes, se hizo consistente la confirmación al borrar y se ajustó el
 contraste de los textos secundarios en ambos temas.
 
-Hay **214 pruebas** sobre el dominio, el reductor y la persistencia. Recorren
+Hay **217 pruebas** sobre el dominio, el reductor y la persistencia. Recorren
 los casos que rompen este tipo de aplicaciones: pesos que no suman 100, notas
 sin peso junto a notas con peso, escalas distintas del 10, la nota del curso
 frente al saco único de notas, la coma decimal española, un temporizador que no
@@ -200,6 +200,25 @@ ocupa unas decenas de kilobytes, muy por debajo del límite del navegador.
 - **Empezar de cero**: también en Ajustes, con confirmación.
 - La aplicación arranca **completamente vacía**. En el alta puedes elegir
   asignaturas de un catálogo de 1.º de Bachillerato (LOMLOE) o escribir las tuyas.
+
+## Aplicación instalable (PWA)
+
+Se puede instalar en la pantalla de inicio del móvil, del iPad o como
+aplicación de escritorio, y sigue funcionando sin conexión.
+
+- **Cómo se instala**: en Chrome/Edge (Android, escritorio) aparece un icono de
+  instalar en la barra de direcciones; en Safari (iPhone/iPad), «Compartir → Añadir
+  a pantalla de inicio».
+- **Sin conexión**: [`vite-plugin-pwa`](https://vite-pwa-org.netlify.app/) genera
+  el manifest y el Service Worker en cada build — no están escritos a mano.
+  Precachea el HTML, el JS, el CSS y las fuentes; con eso basta, porque todos
+  los datos ya viven en `localStorage`, no en un servidor.
+- **Actualizaciones**: `registerType: 'autoUpdate'`. Al publicar una versión
+  nueva, la siguiente vez que se abra la aplicación con conexión se actualiza
+  sola, sin que el alumno tenga que hacer nada.
+- Los iconos (`public/pwa-*.png`, `public/apple-touch-icon.png`) están
+  generados a partir de `public/icono.svg`; si el icono cambia, hay que
+  regenerarlos a mano — no se derivan automáticamente en el build.
 
 ## Sistema visual
 
