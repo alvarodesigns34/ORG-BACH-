@@ -124,9 +124,27 @@ export function migrateWithReport(raw: unknown): MigrateReport {
   data.exams = validExams
 
   const gradeIds = new Set(data.grades.map((g) => g.id))
-  data.exams = data.exams.map((e) =>
-    e.gradeEntryId && !gradeIds.has(e.gradeEntryId) ? { ...e, gradeEntryId: undefined } : e,
+  const gradeById = new Map(data.grades.map((g) => [g.id, g]))
+  data.exams = data.exams.map((e) => {
+    if (!e.gradeEntryId) return e
+    const grade = gradeById.get(e.gradeEntryId)
+    // El enlace solo vale si la nota existe Y es de la misma asignatura.
+    if (!grade || !gradeIds.has(e.gradeEntryId) || grade.subjectId !== e.subjectId) {
+      return { ...e, gradeEntryId: undefined }
+    }
+    return e
+  })
+
+  // Notas cuya categoría ya no existe en esa asignatura: se sueltan, igual
+  // que al editar la asignatura en el reductor.
+  const categoriesBySubject = new Map(
+    data.subjects.map((s) => [s.id, new Set(s.categories.map((c) => c.id))]),
   )
+  data.grades = data.grades.map((g) => {
+    if (!g.categoryId) return g
+    const live = categoriesBySubject.get(g.subjectId)
+    return live && live.has(g.categoryId) ? g : { ...g, categoryId: null }
+  })
 
   data.tasks = data.tasks.map((t) =>
     t.subjectId && !subjectIds.has(t.subjectId) ? { ...t, subjectId: undefined } : t,
@@ -137,9 +155,23 @@ export function migrateWithReport(raw: unknown): MigrateReport {
   data.sessions = data.sessions.map((s) =>
     s.subjectId && !subjectIds.has(s.subjectId) ? { ...s, subjectId: undefined } : s,
   )
+  // Sin asignatura el objetivo deja de ser el mismo: se archiva, igual que
+  // al borrar la asignatura desde la interfaz. Desvincularlo y dejarlo activo
+  // lo convertía en un objetivo global falso.
   data.goals = data.goals.map((g) =>
-    g.subjectId && !subjectIds.has(g.subjectId) ? { ...g, subjectId: undefined } : g,
+    g.subjectId && !subjectIds.has(g.subjectId)
+      ? { ...g, subjectId: undefined, archived: true }
+      : g,
   )
+  data.activity = data.activity.map((a) =>
+    a.subjectId && !subjectIds.has(a.subjectId) ? { ...a, subjectId: undefined } : a,
+  )
+
+  // Un archivo (o un JSON a medias) con asignaturas no puede dejar la app en
+  // el alta: terminarla añadiría otro juego de materias encima.
+  if (!data.settings.onboarded && data.subjects.length > 0) {
+    data.settings = { ...data.settings, onboarded: true }
+  }
 
   return { data, dropped, totalDropped }
 }
@@ -230,6 +262,11 @@ export function clear(): void {
   }
 }
 
+/** Escribe un curso vacío. Las otras pestañas reciben un `storage` con valor. */
+export function saveEmpty(): { ok: true } | { ok: false; error: string } {
+  return save(createEmptyData())
+}
+
 // ---------------------------------------------------------------------------
 // Copia del contenido ilegible
 // ---------------------------------------------------------------------------
@@ -261,19 +298,24 @@ export function readBackup(): string | null {
   }
 }
 
+export function clearBackup(): void {
+  try {
+    localStorage.removeItem(BACKUP_KEY)
+  } catch {
+    // Sin almacenamiento no hay copia que borrar.
+  }
+}
+
 /**
  * Borra los datos académicos Y el temporizador en marcha.
  *
- * `clear()` a secas deja el temporizador vivo a propósito: importar una copia
- * no debería interrumpir una sesión de estudio que está corriendo, porque el
- * temporizador es estado de la sesión del navegador, no parte de la copia.
- * Pero "Empezar de cero" es justo lo contrario — significa CERO — así que
- * también se lleva el temporizador. Si no, un pomodoro en marcha sobrevive al
- * borrado y reaparece al volver a la pantalla de Estudio.
+ * Se escribe un curso vacío en vez de `removeItem`: un `storage` con
+ * `newValue === null` lo ignoraba la otra pestaña, y el siguiente tecleo
+ * restauraba el curso borrado.
  */
 export function resetAll(): void {
-  clear()
-  saveTimer(null)
+  saveEmpty()
+  clearTimer()
 }
 
 // ---------------------------------------------------------------------------
@@ -289,6 +331,9 @@ export function resetAll(): void {
  */
 const TIMER_KEY = 'bachillerato-os:timer'
 
+/** La pestaña actual también tiene que enterarse de un reset del temporizador. */
+export const TIMER_CLEARED_EVENT = 'bachillerato-os:timer-cleared'
+
 export function loadTimer(): TimerState | null {
   try {
     const raw = localStorage.getItem(TIMER_KEY)
@@ -300,12 +345,23 @@ export function loadTimer(): TimerState | null {
   }
 }
 
-export function saveTimer(state: TimerState | null): void {
+export function saveTimer(state: TimerState | null): { ok: true } | { ok: false; error: string } {
   try {
     if (state) localStorage.setItem(TIMER_KEY, JSON.stringify(state))
     else localStorage.removeItem(TIMER_KEY)
-  } catch {
-    // Sin almacenamiento el temporizador sigue funcionando en memoria.
+    return { ok: true }
+  } catch (error) {
+    return {
+      ok: false,
+      error: `No se pudo guardar el temporizador (${describe(error)}). Si recargas ahora, se pierde la sesión.`,
+    }
+  }
+}
+
+export function clearTimer(): void {
+  saveTimer(null)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(TIMER_CLEARED_EVENT))
   }
 }
 
@@ -363,14 +419,6 @@ export function importJSON(text: string): ImportResult {
   }
 
   const report = migrateWithReport(parsed)
-
-  // Un archivo con datos dentro no puede dejar la aplicación en la pantalla de
-  // alta: si `onboarded` no venía a true, se pintaba el alta ENCIMA de lo
-  // recién importado, y terminarla añadía asignaturas sobre las que ya
-  // estaban. Curso duplicado por importar una copia.
-  if (!report.data.settings.onboarded && report.data.subjects.length > 0) {
-    report.data.settings = { ...report.data.settings, onboarded: true }
-  }
 
   // Importar sustituye TODO lo que había. Si el archivo traía registros
   // corruptos, el alumno tiene que enterarse en ese momento: descubrir tres

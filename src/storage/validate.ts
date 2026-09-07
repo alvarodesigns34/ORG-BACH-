@@ -84,6 +84,15 @@ const SUBJECT_COLORS = [
   'teal', 'indigo', 'moss', 'clay', 'slate',
 ] as const
 
+function uniqueById<T extends { id: string }>(items: T[]): T[] {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    if (seen.has(item.id)) return false
+    seen.add(item.id)
+    return true
+  })
+}
+
 function parseCategory(raw: unknown): GradeCategory | null {
   if (!isRow(raw) || !isId(raw.id) || !isText(raw.name)) return null
   return { id: raw.id, name: raw.name, weight: clampNum(raw.weight, 0, 100, 0) }
@@ -93,6 +102,8 @@ function parseSlot(raw: unknown): ScheduleSlot | null {
   if (!isRow(raw) || !isId(raw.id) || !isTime(raw.start) || !isTime(raw.end)) return null
   const day = raw.day
   if (!isNum(day) || day < 0 || day > 6) return null
+  // Una franja que termina antes de empezar dibuja una duración negativa.
+  if (raw.end < raw.start) return null
   return {
     id: raw.id,
     day: day as ScheduleSlot['day'],
@@ -107,9 +118,10 @@ export function parseSubject(raw: unknown): Subject | null {
   return {
     id: raw.id,
     name: raw.name,
-    // Sin abreviatura, se deriva del nombre: igual que al crear una asignatura
-    // desde la interfaz, para que ninguna insignia se quede vacía.
-    shortName: optText(raw.shortName) ?? deriveShortName(raw.name),
+    // Sin abreviatura, o con una vacía, se deriva del nombre: igual que al
+    // crear una asignatura desde la interfaz, para que ninguna insignia se
+    // quede en blanco. `optText('')` es `''`, y `'' ?? derive` se queda en `''`.
+    shortName: optText(raw.shortName)?.trim() || deriveShortName(raw.name),
     color: (SUBJECT_COLORS as readonly string[]).includes(raw.color as string)
       ? (raw.color as Subject['color'])
       : 'slate',
@@ -117,12 +129,16 @@ export function parseSubject(raw: unknown): Subject | null {
     room: optText(raw.room),
     weight: clampNum(raw.weight, 0, 100, 1),
     targetGrade: isNum(raw.targetGrade) && raw.targetGrade >= 0 ? raw.targetGrade : undefined,
-    schedule: Array.isArray(raw.schedule)
-      ? raw.schedule.map(parseSlot).filter((s): s is ScheduleSlot => s !== null)
-      : [],
-    categories: Array.isArray(raw.categories)
-      ? raw.categories.map(parseCategory).filter((c): c is GradeCategory => c !== null)
-      : [],
+    schedule: uniqueById(
+      Array.isArray(raw.schedule)
+        ? raw.schedule.map(parseSlot).filter((s): s is ScheduleSlot => s !== null)
+        : [],
+    ),
+    categories: uniqueById(
+      Array.isArray(raw.categories)
+        ? raw.categories.map(parseCategory).filter((c): c is GradeCategory => c !== null)
+        : [],
+    ),
     createdAt: isStamp(raw.createdAt) ? raw.createdAt : new Date().toISOString(),
     archived: raw.archived === true,
     demo: raw.demo === true,
@@ -137,6 +153,8 @@ function parseSubtask(raw: unknown): Subtask | null {
 export function parseTask(raw: unknown): Task | null {
   if (!isRow(raw) || !isId(raw.id) || !isText(raw.title) || !raw.title.trim()) return null
   const dueDate = optDay(raw.dueDate)
+  const status = oneOf('pendiente', 'en_progreso', 'completada')(raw.status) ? raw.status : 'pendiente'
+  const stamp = isStamp(raw.completedAt) ? raw.completedAt : undefined
   return {
     id: raw.id,
     title: raw.title,
@@ -146,14 +164,19 @@ export function parseTask(raw: unknown): Task | null {
     // Una hora sin fecha no significa nada: se descarta con ella.
     dueTime: dueDate ? optTime(raw.dueTime) : undefined,
     priority: oneOf('baja', 'media', 'alta', 'urgente')(raw.priority) ? raw.priority : 'media',
-    status: oneOf('pendiente', 'en_progreso', 'completada')(raw.status) ? raw.status : 'pendiente',
+    status,
     estimatedMinutes: optNum(raw.estimatedMinutes),
     tags: Array.isArray(raw.tags) ? raw.tags.filter(isText) : [],
-    subtasks: Array.isArray(raw.subtasks)
-      ? raw.subtasks.map(parseSubtask).filter((s): s is Subtask => s !== null)
-      : [],
+    subtasks: uniqueById(
+      Array.isArray(raw.subtasks)
+        ? raw.subtasks.map(parseSubtask).filter((s): s is Subtask => s !== null)
+        : [],
+    ),
     createdAt: isStamp(raw.createdAt) ? raw.createdAt : new Date().toISOString(),
-    completedAt: isStamp(raw.completedAt) ? raw.completedAt : undefined,
+    // `completedAt` es consecuencia del estado. Una tarea marcada completada
+    // sin sello no entra en los objetivos de tareas; un sello en una pendiente
+    // cuenta trabajo que no está hecho.
+    completedAt: status === 'completada' ? (stamp ?? new Date().toISOString()) : undefined,
     demo: raw.demo === true,
   }
 }
@@ -337,7 +360,12 @@ export function parseCollection<T extends { id: string }>(
   raw: unknown,
   parse: (item: unknown) => T | null,
 ): CollectionResult<T> {
-  if (!Array.isArray(raw)) return { items: [], dropped: 0 }
+  // Ausente o null: no había colección. No es un descarte, es un vacío.
+  if (raw == null) return { items: [], dropped: 0 }
+  // Presente pero no es una lista: el archivo está mal. Contarlo como
+  // descarte hace que load/import avisen, en vez de abrir un curso vacío
+  // y cementarlo en el siguiente guardado.
+  if (!Array.isArray(raw)) return { items: [], dropped: 1 }
   const items: T[] = []
   let dropped = 0
   const seen = new Set<string>()

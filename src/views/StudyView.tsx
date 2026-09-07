@@ -53,11 +53,40 @@ export function StudyView() {
   const [now, setNow] = useState(() => Date.now())
   const [mode, setMode] = useState<TimerMode>('pomodoro')
   const [pendingDelete, setPendingDelete] = useState<string | null>(null)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
+  const [timerNotice, setTimerNotice] = useState<string | null>(null)
   const [subjectId, setSubjectId] = useState('')
   const [topic, setTopic] = useState('')
 
   // Persistir cada cambio del temporizador.
-  useEffect(() => storage.saveTimer(timer), [timer])
+  useEffect(() => {
+    const result = storage.saveTimer(timer)
+    if (!result.ok) setTimerNotice(result.error)
+  }, [timer])
+
+  useEffect(() => {
+    const onCleared = () => setTimer(null)
+    window.addEventListener(storage.TIMER_CLEARED_EVENT, onCleared)
+    return () => window.removeEventListener(storage.TIMER_CLEARED_EVENT, onCleared)
+  }, [])
+
+  // Si se borra la asignatura de la sesión, no se puede registrar contra ella.
+  useEffect(() => {
+    if (!timer?.subjectId) return
+    if (!data.subjects.some((s) => s.id === timer.subjectId)) {
+      setTimer({ ...timer, subjectId: undefined })
+    }
+  }, [data.subjects, timer])
+
+  // Un portátil cerrado toda la noche no puede convertirse en 8 h de estudio.
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState !== 'hidden') return
+      setTimer((current) => (current && isRunning(current) ? pause(current) : current))
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [])
 
   // Repintado: solo mientras corre, para no despertar la pestaña sin motivo.
   useEffect(() => {
@@ -95,6 +124,7 @@ export function StudyView() {
   }, [timer, now, config, complete])
 
   const start = () => {
+    warmupAudio()
     setTimer(createTimer(mode, subjectId || undefined, topic.trim() || undefined))
     setNow(Date.now())
   }
@@ -108,10 +138,6 @@ export function StudyView() {
         session: {
           subjectId: timer.subjectId,
           topic: timer.topic,
-          // Inicio real de la sesión completa, guardado desde que arrancó.
-          // Restarle el tiempo transcurrido daría el comienzo del último
-          // tramo, no el de la sesión: en un pomodoro de varias fases que
-          // cruza la medianoche, la archivaría en el día equivocado.
           startedAt: new Date(timer.sessionStartedAt).toISOString(),
           minutes,
           mode: timer.mode,
@@ -120,7 +146,18 @@ export function StudyView() {
     }
     setTimer(null)
     setTopic('')
+    setConfirmDiscard(false)
   }, [timer, config, dispatch])
+
+  const requestFinish = useCallback(() => {
+    if (!timer) return
+    const minutes = minutesToLog(timer, config, Date.now())
+    if (minutes <= 0) {
+      setConfirmDiscard(true)
+      return
+    }
+    finish()
+  }, [timer, config, finish])
 
   const sessions = [...data.sessions].sort((a, b) => b.startedAt.localeCompare(a.startedAt))
   const lastTwoWeeks = studyByDay(data.sessions, today, 14)
@@ -151,6 +188,11 @@ export function StudyView() {
         {/* --- Temporizador --- */}
         <div className="lg:col-span-5">
           <Card className="lg:sticky lg:top-6">
+            {timerNotice && (
+              <p role="status" className="text-[0.8125rem] text-danger bg-danger-quiet rounded-sm px-3 py-2 mb-4">
+                {timerNotice}
+              </p>
+            )}
             {timer ? (
               <RunningTimer
                 timer={timer}
@@ -170,7 +212,7 @@ export function StudyView() {
                   setTimer(nextPhase(timer, config))
                   setNow(Date.now())
                 }}
-                onFinish={finish}
+                onFinish={requestFinish}
               />
             ) : (
               <IdleTimer
@@ -315,6 +357,15 @@ export function StudyView() {
         </div>
       </div>
 
+      <ConfirmDialog
+        open={confirmDiscard}
+        onCancel={() => setConfirmDiscard(false)}
+        onConfirm={finish}
+        title="Terminar sin guardar"
+        message="No hay minutos de trabajo que registrar. Se cierra el temporizador y se pierde el tramo en curso."
+        confirmLabel="Cerrar igual"
+        destructive
+      />
       <ConfirmDialog
         open={!!pendingDelete}
         onCancel={() => setPendingDelete(null)}
@@ -471,6 +522,7 @@ function RunningTimer({
             'numeral text-[3rem] leading-none transition-colors duration-300',
             complete ? 'text-ok' : !running && 'text-ink-3',
           )}
+          aria-live={complete ? 'polite' : 'off'}
         >
           {formatClock(displayMs(timer, config, now))}
         </span>
@@ -583,11 +635,27 @@ function Ring({
  * para un pitido de medio segundo. Va envuelto en try/catch porque el
  * navegador puede bloquear el audio si el usuario no ha interactuado todavía.
  */
+let audioCtx: AudioContext | null = null
+
+function getAudioContext(): AudioContext | null {
+  const Ctx =
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+  if (!Ctx) return null
+  if (!audioCtx) audioCtx = new Ctx()
+  if (audioCtx.state === 'suspended') void audioCtx.resume()
+  return audioCtx
+}
+
+/** Hay que crear el contexto con un gesto del usuario o el pitido sale silenciado. */
+function warmupAudio() {
+  getAudioContext()
+}
+
 function beep() {
   try {
-    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-    if (!Ctx) return
-    const ctx = new Ctx()
+    const ctx = getAudioContext()
+    if (!ctx) return
     const now = ctx.currentTime
 
     for (const [index, frequency] of [880, 1174.7].entries()) {
@@ -595,7 +663,6 @@ function beep() {
       const gain = ctx.createGain()
       oscillator.type = 'sine'
       oscillator.frequency.value = frequency
-      // Entrada y salida suaves: un tono cuadrado seco resulta agresivo.
       const start = now + index * 0.18
       gain.gain.setValueAtTime(0, start)
       gain.gain.linearRampToValueAtTime(0.18, start + 0.02)
@@ -604,9 +671,7 @@ function beep() {
       oscillator.start(start)
       oscillator.stop(start + 0.18)
     }
-
-    setTimeout(() => void ctx.close(), 800)
   } catch {
-    // Sin audio disponible, el aviso visual sigue estando.
+    // El navegador puede seguir bloqueando el audio.
   }
 }

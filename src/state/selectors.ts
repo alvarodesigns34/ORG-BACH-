@@ -134,12 +134,12 @@ export function useTaskSummary(): TaskSummary {
 // Exámenes
 // ---------------------------------------------------------------------------
 
-/** Exámenes de hoy en adelante, del más cercano al más lejano. */
+/** Exámenes de hoy en adelante, más los pasados que siguen sin nota. */
 export function useUpcomingExams(limit?: number): Exam[] {
   const { data, today } = useStore()
   return useMemo(() => {
     const list = data.exams
-      .filter((e) => e.date >= today)
+      .filter((e) => e.date >= today || !e.gradeEntryId)
       .sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))
     return limit ? list.slice(0, limit) : list
   }, [data.exams, today, limit])

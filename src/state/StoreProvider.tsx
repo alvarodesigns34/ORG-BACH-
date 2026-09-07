@@ -37,6 +37,13 @@ interface StoreValue {
   /** Aviso del almacenamiento; null si no hay nada que contar. */
   storageNotice: StorageNotice | null
   dismissStorageNotice: () => void
+  /** Hay una copia ilegible apartada: no se debe abrir el alta encima. */
+  hasIllegibleBackup: boolean
+  downloadIllegibleBackup: () => void
+  /** Descarta la copia ilegible y deja seguir con el alta. */
+  acknowledgeCorruptStorage: () => void
+  /** Sustituye el curso y lo escribe YA, sin el debounce de 350 ms. */
+  replaceAndSave: (data: AppData) => void
 }
 
 const StoreContext = createContext<StoreValue | null>(null)
@@ -54,6 +61,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     return null
   })
+  const [hasIllegibleBackup, setHasIllegibleBackup] = useState(
+    () => initial.status === 'recuperado' && storage.readBackup() !== null,
+  )
   const [today, setToday] = useState<DateISO>(() => todayISO())
 
   // --- Guardado ---------------------------------------------------------
@@ -76,36 +86,57 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const lastPersisted = useRef(data)
   /** Hay un cambio del alumno todavía sin escribir. */
   const pendingWrite = useRef(false)
+  /**
+   * Esta pestaña rehusó adoptar un cambio ajeno. Hasta recargar (o
+   * `replaceAndSave`) no se vuelve a escribir: si se guardara el debounce
+   * pendiente, pisaría las notas de la otra pestaña después de haber avisado
+   * de lo contrario.
+   */
+  const writesFrozen = useRef(false)
+  const latest = useRef(data)
+  latest.current = data
+
+  const persist = useCallback((snapshot: AppData): boolean => {
+    const result = storage.save(snapshot)
+    if (result.ok) {
+      lastPersisted.current = snapshot
+      pendingWrite.current = false
+      setStorageNotice(null)
+      return true
+    }
+    // El fallo no borra el pendiente: hay que reintentar al ocultar la
+    // pestaña y en el siguiente cambio. Si se marcara como limpio, un
+    // `storage` ajeno haría `data/replace` y se perdería el curso en memoria.
+    pendingWrite.current = true
+    setStorageNotice({ level: 'error', text: result.error })
+    return false
+  }, [])
 
   useEffect(() => {
     if (data === lastPersisted.current) return
+    if (writesFrozen.current) return
     pendingWrite.current = true
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(() => {
-      const result = storage.save(data)
-      pendingWrite.current = false
-      if (result.ok) lastPersisted.current = data
-      // Un guardado correcto retira el aviso de arranque: si había registros
-      // descartados, ya se ha escrito el estado bueno y contarlo otra vez
-      // sobra.
-      setStorageNotice(result.ok ? null : { level: 'error', text: result.error })
+      persist(data)
     }, SAVE_DEBOUNCE_MS)
 
     return () => {
       if (timer.current) clearTimeout(timer.current)
     }
-  }, [data])
+  }, [data, persist])
 
   // Cerrar la pestaña justo después de escribir no debe perder el último
   // cambio: se fuerza el guardado pendiente antes de que la página se oculte.
-  // Solo el pendiente: sin cambios que salvar no se escribe nada.
-  const latest = useRef(data)
-  latest.current = data
   useEffect(() => {
     const flush = () => {
-      if (document.visibilityState !== 'hidden' || !pendingWrite.current) return
-      if (storage.save(latest.current).ok) lastPersisted.current = latest.current
-      pendingWrite.current = false
+      if (writesFrozen.current) return
+      if (!pendingWrite.current) return
+      if (timer.current) {
+        clearTimeout(timer.current)
+        timer.current = null
+      }
+      persist(latest.current)
     }
     document.addEventListener('visibilitychange', flush)
     window.addEventListener('pagehide', flush)
@@ -113,35 +144,86 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', flush)
       window.removeEventListener('pagehide', flush)
     }
-  }, [])
+  }, [persist])
 
   // --- Otras pestañas ---------------------------------------------------
-  // La aplicación vive en el navegador todo el día y es normal acabar con dos
-  // pestañas abiertas. Sin esto, la última en guardar pisaba a la otra sin que
-  // nadie se enterara.
-  //
   // Si aquí no hay nada sin guardar, se adopta lo que ha escrito la otra
-  // pestaña: es más reciente y no se pierde nada. Si SÍ hay algo a medias, no
-  // se toca —perder lo que se está escribiendo sería peor— y se avisa, que es
-  // lo único honesto cuando dos versiones han divergido de verdad.
+  // pestaña. Si SÍ hay algo a medias, se congela esta pestaña: no se adopta
+  // y TAMPOCO se escribe el debounce pendiente, que es lo que pisaba el
+  // cambio ajeno después de haber avisado.
   useEffect(() => {
+    const adopt = (next: AppData) => {
+      if (timer.current) {
+        clearTimeout(timer.current)
+        timer.current = null
+      }
+      pendingWrite.current = false
+      lastPersisted.current = next
+      dispatch({ type: 'data/replace', data: next })
+    }
+
     const onExternalWrite = (event: StorageEvent) => {
-      if (event.key !== STORAGE_KEY || event.newValue === null) return
-      if (pendingWrite.current) {
+      if (event.key !== STORAGE_KEY) return
+
+      if (pendingWrite.current || writesFrozen.current) {
+        writesFrozen.current = true
+        pendingWrite.current = true
+        if (timer.current) {
+          clearTimeout(timer.current)
+          timer.current = null
+        }
         setStorageNotice({
           level: 'aviso',
-          text: 'Has cambiado algo en otra pestaña. Para no perder lo que estás escribiendo aquí, esos cambios no se han cargado: recarga la página cuando termines.',
+          text: 'Has cambiado algo en otra pestaña. Esta no va a guardar ni a cargar esos cambios, para no pisarlos. Recarga la página cuando termines aquí, o quédate con lo de la otra pestaña recargando ya.',
         })
         return
       }
+
+      if (event.newValue === null) {
+        const empty = storage.load()
+        adopt(empty.data)
+        return
+      }
+
       const outcome = storage.load()
       if (outcome.status === 'recuperado') return
-      lastPersisted.current = outcome.data
-      dispatch({ type: 'data/replace', data: outcome.data })
+      adopt(outcome.data)
     }
     window.addEventListener('storage', onExternalWrite)
     return () => window.removeEventListener('storage', onExternalWrite)
   }, [])
+
+  const replaceAndSave = useCallback(
+    (next: AppData) => {
+      writesFrozen.current = false
+      if (timer.current) {
+        clearTimeout(timer.current)
+        timer.current = null
+      }
+      dispatch({ type: 'data/replace', data: next })
+      persist(next)
+    },
+    [persist],
+  )
+
+  const downloadIllegibleBackup = useCallback(() => {
+    const raw = storage.readBackup()
+    if (!raw) return
+    const blob = new Blob([raw], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `bachillerato-os-ilegible.json`
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }, [])
+
+  const acknowledgeCorruptStorage = useCallback(() => {
+    storage.clearBackup()
+    setHasIllegibleBackup(false)
+    writesFrozen.current = false
+    persist(latest.current)
+  }, [persist])
 
   // --- Tema -------------------------------------------------------------
   const theme = data.settings.theme
@@ -156,8 +238,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [theme])
 
   // --- Día actual -------------------------------------------------------
-  // Se comprueba al volver a la pestaña y cada minuto: en cuanto cambia el
-  // día, "hoy" deja de mentir sin necesidad de recargar.
   useEffect(() => {
     const check = () => setToday((prev) => (prev === todayISO() ? prev : todayISO()))
     const id = setInterval(check, 60_000)
@@ -171,8 +251,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const dismissStorageNotice = useCallback(() => setStorageNotice(null), [])
 
   const value = useMemo<StoreValue>(
-    () => ({ data, dispatch, today, storageNotice, dismissStorageNotice }),
-    [data, today, storageNotice, dismissStorageNotice],
+    () => ({
+      data,
+      dispatch,
+      today,
+      storageNotice,
+      dismissStorageNotice,
+      hasIllegibleBackup,
+      downloadIllegibleBackup,
+      acknowledgeCorruptStorage,
+      replaceAndSave,
+    }),
+    [
+      data,
+      today,
+      storageNotice,
+      dismissStorageNotice,
+      hasIllegibleBackup,
+      downloadIllegibleBackup,
+      acknowledgeCorruptStorage,
+      replaceAndSave,
+    ],
   )
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
@@ -183,6 +282,11 @@ function applyTheme(preference: ThemePreference) {
     preference === 'dark' ||
     (preference === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+  const color = dark ? '#121110' : '#F6F4F0'
+  for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
+    meta.setAttribute('content', color)
+    meta.removeAttribute('media')
+  }
 }
 
 export function useStore(): StoreValue {

@@ -64,7 +64,7 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
       <MetricStrip
         pending={summary.pending.length}
         dueToday={summary.today.length}
-        exams={data.exams.filter((e) => e.date >= today).length}
+        exams={data.exams.filter((e) => e.date >= today || !e.gradeEntryId).length}
         average={average}
         scale={settings.gradeScale}
         weekMinutes={study.weekMinutes}
@@ -78,7 +78,7 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
           que tiene que hacer esta pantalla. */}
       {alerts.length > 0 && (
         <div className="mt-5 flex flex-col gap-2">
-          {alerts.slice(0, 2).map((alert, i) => (
+          {alerts.map((alert, i) => (
             <a
               key={alert.id}
               href={alert.href ?? hrefFor('inicio')}
@@ -107,12 +107,6 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
               <ArrowRight className="size-4 text-ink-3 shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
             </a>
           ))}
-
-          {alerts.length > 2 && (
-            <p className="text-[0.75rem] text-ink-3 px-1">
-              Y {alerts.length - 2} {alerts.length - 2 === 1 ? 'aviso más' : 'avisos más'}.
-            </p>
-          )}
         </div>
       )}
 

@@ -56,6 +56,10 @@ export function EventEditor({ open, onClose, event, defaults }: EventEditorProps
       setError('El evento necesita un título.')
       return
     }
+    if (!date) {
+      setError('El evento necesita una fecha.')
+      return
+    }
     // Un evento que termina antes de empezar dibujaría una duración negativa
     // en el calendario y no hay forma de interpretarlo.
     if (startTime && endTime && endTime < startTime) {
@@ -145,9 +149,17 @@ export function EventEditor({ open, onClose, event, defaults }: EventEditorProps
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Field label="Fecha" required>
-              {({ id }) => (
-                <Input id={id} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <Field label="Fecha" required error={!date ? error : null}>
+              {({ id, describedBy, required, invalid }) => (
+                <Input
+                  id={id}
+                  type="date"
+                  required={required}
+                  aria-invalid={invalid}
+                  aria-describedby={describedBy}
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                />
               )}
             </Field>
             <Field label="Empieza">

@@ -75,6 +75,11 @@ describe('parseSubject', () => {
     assert.equal(parseSubject({ ...valid, shortName: 'MA1' })?.shortName, 'MA1')
   })
 
+  it('una abreviatura vacía se deriva, no se deja en blanco', () => {
+    assert.equal(parseSubject({ ...valid, shortName: '' })?.shortName, 'MI')
+    assert.equal(parseSubject({ ...valid, shortName: '   ' })?.shortName, 'MI')
+  })
+
   it('rechaza una nota objetivo negativa', () => {
     assert.equal(parseSubject({ ...valid, targetGrade: -2 })?.targetGrade, undefined)
   })
@@ -210,6 +215,23 @@ describe('parseTask', () => {
     })
     assert.deepEqual(parsed?.tags, ['repaso', 'entrega'])
   })
+
+  it('una completada sin sello recibe fecha; una pendiente pierde el sello', () => {
+    const done = parseTask({ id: 't1', title: 'Hecha', status: 'completada', tags: [], subtasks: [] })
+    assert.equal(done?.status, 'completada')
+    assert.ok(done?.completedAt)
+
+    const open = parseTask({
+      id: 't2',
+      title: 'Pendiente',
+      status: 'pendiente',
+      completedAt: '2026-10-01T12:00:00.000Z',
+      tags: [],
+      subtasks: [],
+    })
+    assert.equal(open?.status, 'pendiente')
+    assert.equal(open?.completedAt, undefined)
+  })
 })
 
 describe('parseCollection', () => {
@@ -235,8 +257,14 @@ describe('parseCollection', () => {
     assert.equal(result.dropped, 1)
   })
 
-  it('con algo que no es una lista devuelve vacío', () => {
-    assert.deepEqual(parseCollection('no soy una lista', parseSubject), { items: [], dropped: 0 })
+  it('con algo que no es una lista avisa en vez de fingir un vacío', () => {
+    assert.deepEqual(parseCollection('no soy una lista', parseSubject), { items: [], dropped: 1 })
+    assert.deepEqual(parseCollection({ boom: true }, parseSubject), { items: [], dropped: 1 })
+  })
+
+  it('una clave ausente o null no cuenta como descarte', () => {
+    assert.deepEqual(parseCollection(undefined, parseSubject), { items: [], dropped: 0 })
+    assert.deepEqual(parseCollection(null, parseSubject), { items: [], dropped: 0 })
   })
 })
 
@@ -437,6 +465,7 @@ describe('migrateWithReport', () => {
       assert.equal(report.data.events[0].subjectId, undefined)
       assert.equal(report.data.goals.length, 1)
       assert.equal(report.data.goals[0].subjectId, undefined)
+      assert.equal(report.data.goals[0].archived, true)
       assert.equal(report.totalDropped, 0)
     })
 

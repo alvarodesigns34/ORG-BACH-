@@ -97,8 +97,13 @@ export function reducer(state: AppData, action: Action): AppData {
   switch (action.type) {
     // --- Ajustes y datos globales ---
 
-    case 'settings/update':
-      return { ...state, settings: { ...state.settings, ...action.patch } }
+    case 'settings/update': {
+      const next = { ...state.settings, ...action.patch }
+      if (action.patch.gradeScale) {
+        next.gradeScale = { ...state.settings.gradeScale, ...action.patch.gradeScale }
+      }
+      return { ...state, settings: next }
+    }
 
     case 'data/replace':
       return action.data
@@ -179,12 +184,21 @@ export function reducer(state: AppData, action: Action): AppData {
         goals: state.goals.map((g) =>
           g.subjectId === action.id ? { ...g, subjectId: undefined, archived: true } : g,
         ),
+        activity: state.activity.map((a) =>
+          a.subjectId === action.id ? { ...a, subjectId: undefined } : a,
+        ),
       }
 
     // --- Tareas ---
 
     case 'task/add': {
-      const task: Task = { ...action.task, id: newId('task'), createdAt: nowISO() }
+      const completing = action.task.status === 'completada'
+      const task: Task = {
+        ...action.task,
+        id: newId('task'),
+        createdAt: nowISO(),
+        completedAt: completing ? action.task.completedAt ?? nowISO() : undefined,
+      }
       return {
         ...state,
         tasks: [...state.tasks, task],
@@ -256,13 +270,18 @@ export function reducer(state: AppData, action: Action): AppData {
 
     case 'grade/add': {
       const grade: GradeEntry = { ...action.grade, id: newId('grade'), createdAt: nowISO() }
+      const exam = action.linkExamId
+        ? state.exams.find((e) => e.id === action.linkExamId)
+        : undefined
+      const canLink = exam && exam.subjectId === grade.subjectId
       return {
         ...state,
         grades: [...state.grades, grade],
         // El enlace con el examen se resuelve aquí porque es aquí donde se
         // genera el identificador: la vista no puede conocerlo de antemano.
-        exams: action.linkExamId
-          ? patchById(state.exams, action.linkExamId, { gradeEntryId: grade.id })
+        // Solo se enlaza si el examen es de la misma asignatura.
+        exams: canLink
+          ? patchById(state.exams, action.linkExamId!, { gradeEntryId: grade.id })
           : state.exams,
         activity: logActivity(
           state,
@@ -302,8 +321,21 @@ export function reducer(state: AppData, action: Action): AppData {
       }
     }
 
-    case 'exam/update':
-      return { ...state, exams: patchById(state.exams, action.id, action.patch) }
+    case 'exam/update': {
+      const exams = patchById(state.exams, action.id, action.patch)
+      const updated = exams.find((e) => e.id === action.id)
+      if (!updated) return { ...state, exams }
+      if (updated.gradeEntryId) {
+        const grade = state.grades.find((g) => g.id === updated.gradeEntryId)
+        if (!grade || grade.subjectId !== updated.subjectId) {
+          return {
+            ...state,
+            exams: patchById(exams, action.id, { gradeEntryId: undefined }),
+          }
+        }
+      }
+      return { ...state, exams }
+    }
 
     case 'exam/remove':
       return { ...state, exams: state.exams.filter((e) => e.id !== action.id) }
@@ -324,7 +356,9 @@ export function reducer(state: AppData, action: Action): AppData {
     // --- Sesiones de estudio ---
 
     case 'session/add': {
-      const session: StudySession = { ...action.session, id: newId('ses') }
+      const minutes = Math.min(Math.max(0, Math.round(action.session.minutes)), 24 * 60)
+      if (minutes <= 0) return state
+      const session: StudySession = { ...action.session, id: newId('ses'), minutes }
       return {
         ...state,
         sessions: [...state.sessions, session],
@@ -356,8 +390,9 @@ export function reducer(state: AppData, action: Action): AppData {
 
     case 'goal/remove':
       return { ...state, goals: state.goals.filter((g) => g.id !== action.id) }
-
-    default:
-      return state
   }
+
+  const _exhaustive: never = action
+  void _exhaustive
+  return state
 }

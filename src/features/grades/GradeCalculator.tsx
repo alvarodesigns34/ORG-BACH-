@@ -11,6 +11,7 @@ import {
 } from '@/domain/grades'
 import type { RequiredStatus } from '@/domain/grades'
 import { parseDecimal, toDecimalInput } from '@/domain/number'
+import type { TermId } from '@/domain/types'
 import { useSettings } from '@/state/StoreProvider'
 import { useSubjectResults, useSubjects } from '@/state/selectors'
 import { Field, NumberInput, Select } from '@/ui/fields'
@@ -24,6 +25,8 @@ interface GradeCalculatorProps {
   onClose: () => void
   /** Asignatura de partida; si no se indica, se elige en el propio diálogo. */
   subjectId?: string
+  /** Evaluación que se está mirando. Si falta, se usa la activa de Ajustes. */
+  term?: TermId | 'todas'
 }
 
 /**
@@ -33,10 +36,10 @@ interface GradeCalculatorProps {
  * los campos a mano: sirve tanto para «cómo voy» como para probar escenarios
  * («¿y si el profesor cambia los pesos?»).
  */
-export function GradeCalculator({ open, onClose, subjectId }: GradeCalculatorProps) {
+export function GradeCalculator({ open, onClose, subjectId, term }: GradeCalculatorProps) {
   const settings = useSettings()
   const subjects = useSubjects()
-  const results = useSubjectResults(settings.activeTerm)
+  const results = useSubjectResults(term ?? settings.activeTerm)
   const scale = settings.gradeScale
 
   const [mode, setMode] = useState<Mode>('necesito')
@@ -262,7 +265,7 @@ export function GradeCalculator({ open, onClose, subjectId }: GradeCalculatorPro
                   max={100}
                   step={5}
                   suffix="%"
-                  placeholder={remaining !== null ? String(remaining) : '30'}
+                  placeholder={remaining !== null ? toDecimalInput(remaining) : '30'}
                   value={assumedOver}
                   onChange={(e) => setAssumedOver(e.target.value)}
                 />

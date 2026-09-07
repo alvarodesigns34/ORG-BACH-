@@ -60,7 +60,7 @@ export function SubjectsView() {
               (t) => t.subjectId === subject.id && !isDone(t),
             ).length
             const nextExam = data.exams
-              .filter((e) => e.subjectId === subject.id && e.date >= today)
+              .filter((e) => e.subjectId === subject.id && (e.date >= today || !e.gradeEntryId))
               .sort((a, b) => a.date.localeCompare(b.date))[0]
 
             return (

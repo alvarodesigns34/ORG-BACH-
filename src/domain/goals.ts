@@ -8,7 +8,7 @@
  */
 
 import { formatDuration, startOfWeek, toDay } from './dates.ts'
-import { formatGrade } from './grades.ts'
+import { formatGrade, round } from './grades.ts'
 import type { SubjectResult } from './grades.ts'
 import { isDone } from './tasks.ts'
 import type {
@@ -139,13 +139,14 @@ export function goalProgress(goal: Goal, ctx: GoalContext): GoalProgress {
           measurable: false,
         }
       }
-      const done = average >= target
+      const shown = round(average, ctx.scale.decimals)
+      const done = shown >= target
       return {
         current: average,
         target,
         percent: clampPercent((average / target) * 100),
         label: `${formatGrade(average, ctx.scale)} de ${formatGrade(target, ctx.scale)}`,
-        headline: done ? 'Conseguido' : `faltan ${formatGrade(target - average, ctx.scale)}`,
+        headline: done ? 'Conseguido' : `faltan ${formatGrade(target - shown, ctx.scale)}`,
         done,
         measurable: true,
       }

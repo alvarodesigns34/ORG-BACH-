@@ -310,7 +310,7 @@ function MonthGrid({ cursor, selected, today, index, subjects, weekStartsOn, onS
 
               <span className="flex flex-col gap-0.5 w-full min-w-0">
                 {items.slice(0, 2).map((item) => (
-                  <ItemChip key={item.id} item={item} subject={subjects.get(item.subjectId ?? '')} />
+                  <ItemChip key={`${item.kind}-${item.id}`} item={item} subject={subjects.get(item.subjectId ?? '')} />
                 ))}
                 {items.length > 2 && (
                   <span className="text-[0.6875rem] text-ink-3 pl-0.5 tabular-nums">
@@ -373,6 +373,9 @@ function WeekColumns({ cursor, selected, today, index, subjects, weekStartsOn, o
               key={day}
               type="button"
               onClick={() => onSelect(day)}
+              aria-label={`${formatDayMonth(day)}${items.length ? `, ${items.length} elementos` : ', sin nada'}`}
+              aria-current={isToday ? 'date' : undefined}
+              aria-pressed={day === selected}
               className={cx(
                 'flex flex-col text-left p-3 min-h-[9rem]',
                 'border-b border-r border-hairline last:border-r-0',
@@ -397,7 +400,7 @@ function WeekColumns({ cursor, selected, today, index, subjects, weekStartsOn, o
                   <span className="text-[0.6875rem] text-ink-3">—</span>
                 ) : (
                   items.map((item) => (
-                    <ItemChip key={item.id} item={item} subject={subjects.get(item.subjectId ?? '')} />
+                    <ItemChip key={`${item.kind}-${item.id}`} item={item} subject={subjects.get(item.subjectId ?? '')} />
                   ))
                 )}
               </span>

@@ -4,8 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="Centro de control academico personal: tareas, examenes, notas y estudio en un solo sitio." />
-    <meta name="theme-color" content="#F6F4F0" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#121110" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#F6F4F0" />
     <title>Bachillerato OS</title>
 
     <link rel="icon" href="/icono.svg" type="image/svg+xml" />
@@ -14,7 +13,7 @@
          quitar la barra de Safari necesita estas etiquetas suyas propias. -->
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Bachillerato" />
 
     <link
@@ -24,6 +23,13 @@
       type="font/woff2"
       crossorigin
     />
+
+    <style>
+      /* El CSS llega con el JS. Sin esto, el script de tema pinta data-theme
+         sobre un documento blanco hasta que carga el bundle. */
+      html, body { background: #f6f4f0; color: #1b1917; }
+      html[data-theme='dark'], html[data-theme='dark'] body { background: #121110; color: #f2efe9; }
+    </style>
 
     <script>
       // Aplica el tema antes del primer pintado para evitar el parpadeo blanco.
@@ -36,6 +42,8 @@
             ((!pref || pref === 'system') &&
               window.matchMedia('(prefers-color-scheme: dark)').matches)
           document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
+          var meta = document.querySelector('meta[name="theme-color"]')
+          if (meta) meta.setAttribute('content', dark ? '#121110' : '#F6F4F0')
         } catch (e) {
           document.documentElement.setAttribute('data-theme', 'light')
         }
@@ -43,6 +51,7 @@
     </script>
   </head>
   <body>
+    <a href="#contenido" class="skip-link">Saltar al contenido</a>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

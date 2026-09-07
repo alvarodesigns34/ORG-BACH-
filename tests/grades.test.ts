@@ -532,6 +532,12 @@ describe('gradeTone', () => {
     assert.equal(gradeTone(null, DEFAULT_SCALE), 'neutral')
   })
 
+  it('compara lo que se pinta, no el flotante crudo', () => {
+    // 4,995 se enseña como 5,00. En rojo de suspenso sería mentir.
+    assert.equal(gradeTone(4.995, DEFAULT_SCALE), 'warn')
+    assert.equal(gradeTone(4.994, DEFAULT_SCALE), 'danger')
+  })
+
   it('respeta una escala distinta del 10', () => {
     const scale = { max: 100, pass: 50, decimals: 0 }
     assert.equal(gradeTone(49, scale), 'danger')

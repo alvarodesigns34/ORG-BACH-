@@ -78,7 +78,7 @@ export const SUBJECT_CATALOG: CatalogGroup[] = [
   {
     id: 'comunes',
     label: 'Materias comunes',
-    hint: 'Las cursa todo el mundo, sea cual sea la modalidad.',
+    hint: 'Mínimo estatal. Añade la lengua cooficial si la cursas.',
     subjects: [
       { name: 'Lengua Castellana y Literatura I', color: 'terracotta', weight: 3 },
       { name: 'Lengua Extranjera I (Inglés)', color: 'sky', weight: 3 },

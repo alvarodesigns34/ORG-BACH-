@@ -80,7 +80,7 @@ export function AppShell({ current, onCreate, badges, children }: AppShellProps)
           className={cx(
             'flex-1 min-w-0',
             // Hueco inferior en móvil para que la barra fija no tape contenido.
-            'pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-16',
+            'pb-[calc(8.5rem+env(safe-area-inset-bottom))] lg:pb-16',
           )}
         >
           {children}

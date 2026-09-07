@@ -198,6 +198,12 @@ describe('objetivos de media', () => {
     const progress = goalProgress(makeGoal({ kind: 'media', scope: 'trimestral', target: 9 }), ctx)
     assert.equal(progress.headline, 'Conseguido')
   })
+
+  it('un 4,995 hacia un 5 se da por conseguido: es un 5,00', () => {
+    const ctx = makeContext({ globalAverage: 4.995 })
+    const progress = goalProgress(makeGoal({ kind: 'media', scope: 'trimestral', target: 5 }), ctx)
+    assert.equal(progress.done, true)
+  })
 })
 
 describe('titulares del resto de tipos', () => {

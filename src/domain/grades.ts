@@ -554,9 +554,12 @@ export type GradeTone = 'ok' | 'warn' | 'danger' | 'neutral'
  */
 export function gradeTone(value: number | null | undefined, scale: GradeScale): GradeTone {
   if (value === null || value === undefined || !Number.isFinite(value)) return 'neutral'
-  if (value < scale.pass) return 'danger'
+  // Se compara lo que se VE, no el flotante crudo: un 4,995 pintado como 5,00
+  // no puede ir en rojo de suspenso.
+  const shown = round(value, scale.decimals)
+  if (shown < scale.pass) return 'danger'
   // El tramo justo por encima del aprobado merece atención, no celebración.
-  if (value < scale.pass + (scale.max - scale.pass) * 0.35) return 'warn'
+  if (shown < scale.pass + (scale.max - scale.pass) * 0.35) return 'warn'
   return 'ok'
 }
 

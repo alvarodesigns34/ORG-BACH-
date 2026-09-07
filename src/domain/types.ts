@@ -32,6 +32,12 @@ export const TERMS: { id: TermId; name: string; short: string }[] = [
   { id: 'T3', name: '3.ª evaluación', short: '3.ª ev.' },
 ]
 
+/** Nombre de una evaluación, o del curso, sin reventar si el id no existe. */
+export function termName(id: TermId | 'todas'): string {
+  if (id === 'todas') return 'el curso completo'
+  return TERMS.find((t) => t.id === id)?.name ?? id
+}
+
 // ---------------------------------------------------------------------------
 // Asignaturas
 // ---------------------------------------------------------------------------

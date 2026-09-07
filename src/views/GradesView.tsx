@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Calculator, GraduationCap, Plus } from 'lucide-react'
 
 import { formatGrade, numeralTone } from '@/domain/grades'
-import { TERMS, type GradeEntry, type TermId } from '@/domain/types'
+import { TERMS, termName, type GradeEntry, type TermId } from '@/domain/types'
 import { useSettings, useStore } from '@/state/StoreProvider'
 import { useGlobalAverage, useSubjectResults, useSubjects, useTermAverages } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
@@ -35,8 +35,7 @@ export function GradesView() {
     setCalculatorOpen(true)
   }
 
-  const scopeLabel =
-    scope === 'todas' ? 'el curso completo' : TERMS.find((t) => t.id === scope)!.name.toLowerCase()
+  const scopeLabel = termName(scope)
 
   if (subjects.length === 0) {
     return (
@@ -160,6 +159,7 @@ export function GradesView() {
       <GradeCalculator
         open={calculatorOpen}
         subjectId={calculatorFor}
+        term={scope}
         onClose={() => setCalculatorOpen(false)}
       />
     </Page>
@@ -193,7 +193,7 @@ function TermSummary({ averages, scale, active, onSelect, mode }: TermSummaryPro
       <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-hairline">
         {averages.map((entry) => {
           const isFinal = entry.term === 'final'
-          const label = isFinal ? 'Nota final' : TERMS.find((t) => t.id === entry.term)!.name
+          const label = entry.term === 'final' ? 'Nota final' : termName(entry.term)
           const selected = !isFinal && active === entry.term
 
           const content = (

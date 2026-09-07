@@ -14,7 +14,7 @@ import assert from 'node:assert/strict'
 import { beforeEach, describe, it } from 'node:test'
 
 import { STORAGE_KEY } from '../src/data/defaults.ts'
-import { load, readBackup, save } from '../src/storage/persistence.ts'
+import { load, migrateWithReport, readBackup, resetAll, save } from '../src/storage/persistence.ts'
 import { createEmptyData } from '../src/data/defaults.ts'
 
 // --- Doble de localStorage -------------------------------------------------
@@ -93,6 +93,37 @@ describe('load', () => {
     assert.match(outcome.warning ?? '', /asignaturas/)
     assert.match(outcome.warning ?? '', /notas/)
   })
+
+  it('marca el alta hecha si hay asignaturas aunque onboarded no viniera', () => {
+    put({ version: 1, subjects: [SUBJECT] })
+    const outcome = load()
+    assert.equal(outcome.status, 'cargado')
+    if (outcome.status !== 'cargado') return
+    assert.equal(outcome.data.settings.onboarded, true)
+  })
+
+  it('archiva los objetivos de una asignatura que no está', () => {
+    put({
+      version: 1,
+      subjects: [SUBJECT],
+      goals: [
+        {
+          id: 'g1',
+          title: 'Subir Física a 9',
+          kind: 'media',
+          scope: 'trimestral',
+          target: 9,
+          subjectId: 'fis-desaparecida',
+          createdAt: '2026-09-01T00:00:00.000Z',
+        },
+      ],
+    })
+    const outcome = load()
+    assert.equal(outcome.status, 'cargado')
+    if (outcome.status !== 'cargado') return
+    assert.equal(outcome.data.goals[0].archived, true)
+    assert.equal(outcome.data.goals[0].subjectId, undefined)
+  })
 })
 
 describe('load con datos ilegibles', () => {
@@ -146,5 +177,24 @@ describe('save', () => {
     assert.equal(result.ok, false)
     if (result.ok) return
     assert.match(result.error, /espacio/)
+  })
+})
+
+describe('resetAll', () => {
+  it('deja un curso vacío en disco, no borra la clave', () => {
+    put({ version: 1, subjects: [SUBJECT] })
+    resetAll()
+    assert.ok(store.has(STORAGE_KEY))
+    const outcome = load()
+    assert.equal(outcome.status, 'cargado')
+    if (outcome.status !== 'cargado') return
+    assert.equal(outcome.data.subjects.length, 0)
+  })
+})
+
+describe('migrateWithReport avisa si una colección no es una lista', () => {
+  it('subjects como objeto cuenta como descarte', () => {
+    const report = migrateWithReport({ version: 1, subjects: { no: 'lista' } })
+    assert.ok((report.dropped.subjects ?? 0) >= 1)
   })
 })

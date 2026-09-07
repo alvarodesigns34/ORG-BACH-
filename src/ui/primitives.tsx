@@ -12,7 +12,7 @@ export function cx(...parts: (string | false | null | undefined)[]): string {
 // Botones
 // ---------------------------------------------------------------------------
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerFill'
 type ButtonSize = 'sm' | 'md' | 'lg'
 
 const VARIANTS: Record<ButtonVariant, string> = {
@@ -22,6 +22,8 @@ const VARIANTS: Record<ButtonVariant, string> = {
     'bg-surface text-ink border border-hairline-strong hover:bg-raised hover:border-ink-3/40 active:translate-y-px',
   ghost: 'bg-transparent text-ink-2 border border-transparent hover:bg-sunken hover:text-ink',
   danger: 'bg-transparent text-danger border border-transparent hover:bg-danger-quiet',
+  dangerFill:
+    'bg-danger text-white border border-transparent hover:brightness-110 active:translate-y-px',
 }
 
 const SIZES: Record<ButtonSize, string> = {
@@ -284,7 +286,7 @@ export function Segmented<T extends string>({
 }: SegmentedProps<T>) {
   return (
     <div
-      role="tablist"
+      role="radiogroup"
       aria-label={label}
       className={cx(
         'inline-flex items-center gap-0.5 p-0.5 rounded-sm bg-sunken border border-hairline',
@@ -297,9 +299,9 @@ export function Segmented<T extends string>({
         return (
           <button
             key={option.value}
-            role="tab"
+            role="radio"
             type="button"
-            aria-selected={active}
+            aria-checked={active}
             onClick={() => onChange(option.value)}
             className={cx(
               'inline-flex items-center gap-1.5 rounded-[5px] font-medium whitespace-nowrap',
@@ -312,12 +314,7 @@ export function Segmented<T extends string>({
           >
             {option.label}
             {option.count !== undefined && (
-              <span
-                className={cx(
-                  'tabular-nums text-[0.6875rem] font-semibold',
-                  active ? 'text-ink-3' : 'text-ink-3/70',
-                )}
-              >
+              <span className="tabular-nums text-[0.6875rem] font-semibold text-ink-3">
                 {option.count}
               </span>
             )}

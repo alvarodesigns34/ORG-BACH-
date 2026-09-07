@@ -405,7 +405,7 @@ export function ColumnChart({
                       width={barWidth}
                       height={barHeight}
                       rx={4}
-                      fill={column.highlight ? 'var(--c-accent)' : 'var(--c-accent)'}
+                      fill={column.highlight ? 'var(--c-accent)' : 'var(--c-ink-3)'}
                       opacity={hover === i ? 1 : column.highlight ? 0.95 : 0.55}
                       className="transition-opacity duration-150"
                     />

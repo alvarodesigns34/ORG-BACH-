@@ -168,7 +168,15 @@ export function GoalsView() {
 
                 {/* Barra con marcas cada 25 %: da una referencia sin cargar de
                     números una barra que ya lleva su porcentaje al lado. */}
-                <div className="relative h-2.5 rounded-full bg-sunken overflow-hidden mt-4">
+                <div
+                  className="relative h-2.5 rounded-full bg-sunken overflow-hidden mt-4"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(progress.percent)}
+                  aria-valuetext={progress.label}
+                  aria-label={goal.title}
+                >
                   <div
                     className={cx(
                       'h-full rounded-full transition-[width] duration-500 ease-out',

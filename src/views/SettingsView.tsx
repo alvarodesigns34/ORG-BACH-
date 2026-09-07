@@ -15,7 +15,7 @@ import { Button, Card, SectionHeader, cx } from '@/ui/primitives'
 export function SettingsView() {
   const settings = useSettings()
   const dispatch = useDispatch()
-  const { data } = useStore()
+  const { data, replaceAndSave } = useStore()
 
   const fileInput = useRef<HTMLInputElement>(null)
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn' | 'danger'; text: string } | null>(
@@ -63,7 +63,8 @@ export function SettingsView() {
 
   const applyImport = () => {
     if (!pendingImport) return
-    dispatch({ type: 'data/replace', data: pendingImport.data })
+    storage.clearTimer()
+    replaceAndSave(pendingImport.data)
     setNotice(
       pendingImport.warning
         ? { tone: 'warn', text: `Datos importados. ${pendingImport.warning}` }
@@ -368,7 +369,7 @@ export function SettingsView() {
               Exportar copia
             </Button>
 
-            <Button onClick={() => fileInput.current?.click()}>
+            <Button onClick={() => fileInput.current?.click()} aria-label="Importar copia JSON">
               <Upload className="size-4" />
               Importar copia
             </Button>
@@ -377,6 +378,8 @@ export function SettingsView() {
               type="file"
               accept="application/json,.json"
               className="sr-only"
+              tabIndex={-1}
+              aria-hidden
               onChange={(e) => {
                 const file = e.target.files?.[0]
                 if (file) void importFile(file)
@@ -422,7 +425,7 @@ export function SettingsView() {
         onCancel={() => setConfirmReset(false)}
         onConfirm={() => {
           storage.resetAll()
-          dispatch({ type: 'data/replace', data: createEmptyData() })
+          replaceAndSave(createEmptyData())
           setConfirmReset(false)
         }}
         title="Borrar todos los datos"

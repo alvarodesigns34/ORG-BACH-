@@ -8,7 +8,7 @@ import {
   suggestTitle,
 } from '@/domain/goals'
 import { parseDecimal, parseDecimalOr, toDecimalInput } from '@/domain/number'
-import { TERMS, type Goal, type GoalKind, type GoalScope, type TermId } from '@/domain/types'
+import { TERMS, termName, type Goal, type GoalKind, type GoalScope, type TermId } from '@/domain/types'
 import { useDispatch, useSettings } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
 import { Field, Input, NumberInput, Select } from '@/ui/fields'
@@ -263,8 +263,12 @@ export function GoalEditor({ open, onClose, goal }: GoalEditorProps) {
           {kind === 'media' && (
             <p className="text-[0.75rem] text-ink-3 bg-sunken rounded-sm px-3 py-2 text-balance">
               Se compara con tu media {subjectId ? 'en esa asignatura' : 'global'} de{' '}
-              {scope === 'anual' ? 'todo el curso' : 'la evaluación activa'}, calculada con la
-              escala sobre {settings.gradeScale.max}.
+              {scope === 'anual'
+                ? 'todo el curso'
+                : term
+                  ? termName(term).toLowerCase()
+                  : 'la evaluación activa'}
+              , calculada con la escala sobre {settings.gradeScale.max}.
             </p>
           )}
         </div>

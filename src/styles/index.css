@@ -360,3 +360,18 @@
     scroll-behavior: auto !important;
   }
 }
+
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: -3rem;
+  z-index: 100;
+  padding: 0.5rem 0.75rem;
+  background: var(--c-accent, #2c4a8f);
+  color: #fff;
+  border-radius: 0.25rem;
+  font: 600 0.875rem/1.2 Manrope, system-ui, sans-serif;
+}
+.skip-link:focus {
+  top: 0.75rem;
+}

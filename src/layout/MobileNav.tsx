@@ -30,7 +30,7 @@ export function MobileNav({ current, onCreate, badges }: MobileNavProps) {
       <button
         type="button"
         onClick={onCreate}
-        aria-label="Crear"
+        aria-label="Crear tarea"
         className={cx(
           'lg:hidden fixed right-4 z-30 size-14 rounded-full',
           'bg-accent text-accent-ink shadow-lg',
@@ -95,6 +95,7 @@ export function MobileNav({ current, onCreate, badges }: MobileNavProps) {
               type="button"
               onClick={() => setSheetOpen(true)}
               aria-haspopup="dialog"
+              aria-expanded={sheetOpen}
               className={cx(
                 'relative w-full flex flex-col items-center justify-center gap-1 h-[4.25rem]',
                 'text-[0.6875rem] font-medium transition-colors duration-150',

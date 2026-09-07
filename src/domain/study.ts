@@ -217,10 +217,13 @@ export function parseTimerState(raw: unknown, now = Date.now()): TimerState | nu
     input.runningSince === null ? null : isPositiveTime(input.runningSince, now) ? input.runningSince : undefined
   if (runningSince === undefined) return null
 
-  const accumulatedMs = input.accumulatedMs
-  if (typeof accumulatedMs !== 'number' || !Number.isFinite(accumulatedMs) || accumulatedMs < 0) {
+  const accumulatedRaw = input.accumulatedMs
+  if (typeof accumulatedRaw !== 'number' || !Number.isFinite(accumulatedRaw) || accumulatedRaw < 0) {
     return null
   }
+  // Tope de 24 h: un temporizador que se ha dejado correr días enteros no
+  // puede convertirse en una sesión de miles de minutos.
+  const accumulatedMs = Math.min(accumulatedRaw, 24 * 60 * 60 * 1000)
 
   const completed = input.completed
   if (typeof completed !== 'number' || !Number.isInteger(completed) || completed < 0) {

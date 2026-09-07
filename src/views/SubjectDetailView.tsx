@@ -4,7 +4,7 @@ import { ArrowLeft, CalendarPlus, ListChecks, Pencil, Plus } from 'lucide-react'
 import { formatGrade, formatPercent, numeralTone } from '@/domain/grades'
 import { colorVar, quietVar } from '@/domain/palette'
 import { isDone, sortTasks } from '@/domain/tasks'
-import { TERMS, type Exam, type GradeEntry, type Task } from '@/domain/types'
+import { termName, type Exam, type GradeEntry, type Task } from '@/domain/types'
 import { hrefFor } from '@/router'
 import { useSettings, useStore, useToday } from '@/state/StoreProvider'
 import { useSubjectResults } from '@/state/selectors'
@@ -45,7 +45,7 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
   const exams = useMemo(
     () =>
       data.exams
-        .filter((e) => e.subjectId === subjectId && e.date >= today)
+        .filter((e) => e.subjectId === subjectId && (e.date >= today || !e.gradeEntryId))
         .sort((a, b) => a.date.localeCompare(b.date)),
     [data.exams, subjectId, today],
   )
@@ -112,13 +112,11 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
           <h1 className="display text-[1.75rem] sm:text-[2.125rem] leading-[1.1] tracking-[-0.025em] mt-2">
             {subject.name}
           </h1>
-          {(subject.teacher || subject.room) && (
-            <p className="text-[0.875rem] text-ink-3 mt-1.5">
-              {[subject.teacher, subject.room && `Aula ${subject.room}`, `${subject.weight} h/semana`]
-                .filter(Boolean)
-                .join(' · ')}
-            </p>
-          )}
+          <p className="text-[0.875rem] text-ink-3 mt-1.5">
+            {[subject.teacher, subject.room && `Aula ${subject.room}`, `${subject.weight} h/semana`]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
         </div>
 
         <Button variant="secondary" onClick={() => setEditingSubject(true)}>
@@ -151,7 +149,7 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
               hint={
                 result.entryCount === 0
                   ? 'Sin notas todavía'
-                  : `${result.entryCount} ${result.entryCount === 1 ? 'nota' : 'notas'} en ${TERMS.find((t) => t.id === settings.activeTerm)!.name.toLowerCase()}`
+                  : `${result.entryCount} ${result.entryCount === 1 ? 'nota' : 'notas'} en ${termName(settings.activeTerm).toLowerCase()}`
               }
               className="px-5 sm:px-6 pt-5 pb-4"
             />
@@ -272,6 +270,7 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
       <GradeCalculator
         open={calculatorOpen}
         subjectId={subject.id}
+        term={settings.activeTerm}
         onClose={() => setCalculatorOpen(false)}
       />
     </Page>

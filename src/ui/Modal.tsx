@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
@@ -6,6 +6,9 @@ import { Button, IconButton, cx } from './primitives'
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/** Cuántos diálogos hay abiertos. `inert` en #root solo se quita al cerrar el último. */
+let openModals = 0
 
 interface ModalProps {
   open: boolean
@@ -77,14 +80,26 @@ export function Modal({
     const gap = window.innerWidth - document.documentElement.clientWidth
     body.style.overflow = 'hidden'
     if (gap > 0) body.style.paddingRight = `${gap}px`
+    const root = document.getElementById('root')
+    openModals += 1
+    root?.setAttribute('inert', '')
     return () => {
       body.style.overflow = previousOverflow
       body.style.paddingRight = previousPadding
+      openModals -= 1
+      if (openModals <= 0) {
+        openModals = 0
+        root?.removeAttribute('inert')
+      }
     }
   }, [open])
 
-  const onKeyDown = useCallback(
-    (event: React.KeyboardEvent) => {
+  // Esc y el tabulador tienen que funcionar aunque el foco haya salido al
+  // fondo. El listener va en `document`, no en el overlay.
+  useEffect(() => {
+    if (!open) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation()
         onClose()
@@ -92,12 +107,12 @@ export function Modal({
       }
       if (event.key !== 'Tab') return
 
-      // Retención del foco: el tabulador circula dentro del diálogo.
       const node = panel.current
       if (!node) return
-      const items = [...node.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
-        (el) => el.offsetParent !== null,
-      )
+      const items = [...node.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => {
+        if (el.hasAttribute('disabled')) return false
+        return el.getClientRects().length > 0
+      })
       if (items.length === 0) return
 
       const first = items[0]
@@ -109,19 +124,18 @@ export function Modal({
         event.preventDefault()
         first.focus()
       }
-    },
-    [onClose],
-  )
+    }
+
+    document.addEventListener('keydown', onKeyDown, true)
+    return () => document.removeEventListener('keydown', onKeyDown, true)
+  }, [open, onClose])
 
   if (!open) return null
 
   const widths = { sm: 'sm:max-w-md', md: 'sm:max-w-xl', lg: 'sm:max-w-3xl' }
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex sm:items-center justify-center items-end"
-      onKeyDown={onKeyDown}
-    >
+    <div className="fixed inset-0 z-50 flex sm:items-center justify-center items-end">
       <div
         className="absolute inset-0 animate-fade"
         style={{ background: 'var(--scrim)' }}
@@ -222,9 +236,8 @@ export function ConfirmDialog({
             Cancelar
           </Button>
           <Button
-            variant="primary"
+            variant={destructive ? 'dangerFill' : 'primary'}
             onClick={onConfirm}
-            className={destructive ? 'bg-danger hover:bg-danger text-white hover:brightness-110' : undefined}
           >
             {confirmLabel}
           </Button>

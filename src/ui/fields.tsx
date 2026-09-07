@@ -26,7 +26,12 @@ const CONTROL = [
 
 interface FieldProps {
   label: string
-  children: (props: { id: string; describedBy?: string }) => ReactNode
+  children: (props: {
+    id: string
+    describedBy?: string
+    required?: boolean
+    invalid?: boolean
+  }) => ReactNode
   hint?: string
   error?: string | null
   required?: boolean
@@ -47,7 +52,8 @@ export function Field({
   const id = useId()
   const hintId = `${id}-hint`
   const errorId = `${id}-error`
-  const describedBy = error ? errorId : hint ? hintId : undefined
+  const describedBy =
+    [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ') || undefined
 
   return (
     <div className={cx('flex flex-col gap-1.5', className)}>
@@ -66,7 +72,7 @@ export function Field({
         )}
       </label>
 
-      {children({ id, describedBy })}
+      {children({ id, describedBy, required, invalid: !!error })}
 
       {error ? (
         <p id={errorId} role="alert" className="text-[0.75rem] text-danger">
@@ -143,6 +149,7 @@ export function NumberInput({
   return (
     <div className="relative">
       <input
+        {...props}
         type="text"
         inputMode="decimal"
         autoComplete="off"
@@ -153,7 +160,6 @@ export function NumberInput({
           if (cleaned !== event.target.value) event.target.value = cleaned
           onChange(event)
         }}
-        {...props}
       />
       {suffix && (
         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[0.8125rem] text-ink-3">
@@ -376,7 +382,6 @@ export function Switch({
         type="button"
         role="switch"
         aria-checked={checked}
-        aria-label={label}
         onClick={() => onChange(!checked)}
         className={cx(
           'relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 mt-0.5',
