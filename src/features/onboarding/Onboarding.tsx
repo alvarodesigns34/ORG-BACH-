@@ -90,7 +90,7 @@ export function Onboarding() {
   const total = picked.size + custom.length
 
   return (
-    <div className="min-h-dvh grid lg:grid-cols-[5fr_7fr]">
+    <div className="min-h-dvh grid lg:grid-cols-[5fr_7fr] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       {/* --- Columna de presentación --- */}
       <div className="hidden lg:flex flex-col justify-between p-12 xl:p-16 bg-surface border-r border-hairline">
         <BrandMark size={34} />

@@ -62,7 +62,11 @@ export function AppShell({ current, onCreate, badges, children }: AppShellProps)
         {/* Cabecera solo de móvil: en escritorio la identidad vive en el lateral. */}
         <header
           className={cx(
-            'lg:hidden sticky top-0 z-20 h-14 px-4 flex items-center justify-between gap-3',
+            'lg:hidden sticky top-0 z-20 flex items-center justify-between gap-3',
+            // El fondo llega al borde (status bar translúcida); el contenido
+            // se queda debajo de la hora, el Dynamic Island y la batería.
+            'h-[calc(3.5rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)]',
+            'pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]',
             'bg-canvas/92 backdrop-blur-md border-b border-hairline',
           )}
         >

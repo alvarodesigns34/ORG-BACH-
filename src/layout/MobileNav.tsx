@@ -32,9 +32,10 @@ export function MobileNav({ current, onCreate, badges }: MobileNavProps) {
         onClick={onCreate}
         aria-label="Crear tarea"
         className={cx(
-          'lg:hidden fixed right-4 z-30 size-14 rounded-full',
+          'lg:hidden fixed z-30 size-14 rounded-full',
           'bg-accent text-accent-ink shadow-lg',
           'grid place-items-center active:scale-95 transition-transform duration-150',
+          'right-[max(1rem,env(safe-area-inset-right))]',
           'bottom-[calc(4.5rem+env(safe-area-inset-bottom))]',
         )}
       >
@@ -47,6 +48,7 @@ export function MobileNav({ current, onCreate, badges }: MobileNavProps) {
           'lg:hidden fixed bottom-0 inset-x-0 z-30',
           'bg-surface/92 backdrop-blur-md border-t border-hairline',
           'pb-[env(safe-area-inset-bottom)]',
+          'pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]',
         )}
       >
         <ul className="grid grid-cols-5">

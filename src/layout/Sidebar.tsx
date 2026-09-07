@@ -18,7 +18,7 @@ export function Sidebar({ current, onCreate, badges }: SidebarProps) {
   const settings = useSettings()
 
   return (
-    <aside className="hidden lg:flex flex-col w-[268px] shrink-0 border-r border-hairline bg-surface h-dvh sticky top-0">
+    <aside className="hidden lg:flex flex-col w-[268px] shrink-0 border-r border-hairline bg-surface h-dvh sticky top-0 pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)]">
       {/* --- Identidad --- */}
       <div className="px-5 pt-5 pb-4">
         <a

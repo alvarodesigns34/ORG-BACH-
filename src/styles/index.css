@@ -404,5 +404,5 @@ html.is-standalone body {
   font: 600 0.875rem/1.2 Manrope, system-ui, sans-serif;
 }
 .skip-link:focus {
-  top: 0.75rem;
+  top: max(0.75rem, env(safe-area-inset-top));
 }

@@ -45,7 +45,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (!this.state.error) return this.props.children
 
     return (
-      <div className="min-h-dvh grid place-items-center px-6 bg-canvas text-ink">
+      <div className="min-h-dvh grid place-items-center px-6 bg-canvas text-ink pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <div className="max-w-md flex flex-col gap-4">
           <p className="eyebrow">Algo ha fallado</p>
           <h1 className="display text-[1.75rem] leading-tight">

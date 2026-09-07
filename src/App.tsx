@@ -74,7 +74,7 @@ function Shell() {
   // escribiría encima de la única copia. Primero hay que bajarla o confirmar.
   if (hasIllegibleBackup) {
     return (
-      <div className="min-h-dvh grid place-items-center px-6 bg-canvas">
+      <div className="min-h-dvh grid place-items-center px-6 bg-canvas pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <div className="max-w-md flex flex-col gap-4">
           <StorageBanner />
           <h1 className="display text-[1.75rem] leading-tight">
