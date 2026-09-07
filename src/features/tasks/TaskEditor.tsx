@@ -311,7 +311,7 @@ export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
                         )
                       }
                       className={cx(
-                        'flex-1 min-w-0 bg-transparent text-[0.875rem] outline-none',
+                        'flex-1 min-w-0 bg-transparent text-[1rem] outline-none',
                         'focus:underline decoration-accent underline-offset-4',
                         subtask.done && 'line-through text-ink-3',
                       )}

@@ -13,7 +13,7 @@ import { cx } from './primitives'
 /** Estilo común a todo control de formulario, para que no deriven entre sí. */
 const CONTROL = [
   'w-full bg-raised text-ink rounded-sm border border-hairline-strong',
-  'px-3 text-[0.875rem] placeholder:text-ink-3/70',
+  'px-3 text-[1rem] placeholder:text-ink-3/70',
   'transition-[border-color,box-shadow] duration-150',
   'hover:border-ink-3/45',
   'focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/18',
@@ -254,7 +254,7 @@ export function NumberField({
         className={cx(
           CONTROL,
           'tabular-nums',
-          inputSize === 'sm' ? 'h-8 text-[0.8125rem]' : 'h-10',
+          inputSize === 'sm' ? 'h-9 leading-none' : 'h-10',
           suffix && (inputSize === 'sm' ? 'pr-7' : 'pr-10'),
           className,
         )}

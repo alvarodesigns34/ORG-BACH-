@@ -248,7 +248,7 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
                           ),
                         )
                       }
-                      className="flex-1 min-w-0 bg-transparent text-[0.875rem] outline-none focus:underline decoration-accent underline-offset-4"
+                      className="flex-1 min-w-0 bg-transparent text-[1rem] outline-none focus:underline decoration-accent underline-offset-4"
                     />
                     <NumberField
                       inputSize="sm"

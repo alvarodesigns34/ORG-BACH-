@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
     <meta name="description" content="Centro de control academico personal: tareas, examenes, notas y estudio en un solo sitio." />
     <meta name="theme-color" content="#F6F4F0" />
     <title>Bachillerato OS</title>
@@ -44,6 +44,12 @@
           document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
           var meta = document.querySelector('meta[name="theme-color"]')
           if (meta) meta.setAttribute('content', dark ? '#121110' : '#F6F4F0')
+          // iOS (Añadir a pantalla de inicio) no siempre dispara el media
+          // query display-mode; navigator.standalone sí. La clase activa el
+          // bloqueo de pellizco y el overscroll de app.
+          if (navigator.standalone) {
+            document.documentElement.classList.add('is-standalone')
+          }
         } catch (e) {
           document.documentElement.setAttribute('data-theme', 'light')
         }
