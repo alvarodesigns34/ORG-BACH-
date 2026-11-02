@@ -201,7 +201,7 @@ export function LineChart({
             aria-label={title}
             onPointerMove={onPointerMove}
             onPointerLeave={() => setHover(null)}
-            className="touch-none"
+            className="touch-pan-y"
           >
             {/* Rejilla: solo horizontales, y en segundo plano. */}
             {ticks.map((tick) => (

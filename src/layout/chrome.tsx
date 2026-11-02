@@ -113,7 +113,7 @@ export function TopBar({
       className={cx(
         'lg:hidden fixed top-0 inset-x-0 z-30',
         'pt-[env(safe-area-inset-top)] border-b transition-[background-color,border-color] duration-300',
-        scrolled ? 'glass-bar border-hairline' : 'bg-canvas border-transparent',
+        scrolled ? 'glass-bar border-hairline/70' : 'bg-transparent border-transparent',
       )}
     >
       <div
@@ -150,28 +150,35 @@ export function TopBar({
   )
 }
 
-/** «+» y avatar. En escritorio no hacen falta: están en la barra lateral. */
+/**
+ * Asistente, «+» y avatar. Los dos primeros van juntos en una cápsula de
+ * cristal, como los grupos de botones de las barras de iOS 26. En escritorio
+ * no hacen falta: están en la barra lateral.
+ */
 export function ChromeActions({ className }: { className?: string }) {
   const { openCreate, openAssistant } = useChrome()
   return (
     <div className={cx('flex items-center gap-2', className)}>
-      <button
-        type="button"
-        onClick={openAssistant}
-        aria-label="Asistente de voz"
-        className="pressable grid place-items-center size-9 rounded-full bg-fill text-accent"
-      >
-        <Mic className="size-[19px]" strokeWidth={2.3} />
-      </button>
-      <button
-        type="button"
-        onClick={openCreate}
-        aria-label="Nueva tarea"
-        className="pressable grid place-items-center size-9 rounded-full bg-fill text-accent"
-      >
-        <Plus className="size-[22px]" strokeWidth={2.4} />
-      </button>
-      <AccountAvatar />
+      <div className="liquid flex items-center h-10 rounded-full">
+        <button
+          type="button"
+          onClick={openAssistant}
+          aria-label="Asistente"
+          className="pressable relative z-[2] grid place-items-center h-10 w-11 rounded-full text-accent"
+        >
+          <Mic className="size-[19px]" strokeWidth={2.3} />
+        </button>
+        <span aria-hidden className="w-px h-5 bg-hairline-strong/70" />
+        <button
+          type="button"
+          onClick={openCreate}
+          aria-label="Nueva tarea"
+          className="pressable relative z-[2] grid place-items-center h-10 w-11 rounded-full text-accent"
+        >
+          <Plus className="size-[22px]" strokeWidth={2.4} />
+        </button>
+      </div>
+      <AccountAvatar size={40} />
     </div>
   )
 }
@@ -210,12 +217,13 @@ export function AccountAvatar({
       {...(decorative
         ? { 'aria-hidden': true }
         : { href: hrefFor('ajustes'), 'aria-label': label })}
-      className="pressable relative grid place-items-center rounded-full text-white font-semibold shrink-0"
+      className="pressable relative grid place-items-center rounded-full text-white font-semibold shrink-0 shadow-[inset_0_1px_0_rgb(255_255_255/0.35),inset_0_-1px_0_rgb(0_0_0/0.12),0_4px_14px_rgb(0_0_0/0.14)]"
       style={{
         width: size,
         height: size,
-        fontSize: size * 0.44,
-        background: 'linear-gradient(180deg, #a1a1aa 0%, #77777f 100%)',
+        fontSize: size * 0.42,
+        // El de los contactos de iOS: degradado gris con luz arriba.
+        background: 'linear-gradient(180deg, #a9a9b2 0%, #7c7c86 100%)',
       }}
     >
       {initial}

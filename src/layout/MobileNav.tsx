@@ -195,7 +195,7 @@ export function MobileNav({ current, badges }: MobileNavProps) {
       <nav
         aria-label="Secciones"
         className={cx(
-          'lg:hidden fixed bottom-0 inset-x-0 z-30 glass-bar border-t border-hairline',
+          'lg:hidden fixed bottom-0 inset-x-0 z-30 glass-bar border-t border-hairline/70 shadow-[inset_0_0.5px_0_var(--glass-rim)]',
           'pb-[env(safe-area-inset-bottom)]',
           'pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]',
         )}

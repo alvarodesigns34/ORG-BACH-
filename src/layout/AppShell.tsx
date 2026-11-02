@@ -54,7 +54,9 @@ export function StorageBanner() {
 
 export function AppShell({ current, onCreate, badges, children }: AppShellProps) {
   return (
-    <div className="flex min-h-dvh">
+    <div className="relative isolate flex min-h-dvh">
+      {/* Luz ambiente de color arriba: lo que refractan las barras de cristal. */}
+      <div aria-hidden className="ambient" />
       <Sidebar current={current} onCreate={onCreate} badges={badges} />
 
       <div className="flex-1 min-w-0 flex flex-col">

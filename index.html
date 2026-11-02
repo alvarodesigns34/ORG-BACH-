@@ -37,8 +37,8 @@
           var meta = document.querySelector('meta[name="theme-color"]')
           if (meta) meta.setAttribute('content', dark ? '#000000' : '#F2F2F7')
           // iOS (Añadir a pantalla de inicio) no siempre dispara el media
-          // query display-mode; navigator.standalone sí. La clase activa el
-          // bloqueo de pellizco y el overscroll de app.
+          // query display-mode; navigator.standalone sí. La clase marca el
+          // modo app por si algún estilo lo necesita.
           if (navigator.standalone) {
             document.documentElement.classList.add('is-standalone')
           }

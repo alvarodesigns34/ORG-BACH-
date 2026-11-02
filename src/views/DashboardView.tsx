@@ -83,10 +83,10 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
       <button
         type="button"
         onClick={openAssistant}
-        className="pressable card w-full flex items-center gap-3 pl-4 pr-2 h-14 mb-4 text-left"
+        className="pressable liquid w-full flex items-center gap-3 pl-4 pr-2 h-14 mb-4 text-left rounded-[22px]"
       >
         <span className="flex-1 text-[1rem] text-ink-3">Pregúntame o dime qué apuntar…</span>
-        <span className="grid place-items-center size-10 rounded-full bg-accent-fill text-white shrink-0">
+        <span className="relative z-[2] grid place-items-center size-10 rounded-full bg-accent-fill text-white shrink-0 shadow-[inset_0_1px_0_rgb(255_255_255/0.3),0_4px_12px_rgb(0_113_227/0.35)]">
           <Mic className="size-5" strokeWidth={2.3} />
         </span>
       </button>
@@ -349,8 +349,19 @@ function Widget({
   tone?: 'ok' | 'warn' | 'danger'
 }) {
   return (
-    <a href={href} className="card pressable flex flex-col p-4 min-w-0 active:bg-fill/40">
-      <span className="flex items-center gap-2">
+    <a
+      href={href}
+      className="card pressable relative overflow-hidden flex flex-col p-4 min-w-0 active:bg-fill/40"
+    >
+      {/* Un toque del color de la sección en la esquina, como los widgets de iOS. */}
+      <span
+        aria-hidden
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: `radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, ${tint} 13%, transparent), transparent 62%)`,
+        }}
+      />
+      <span className="relative flex items-center gap-2">
         <span
           className="grid place-items-center size-7 rounded-full text-white shrink-0"
           style={{ background: tint }}
@@ -363,9 +374,11 @@ function Widget({
         value={value}
         size={value.length > 6 ? 'sm' : 'md'}
         tone={tone}
-        className="mt-3 truncate"
+        className="relative mt-3 truncate"
       />
-      {caption && <span className="text-[0.75rem] text-ink-3 mt-1.5 truncate">{caption}</span>}
+      {caption && (
+        <span className="relative text-[0.75rem] text-ink-3 mt-1.5 truncate">{caption}</span>
+      )}
     </a>
   )
 }

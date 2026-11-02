@@ -3,12 +3,11 @@ import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
 import { Button, IconButton, cx } from './primitives'
+import { lockScroll } from './scrollLock'
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-/** Cuántos diálogos hay abiertos. `inert` en #root solo se quita al cerrar el último. */
-let openModals = 0
 
 interface ModalProps {
   open: boolean
@@ -85,29 +84,9 @@ export function Modal({
     return () => restoreFocus.current?.focus({ preventScroll: true })
   }, [open, rendered])
 
-  // Bloquear el desplazamiento del fondo, compensando el ancho de la barra
-  // para que la página no dé un salto lateral al abrirse.
-  useEffect(() => {
-    if (!open) return
-    const { body } = document
-    const previousOverflow = body.style.overflow
-    const previousPadding = body.style.paddingRight
-    const gap = window.innerWidth - document.documentElement.clientWidth
-    body.style.overflow = 'hidden'
-    if (gap > 0) body.style.paddingRight = `${gap}px`
-    const root = document.getElementById('root')
-    openModals += 1
-    root?.setAttribute('inert', '')
-    return () => {
-      body.style.overflow = previousOverflow
-      body.style.paddingRight = previousPadding
-      openModals -= 1
-      if (openModals <= 0) {
-        openModals = 0
-        root?.removeAttribute('inert')
-      }
-    }
-  }, [open])
+  // Bloquear el fondo (y dejarlo inerte) mientras esté abierto. El bloqueo
+  // es compartido entre diálogos: ver scrollLock.ts.
+  useEffect(() => (open ? lockScroll() : undefined), [open])
 
   // Esc y el tabulador tienen que funcionar aunque el foco haya salido al
   // fondo. El listener va en `document`, no en el overlay.

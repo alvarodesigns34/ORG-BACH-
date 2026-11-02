@@ -82,8 +82,16 @@
   --shadow-lg: 0 6px 16px rgb(0 0 0 / 0.06), 0 28px 64px rgb(0 0 0 / 0.16);
 
   /* --- Material de cristal (barra inferior, cabeceras, menús) --- */
-  --glass-bg: rgb(255 255 255 / 0.64);
-  --glass-bg-strong: rgb(250 250 252 / 0.86);
+  --glass-bg: rgb(255 255 255 / 0.58);
+  --glass-bg-strong: rgb(249 249 252 / 0.8);
+  /* Brillo especular del borde del cristal (Liquid Glass). */
+  --glass-spec: rgb(255 255 255 / 0.95);
+  --glass-spec-soft: rgb(255 255 255 / 0.28);
+
+  /* Luz ambiente de la parte de arriba: lo que el cristal refracta. */
+  --ambient-a: rgb(0 122 255 / 0.13);
+  --ambient-b: rgb(175 82 222 / 0.1);
+  --ambient-c: rgb(255 45 85 / 0.06);
   --glass-rim: rgb(255 255 255 / 0.85);
   --glass-edge: rgb(0 0 0 / 0.07);
   --glass-shadow: 0 10px 30px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.05);
@@ -151,8 +159,14 @@
   --shadow-md: 0 2px 6px rgb(0 0 0 / 0.4), 0 10px 28px rgb(0 0 0 / 0.5);
   --shadow-lg: 0 6px 16px rgb(0 0 0 / 0.5), 0 28px 64px rgb(0 0 0 / 0.7);
 
-  --glass-bg: rgb(36 36 40 / 0.55);
-  --glass-bg-strong: rgb(28 28 30 / 0.84);
+  --glass-bg: rgb(44 44 48 / 0.5);
+  --glass-bg-strong: rgb(22 22 25 / 0.8);
+  --glass-spec: rgb(255 255 255 / 0.32);
+  --glass-spec-soft: rgb(255 255 255 / 0.06);
+
+  --ambient-a: rgb(10 132 255 / 0.22);
+  --ambient-b: rgb(191 90 242 / 0.16);
+  --ambient-c: rgb(255 55 95 / 0.09);
   --glass-rim: rgb(255 255 255 / 0.14);
   --glass-edge: rgb(255 255 255 / 0.06);
   --glass-shadow: 0 10px 30px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
@@ -302,21 +316,14 @@
   }
 }
 
-/* En la PWA (icono de inicio) no hay pellizco ni el rebote que recarga la
-   página. index.html pone .is-standalone vía navigator.standalone en iOS
-   antiguos, que no disparan el media query. */
-@media (display-mode: standalone) {
-  html,
-  body {
-    touch-action: pan-x pan-y;
-    overscroll-behavior: none;
-  }
-}
-
-html.is-standalone,
-html.is-standalone body {
-  touch-action: pan-x pan-y;
-  overscroll-behavior: none;
+/* Desplazamiento nativo en todas partes, también en la PWA: el rebote
+   elástico y la inercia de iOS son parte de que se sienta fluido. Antes aquí
+   se fijaba `touch-action: pan-x pan-y` y `overscroll-behavior: none` en
+   html y body en modo app; en iOS eso puede dejar la página sin poder
+   desplazarse con el dedo. Solo se corta el gesto lateral, que en la PWA no
+   lleva a ningún sitio. */
+html {
+  overscroll-behavior-x: none;
 }
 
 /* ==========================================================================
@@ -369,30 +376,99 @@ html.is-standalone body {
    sistema pide menos transparencia. */
 @utility glass {
   background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(22px) saturate(185%);
-  backdrop-filter: blur(22px) saturate(185%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  backdrop-filter: blur(24px) saturate(190%);
   box-shadow:
     inset 0 0.5px 0 var(--glass-rim),
     inset 0 0 0 0.5px var(--glass-edge),
     var(--glass-shadow);
 }
 
+/* Barras (inferior y superior): más transparentes y con más desenfoque, como
+   las de iOS 26; una línea de luz en el canto que da al contenido. */
 @utility glass-bar {
   background: var(--glass-bg-strong);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(200%);
+  backdrop-filter: blur(30px) saturate(200%);
+}
+
+/*
+ * Liquid Glass: cristal con canto especular. El borde es un degradado (luz
+ * arriba a la izquierda, un reflejo más débil abajo a la derecha) recortado
+ * a 1 px con una máscara, así sigue el radio de cualquier forma.
+ */
+@utility liquid {
+  position: relative;
+  isolation: isolate;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(24px) saturate(190%) brightness(1.04);
+  backdrop-filter: blur(24px) saturate(190%) brightness(1.04);
+  box-shadow:
+    inset 0 0 0 0.5px var(--glass-edge),
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 8px 24px rgb(0 0 0 / 0.08);
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      145deg,
+      var(--glass-spec) 0%,
+      var(--glass-spec-soft) 32%,
+      transparent 55%,
+      var(--glass-spec-soft) 80%,
+      var(--glass-spec) 100%
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+    pointer-events: none;
+    z-index: 1;
+  }
+}
+
+[data-theme='dark'] .liquid {
+  box-shadow:
+    inset 0 0 0 0.5px var(--glass-edge),
+    0 1px 2px rgb(0 0 0 / 0.4),
+    0 8px 24px rgb(0 0 0 / 0.45);
+}
+
+/* Luz ambiente: un resplandor de color arriba que se desvanece. Va fija y
+   detrás de todo; las tarjetas son opacas, así que solo se ve en los huecos
+   y a través del cristal de las barras. */
+.ambient {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: min(78vh, 640px);
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 55% at 12% 0%, var(--ambient-a), transparent 70%),
+    radial-gradient(55% 50% at 88% 6%, var(--ambient-b), transparent 70%),
+    radial-gradient(45% 40% at 55% 32%, var(--ambient-c), transparent 70%);
+  -webkit-mask-image: linear-gradient(#000 40%, transparent);
+  mask-image: linear-gradient(#000 40%, transparent);
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .glass,
-  .glass-bar {
+  .glass-bar,
+  .liquid {
     background: var(--c-surface);
   }
 }
 
 @media (prefers-reduced-transparency: reduce) {
   .glass,
-  .glass-bar {
+  .glass-bar,
+  .liquid {
     background: var(--c-surface);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
