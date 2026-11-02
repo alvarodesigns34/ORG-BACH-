@@ -423,7 +423,8 @@ export function EmptyState({
 // ---------------------------------------------------------------------------
 
 /**
- * Una cifra académica: serif, tabular y con la unidad en tamaño menor.
+ * Una cifra académica: redondeada (SF Pro Rounded en Apple), tabular y con la
+ * unidad en tamaño menor.
  * `tabular-nums` evita que el número se mueva al actualizarse.
  */
 export function Numeral({

@@ -5,8 +5,8 @@ calendario, asignaturas y notas en un solo sitio, pensado para abrirlo cada mañ
 y saber en diez segundos qué hay que hacer hoy y cómo va el curso.
 
 No es una demo: todo lo que aparece en la interfaz funciona y todo lo que
-introduces se guarda. Las secciones que aún no están construidas lo dicen
-abiertamente en lugar de aparentar que funcionan.
+introduces se guarda. Funciona sin conexión y sin cuenta; con cuenta, el curso
+se sincroniza entre dispositivos y llega cada tarde un resumen por notificación.
 
 ## Poner en marcha
 
@@ -17,6 +17,7 @@ npm run build    # compila a dist/
 npm run preview  # sirve lo compilado
 npm run typecheck  # comprueba tipos (src y tests)
 npm test           # pruebas (runner de Node, sin dependencias)
+                   # incluye la fusión de la sincronización y el resumen diario
 npm run check      # tipos + pruebas, lo mismo que ejecuta el despliegue
 ```
 
@@ -31,7 +32,8 @@ comprobación de tipos, y ahora se llama por lo que hace.
 | 2 · Productividad | Tareas, subtareas, prioridades, calendario, exámenes, asignaturas | Hecha |
 | 3 · Académico | Notas, categorías de peso, medias ponderadas, calculadora de nota, evaluaciones | Hecha |
 | 4 · Análisis | Estadísticas, gráficos, sesiones de estudio, objetivos | Hecha |
-| 5 · Pulido | Microinteracciones, accesibilidad avanzada, optimización, instalable sin conexión | Parcial |
+| 5 · Pulido | Microinteracciones, accesibilidad avanzada, optimización, instalable sin conexión | Hecha |
+| 6 · Nube | Cuenta, sincronización sin conexión entre dispositivos, resumen diario push | Hecha |
 
 Tras una auditoría externa se hizo una **ronda de endurecimiento**: se corrigió
 el registro del inicio de las sesiones de estudio, se añadió validación campo a
@@ -40,7 +42,8 @@ con los objetivos de una asignatura borrada, se arregló la entrada de decimales
 en Ajustes, se hizo consistente la confirmación al borrar y se ajustó el
 contraste de los textos secundarios en ambos temas.
 
-Hay **217 pruebas** sobre el dominio, el reductor y la persistencia. Recorren
+Hay **263 pruebas** sobre el dominio, el reductor, la persistencia, la fusión
+de la sincronización y el resumen diario. Recorren
 los casos que rompen este tipo de aplicaciones: pesos que no suman 100, notas
 sin peso junto a notas con peso, escalas distintas del 10, la nota del curso
 frente al saco único de notas, la coma decimal española, un temporizador que no
@@ -75,6 +78,12 @@ src/
 │   ├── goals.ts       Progreso de objetivos
 │   └── palette.ts     Claves de color de asignatura
 │
+├── sync/          Sincronización con Supabase (ver «Sincronización»).
+│   ├── hlc.ts          Reloj lógico híbrido
+│   ├── merge.ts        Fusión campo a campo: pura, con pruebas
+│   ├── metaStore.ts    Relojes y cola de pendientes en localStorage
+│   └── engine.ts       Red: sesión, subida, descarga, tiempo real
+├── push/          Suscripción al resumen diario (Web Push)
 ├── storage/       Persistencia y validación de lo que entra.
 │   ├── persistence.ts  Único módulo que toca localStorage
 │   └── validate.ts     Revisión campo a campo de los datos importados
@@ -86,8 +95,17 @@ src/
 └── styles/        Tokens de diseño y utilidades.
 ```
 
-Cambiar `localStorage` por una base de datos con cuenta de usuario significa
-reimplementar `load` y `save` en `src/storage/persistence.ts`. Nada más se entera.
+La sincronización no sustituye a `localStorage`: se apoya en él. El curso se
+sigue guardando en el dispositivo exactamente igual (mismo formato, misma
+copia exportable) y la capa `sync/` trabaja aparte, observando los guardados.
+El resto de la aplicación no sabe que existe la nube.
+
+```
+supabase/
+├── migrations/     Esquema, RLS y funciones (tal como están aplicadas)
+└── functions/
+    └── daily-digest/   Edge Function del resumen diario (index.ts + digest.ts)
+```
 
 ### Cómo se calculan las notas
 
@@ -189,6 +207,13 @@ Cosas decididas a conciencia, no olvidos:
   examen, ni de cambiar el enlace.
 - **Las sesiones de estudio no se pueden editar**, solo crear desde el
   temporizador y borrar desde la lista.
+- **Correo de la cuenta.** Mientras el proyecto de Supabase use su correo
+  integrado, solo puede enviar (confirmación de cuenta, recuperar contraseña) a
+  los miembros del equipo del proyecto y con un límite bajo por hora. Para más
+  usuarios hace falta un SMTP propio (Resend, Brevo…).
+- **Las subtareas se sincronizan como un solo campo**: si dos dispositivos
+  editan subtareas distintas de la misma tarea sin conexión, gana la lista
+  editada más tarde.
 
 ## Datos
 
@@ -196,10 +221,88 @@ Se guardan en `localStorage` bajo la clave `bachillerato-os:v1`. Un curso entero
 ocupa unas decenas de kilobytes, muy por debajo del límite del navegador.
 
 - **Exportar/importar**: en Ajustes, en formato JSON legible. Sirve para cambiar
-  de navegador o de ordenador sin perder nada.
-- **Empezar de cero**: también en Ajustes, con confirmación.
+  de navegador o de ordenador sin perder nada, con o sin cuenta.
+- **Empezar de cero**: también en Ajustes, con confirmación. Con cuenta, borra
+  también en la nube (el aviso lo dice).
 - La aplicación arranca **completamente vacía**. En el alta puedes elegir
-  asignaturas de un catálogo de 1.º de Bachillerato (LOMLOE) o escribir las tuyas.
+  asignaturas de un catálogo de 1.º de Bachillerato (LOMLOE), escribir las tuyas
+  o **iniciar sesión** para recuperar el curso de otro dispositivo.
+
+## Sincronización
+
+Opcional: sin cuenta la aplicación funciona igual que siempre. Con cuenta
+(correo y contraseña, en Ajustes) el curso está en todos tus dispositivos.
+
+**Local primero.** Todo se guarda al instante en el dispositivo, con o sin red.
+Cada cambio queda además en una cola persistente (`bachillerato-os:sync`) que se
+sube en segundo plano: al recuperar la conexión, al volver a la app, cada pocos
+minutos y nada más hacer un cambio. Cerrar la app con cambios pendientes no los
+pierde: siguen en la cola. Un aviso en tiempo real de otro dispositivo dispara
+la descarga en unos segundos.
+
+**Sin pérdidas por conflictos.** Cada campo de cada registro lleva un reloj
+lógico híbrido (HLC). Al fusionar gana, campo a campo, el más reciente:
+
+- Si cambias el título de una tarea en el móvil y su fecha en el portátil, sin
+  conexión, al sincronizar se conservan los dos cambios.
+- Solo dos ediciones del **mismo** campo compiten, y gana la posterior. El HLC
+  hace que «posterior» signifique «hecha después de ver la otra», aunque los
+  relojes de los dispositivos no coincidan.
+- Borrar es un campo más. Si un dispositivo borra una tarea mientras otro la
+  sigue editando sin conexión, la edición la resucita en lugar de perderse.
+- El servidor (`sync_push`) aplica las mismas reglas y es idempotente, así que
+  el orden de llegada no cambia el resultado.
+
+**Primera vez con cuenta.** Si la cuenta está vacía, este dispositivo la
+inaugura con su curso. Si el dispositivo está vacío, descarga el de la cuenta.
+Si hay datos en los dos, la aplicación pregunta: *combinar* (se suman; mandan
+los ajustes de la cuenta) o *usar solo los de la cuenta* (antes descarga una
+copia JSON de lo local). Nunca se elige en silencio.
+
+**Seguridad.** Cada cuenta solo lee lo suyo (RLS sobre `auth.uid()`); nadie
+puede escribir directamente en las tablas: las escrituras pasan por funciones
+que validan forma, tamaño y relojes, y solo escriben en la cuenta autenticada.
+El cliente usa la clave **publicable** de Supabase (pensada para ir en la app);
+ninguna clave secreta está en el repositorio ni en el navegador. El tema
+claro/oscuro no se sincroniza: es de cada dispositivo.
+
+**Cerrar sesión** deja los datos en el dispositivo (y sigue anotando cambios
+para subirlos al volver a entrar con la misma cuenta); hay una casilla para
+borrarlos en un ordenador compartido. **Eliminar cuenta** borra la cuenta y todo
+lo guardado en la nube, y conserva lo local (requiere aplicar la migración
+`supabase/migrations/20261102150000_delete_my_account.sql`; hasta entonces el
+botón muestra un error y no borra nada).
+
+**Cómo se ha verificado.** Además de las pruebas de `tests/sync.test.ts` (dos
+dispositivos y un servidor simulados), la sincronización se probó contra el
+proyecto real con tres navegadores: vincular una cuenta con datos locales,
+recuperar el curso en un dispositivo nuevo, recibir en tiempo real (≈4 s),
+editar sin conexión en dos dispositivos y fusionar al volver la red, combinar
+dos cursos y propagar borrados. La función `sync_push` y las políticas RLS se
+probaron también directamente en SQL.
+
+## Resumen diario (notificaciones)
+
+Cada día a las **17:00, hora peninsular española**, una notificación con las
+tareas pendientes de hoy (y las atrasadas) y los exámenes de los próximos días.
+Llega con la aplicación cerrada: lo envía el servidor, no un temporizador del
+navegador.
+
+- **Voluntario.** No se pide permiso hasta activar el interruptor en Ajustes →
+  Resumen diario. Cada dispositivo tiene el suyo y su propia hora (06:00–23:00),
+  y hay un botón para enviar una prueba.
+- **Cambio de hora.** `pg_cron` llama cada hora en punto a la Edge Function
+  `daily-digest`, que calcula la hora local de cada suscripción con la base de
+  datos de zonas horarias (`Europe/Madrid`). Así sale a las 17:00 tanto en
+  invierno (16:00 UTC) como en verano (15:00 UTC) sin tocar nada; hay pruebas
+  del propio día del cambio. Un envío por día como máximo, aunque se solapen dos
+  ejecuciones, y con margen de dos horas si una ejecución se retrasa.
+- **Sin ruido.** Si no hay nada pendiente ni exámenes cerca, no se envía.
+- **Requiere cuenta**, porque el resumen se calcula con los datos sincronizados.
+- **iPhone/iPad**: Apple solo permite notificaciones web a apps instaladas en la
+  pantalla de inicio (iOS 16.4 o posterior). Ajustes lo explica si hace falta.
+- Las claves VAPID y el secreto del cron se generan dentro de la base de datos
+  (esquema `private`, no expuesto por la API): no pasan por el repositorio.
 
 ## Aplicación instalable (PWA)
 
@@ -211,8 +314,10 @@ aplicación de escritorio, y sigue funcionando sin conexión.
   a pantalla de inicio».
 - **Sin conexión**: [`vite-plugin-pwa`](https://vite-pwa-org.netlify.app/) genera
   el manifest y el Service Worker en cada build — no están escritos a mano.
-  Precachea el HTML, el JS, el CSS y las fuentes; con eso basta, porque todos
-  los datos ya viven en `localStorage`, no en un servidor.
+  Precachea el HTML, el JS y el CSS; con eso basta, porque los datos viven en
+  `localStorage` y la nube solo es una copia sincronizada.
+- **Avisos push**: el Service Worker generado importa `public/push-sw.js`, que
+  muestra el resumen diario y, al tocarlo, abre o enfoca la aplicación.
 - **Actualizaciones**: `registerType: 'autoUpdate'`. Al publicar una versión
   nueva, la siguiente vez que se abra la aplicación con conexión se actualiza
   sola, sin que el alumno tenga que hacer nada.
@@ -222,15 +327,30 @@ aplicación de escritorio, y sigue funcionando sin conexión.
 
 ## Sistema visual
 
-- **Tipografía**: Newsreader (serif) para titulares y cifras académicas, Manrope
-  para la interfaz. Auto-alojadas: la aplicación se ve igual sin conexión.
-- **Color**: papel cálido y tinta negra cálida, nunca blanco ni negro puros. Un
-  solo acento —azul tinta— y colores funcionales reservados para prioridad,
-  estado y asignatura.
-- **Accesibilidad**: contraste WCAG AA, navegación completa por teclado, foco
-  visible, y ninguna información transmitida solo por color (la prioridad usa
-  barras de altura creciente, el tipo de evento usa formas distintas).
-- **Movimiento**: mínimo y funcional. Respeta `prefers-reduced-motion`.
+Inspirado en las apps de Apple: claro, tranquilo y con el contenido delante.
+
+- **Tipografía del sistema**: SF Pro en iPhone, iPad y Mac (SF Pro Rounded para
+  las cifras), Segoe en Windows, Roboto en Android. Sin descargas de fuentes.
+- **Color**: fondo agrupado gris claro (negro puro en oscuro, ideal en OLED),
+  tarjetas sin borde y un solo azul de acento. El azul y los grises de texto se
+  han oscurecido respecto a los de iOS para pasar **WCAG AA** sobre cualquier
+  fondo en que aparecen.
+- **Barra inferior Liquid Glass**: cápsula flotante translúcida y botón «+»
+  aparte. Al tocarla, el indicador se convierte en una lente de cristal que
+  sigue al dedo, aumenta lo que tiene debajo y se asienta con un muelle en la
+  pestaña elegida. Son enlaces reales (teclado y lectores de pantalla), y la
+  lente es decorativa.
+- **Títulos grandes** que se convierten en una barra compacta translúcida al
+  desplazarse; **hojas** modales con tirador, que se cierran arrastrando.
+- **Movimiento**: muelles amortiguados (`linear()`), solo `transform` y
+  `opacity`. Con «reducir movimiento» no hay animaciones; con «reducir
+  transparencia» el cristal pasa a ser opaco.
+- **Microinteracciones**: los botones se hunden bajo el dedo, la casilla de
+  tarea se dibuja al completarla, el interruptor se estira al pulsarlo.
+- **Deshacer en lugar de confirmar**: borrar o completar una tarea ocurre al
+  instante, con unos segundos para deshacerlo.
+- **Accesibilidad**: navegación completa por teclado, foco visible, zonas
+  táctiles de 44 px y ninguna información solo por color.
 
 ## Atajos
 
