@@ -1,27 +1,41 @@
 /**
- * Asistente de voz y texto de Bachillerato OS.
+ * Asistente de voz y texto de Bachillerato OS (Mistral).
  *
  * Recibe lo que dice (audio) o escribe (texto) el alumno, junto con un
- * contexto mínimo (asignaturas, tareas abiertas, exámenes sin nota), y pide a
- * Gemini que lo convierta en ACCIONES estructuradas. No toca la base de datos:
+ * contexto mínimo (asignaturas, tareas abiertas, exámenes sin nota), y pide al
+ * modelo que lo convierta en ACCIONES estructuradas. No toca la base de datos:
  * devuelve las acciones y la app las valida y aplica con su propia lógica.
  *
- * - Requiere sesión (JWT del usuario).
- * - Límite diario por usuario, para que nadie agote la cuota gratuita.
- * - La clave de Gemini vive en el secreto GEMINI_API_KEY de Supabase; nunca
- *   llega al navegador ni al repositorio.
+ * - Voz: Voxtral la transcribe (WAV en base64, que la app genera a 16 kHz
+ *   mono) y el modelo de texto grande la interpreta, igual que un texto.
+ * - Requiere sesión (JWT del usuario) y tiene un límite diario por usuario.
+ * - La clave vive en el secreto MISTRAL_API_KEY de Supabase; nunca llega al
+ *   navegador ni al repositorio.
  */
 
 import postgres from 'npm:postgres@3.4.5'
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { prepare: false, max: 2 })
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
+const API = 'https://api.mistral.ai/v1/chat/completions'
 
-const PRIMARY_MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-3.8-flash'
-/** Si el principal agota su cuota gratuita, se prueba con el ligero. */
-const FALLBACK_MODEL = Deno.env.get('GEMINI_FALLBACK_MODEL') ?? 'gemini-3.5-flash-lite'
+const list = (value: string | undefined, fallback: string) =>
+  (value ?? fallback)
+    .split(',')
+    .map((m) => m.trim())
+    .filter(Boolean)
+
+/** En orden de preferencia; si uno no está disponible, se prueba el siguiente. */
+const TEXT_MODELS = list(
+  Deno.env.get('MISTRAL_TEXT_MODELS'),
+  'mistral-large-latest,mistral-medium-latest,mistral-small-latest',
+)
+const AUDIO_MODELS = list(
+  Deno.env.get('MISTRAL_AUDIO_MODELS'),
+  'voxtral-small-latest,voxtral-mini-latest',
+)
 const DAILY_LIMIT = Number(Deno.env.get('ASSISTANT_DAILY_LIMIT') ?? 150)
-const API = 'https://generativelanguage.googleapis.com/v1beta'
+const CALL_TIMEOUT_MS = 30_000
 
 const CORS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -37,7 +51,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 // ---------------------------------------------------------------------------
-// Instrucciones y formato de respuesta
+// Instrucciones
 // ---------------------------------------------------------------------------
 
 const ACTION_TYPES = [
@@ -50,81 +64,51 @@ const ACTION_TYPES = [
   'log_study',
 ]
 
-const SCHEMA = {
-  type: 'object',
-  properties: {
-    reply: {
-      type: 'string',
-      description: 'Respuesta breve en español (máx. 2 frases) confirmando o preguntando.',
-    },
-    actions: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          type: { type: 'string', enum: ACTION_TYPES },
-          title: { type: 'string' },
-          subject_id: { type: 'string' },
-          subject_name: { type: 'string' },
-          date: { type: 'string', description: 'YYYY-MM-DD' },
-          time: { type: 'string', description: 'HH:MM (24 h)' },
-          priority: { type: 'string', enum: ['baja', 'media', 'alta', 'urgente'] },
-          estimated_minutes: { type: 'number' },
-          notes: { type: 'string' },
-          score: { type: 'number' },
-          max_score: { type: 'number' },
-          weight: { type: 'number', description: 'Porcentaje 0-100' },
-          term: { type: 'string', enum: ['T1', 'T2', 'T3'] },
-          grade_kind: {
-            type: 'string',
-            enum: ['examen', 'trabajo', 'practica', 'oral', 'participacion', 'otro'],
-          },
-          task_id: { type: 'string' },
-          exam_id: { type: 'string' },
-          category_id: { type: 'string' },
-          minutes: { type: 'number' },
-        },
-        required: ['type'],
-      },
-    },
-  },
-  required: ['reply', 'actions'],
+const FORMAT = `Responde SOLO con un objeto JSON, sin texto alrededor, con esta forma:
+{
+  "heard": "lo que ha dicho el alumno, transcrito literalmente (solo si te llega audio; si es texto, cadena vacía)",
+  "reply": "respuesta breve en español",
+  "actions": [ { "type": "add_task|complete_task|add_exam|add_grade|add_event|add_subject|log_study", ...campos } ]
 }
+Campos posibles de cada acción (pon solo los que procedan): title, subject_id, subject_name, date (YYYY-MM-DD), time (HH:MM), priority (baja|media|alta|urgente), estimated_minutes, notes, score, max_score, weight (0-100), term (T1|T2|T3), grade_kind (examen|trabajo|practica|oral|participacion|otro), task_id, exam_id, category_id, minutes.`
 
 function instructions(context: unknown): string {
   return `Eres el asistente de Bachillerato OS, una app para organizar el curso de un alumno de Bachillerato en España.
-El alumno te habla (audio) o escribe en español. Convierte lo que pide en ACCIONES para la app. Responde SOLO con JSON que siga el esquema.
+El alumno te habla (audio) o escribe en español. Convierte lo que pide en ACCIONES para la app.
 
 Acciones:
-- add_task: tarea. title obligatorio. date (YYYY-MM-DD) si dice cuándo («para hoy», «para el viernes»). time si da hora. priority si lo dice («urgente», «importante» = alta). estimated_minutes si dice cuánto le llevará. subject_id si menciona asignatura.
-- complete_task: marcar hecha. task_id de open_tasks que mejor encaje (o title si no hay id).
+- add_task: tarea. title obligatorio (sin la asignatura ni la fecha dentro, p. ej. «Ejercicios del tema 4»). date si dice cuándo («para hoy» = today). time si da hora. priority si lo dice («urgente»; «importante» = alta). estimated_minutes si dice cuánto le llevará. subject_id si menciona asignatura.
+- complete_task: marcar hecha. task_id de open_tasks que mejor encaje.
 - add_exam: examen. subject_id y date obligatorios. title («Examen tema 4»), time, notes (temario), weight (% si lo dice), term.
-- add_grade: nota sacada. subject_id, score obligatorios. max_score solo si dice que no es sobre la escala habitual (grade_max del contexto). weight = % que vale («vale un 40 %» → 40). term: «primera evaluación» = T1, «segunda» = T2, «tercera» = T3; si no lo dice, active_term. grade_kind: examen, trabajo, practica, oral, participacion u otro. Si corresponde a un examen de exams_without_grade de esa asignatura, pon su exam_id. title: nombre de la nota si lo dice.
-- add_event: algo con fecha que no es tarea ni examen (excursión, reunión, entrega sin trabajo). title y date.
-- add_subject: SOLO si el alumno pide crear una asignatura o se refiere a una que claramente no existe en subjects. subject_name obligatorio. Las acciones siguientes que la usen llevan subject_name igual.
-- log_study: «he estudiado 45 minutos de física» → minutes, subject_id, date (hoy si no dice).
+- add_grade: nota sacada. subject_id y score obligatorios. max_score solo si dice que no es sobre grade_max. weight = % que vale («vale un 40 %» → 40). term: «primera evaluación» = T1, «segunda» = T2, «tercera» = T3; si no lo dice, active_term. grade_kind según lo que sea. Si corresponde a un examen de exams_without_grade de esa asignatura, pon su exam_id. title si lo dice.
+- add_event: algo con fecha que no es tarea ni examen (excursión, reunión). title y date.
+- add_subject: SOLO si pide crear una asignatura o nombra una que claramente no existe en subjects. subject_name obligatorio; las acciones siguientes que la usen llevan el mismo subject_name.
+- log_study: «he estudiado 45 minutos de física» → minutes, subject_id, date (today si no dice).
 
 Reglas:
-- Fechas relativas respecto a today y weekday del contexto, zona Europe/Madrid. «El jueves» = el próximo jueves (hoy si hoy es jueves y no ha dicho «que viene»). «Mañana», «pasado mañana», «la semana que viene» (lunes siguiente salvo que diga día).
-- Asignaturas: usa SIEMPRE el id exacto de subjects. Interpreta coloquialismos: «mates» = Matemáticas, «bio»/«biología» = Biología…, «física» = Física y Química, «inglés» = Lengua Extranjera (Inglés), «lengua» = Lengua Castellana. Si hay ambigüedad real entre dos, no adivines: deja actions vacío y pregunta en reply.
+- Fechas: NO las calcules de cabeza. Búscalas en next_days del contexto (fecha y día de la semana de hoy y los próximos días). «El jueves» y «el jueves que viene» = el primer jueves de next_days posterior a hoy. «El jueves de la semana que viene» = el jueves de la semana siguiente (lunes a domingo). «Mañana» y «pasado mañana» = las dos fechas siguientes a hoy. «La semana que viene» sin día = el lunes de la semana siguiente. Escribe SIEMPRE en date la fecha exacta tomada de next_days.
+- Asignaturas: usa SIEMPRE el id exacto de subjects. Interpreta coloquialismos: «mates» = Matemáticas, «bio»/«biología» = Biología…, «física» = Física y Química, «inglés» = Lengua Extranjera (Inglés), «lengua» = Lengua Castellana, «filo» = Filosofía, «histo» = Historia. Si hay ambigüedad real entre dos, no adivines: actions vacío y pregunta en reply.
 - Puedes devolver varias acciones si pide varias cosas.
-- Si no entiendes o falta algo imprescindible (fecha de un examen, nota), actions vacío y pregunta en reply, breve.
-- reply: muy breve, natural, en español de España, tuteando. Confirma lo hecho («Apuntado: examen de Biología el jueves 5»).
+- Si no entiendes o falta algo imprescindible (fecha de un examen, la nota), actions vacío y pregunta en reply.
+- reply: muy breve, natural, en español de España, tuteando. Si devuelves acciones, confirma en pasado lo que queda hecho («Apuntado: examen de Biología el jueves 5»), nunca lo preguntes: la app ya lo aplica. Solo pregunta cuando actions va vacío.
 - No inventes datos que no ha dicho.
+
+${FORMAT}
 
 Contexto del alumno (JSON): ${JSON.stringify(context)}`
 }
 
 // ---------------------------------------------------------------------------
-// Gemini
+// Mistral
 // ---------------------------------------------------------------------------
 
 interface Input {
   text?: string
-  audio?: { data: string; mimeType: string }
+  /** WAV en base64. */
+  audio?: string
 }
 
-class GeminiError extends Error {
+class ModelError extends Error {
   constructor(
     public status: number,
     message: string,
@@ -133,75 +117,77 @@ class GeminiError extends Error {
   }
 }
 
-function extractText(body: Record<string, unknown>): string | null {
-  // Interactions API: steps[] con type "model_output" y content[] de texto.
-  if (typeof body.output_text === 'string') return body.output_text
-  const steps = Array.isArray(body.steps)
-    ? body.steps
-    : Array.isArray(body.outputs)
-      ? body.outputs
-      : []
-  const parts: string[] = []
-  for (const step of steps as Record<string, unknown>[]) {
-    if (typeof step.text === 'string') parts.push(step.text)
-    const content = Array.isArray(step.content) ? step.content : []
-    for (const c of content as Record<string, unknown>[]) {
-      if (c.type === 'text' && typeof c.text === 'string') parts.push(c.text)
-    }
-  }
-  if (parts.length) return parts.join('')
-  // generateContent: candidates[0].content.parts[].text
-  const candidates = Array.isArray(body.candidates) ? body.candidates : []
-  const first = candidates[0] as { content?: { parts?: { text?: string }[] } } | undefined
-  const text = first?.content?.parts?.map((p) => p.text ?? '').join('')
-  return text || null
-}
-
-async function callInteractions(model: string, key: string, system: string, input: Input) {
-  const content: unknown[] = []
-  if (input.text) content.push({ type: 'text', text: input.text })
-  if (input.audio) {
-    content.push({ type: 'text', text: 'Mensaje de voz del alumno:' })
-    content.push({ type: 'audio', data: input.audio.data, mime_type: input.audio.mimeType })
-  }
-  const res = await fetch(`${API}/interactions`, {
+async function callMistral(
+  model: string,
+  key: string,
+  system: string,
+  input: Input,
+  jsonMode: boolean,
+): Promise<string | null> {
+  const userContent = input.audio
+    ? [
+        { type: 'input_audio', input_audio: input.audio },
+        {
+          type: 'text',
+          text: input.text ?? 'Haz lo que pide el alumno en este mensaje de voz.',
+        },
+      ]
+    : (input.text ?? '')
+  const res = await fetch(API, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
     body: JSON.stringify({
       model,
-      system_instruction: system,
-      input: content,
-      store: false,
-      response_format: { type: 'text', mime_type: 'application/json', schema: SCHEMA },
+      temperature: 0.1,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: userContent },
+      ],
+      ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
     }),
   })
-  const body = await res.json().catch(() => ({}))
-  if (!res.ok) throw new GeminiError(res.status, JSON.stringify(body).slice(0, 400))
-  return extractText(body)
+  const body = (await res.json().catch(() => ({}))) as {
+    choices?: { message?: { content?: unknown } }[]
+  }
+  if (!res.ok) throw new ModelError(res.status, JSON.stringify(body).slice(0, 400))
+  const message = body.choices?.[0]?.message?.content
+  if (typeof message === 'string') return message
+  // Algunos modelos devuelven el contenido troceado.
+  if (Array.isArray(message)) {
+    return message.map((p) => (p && typeof p.text === 'string' ? (p.text as string) : '')).join('')
+  }
+  return null
 }
 
-/** API clásica, por si la de Interactions no está disponible para el modelo. */
-async function callGenerateContent(model: string, key: string, system: string, input: Input) {
-  const parts: unknown[] = []
-  if (input.text) parts.push({ text: input.text })
-  if (input.audio) {
-    parts.push({ text: 'Mensaje de voz del alumno:' })
-    parts.push({ inlineData: { mimeType: input.audio.mimeType, data: input.audio.data } })
+/**
+ * Paso 1 con voz: Voxtral solo transcribe. Interpretar (fechas, asignaturas)
+ * lo hace después el modelo de texto grande, que acierta mucho más: en las
+ * pruebas, Voxtral entendía bien la frase pero contaba mal los días.
+ */
+async function transcribe(key: string, audio: string): Promise<string> {
+  let lastError: unknown = null
+  for (const model of AUDIO_MODELS) {
+    const started = Date.now()
+    try {
+      const text = await callMistral(
+        model,
+        key,
+        'Transcribe literalmente, en español, lo que dice el audio. Devuelve SOLO la transcripción, sin comillas ni comentarios.',
+        { audio, text: 'Transcribe este audio.' },
+        false,
+      )
+      console.log('mistral transcripción', model, `${Date.now() - started}ms`)
+      if (text?.trim()) return text.trim().slice(0, 2000)
+    } catch (error) {
+      console.error('mistral transcripción fallo', model, String(error).slice(0, 300))
+      lastError = error
+      if (error instanceof ModelError && (error.status === 401 || error.status === 403)) {
+        throw error
+      }
+    }
   }
-  const res = await fetch(`${API}/models/${model}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({
-      systemInstruction: {
-        parts: [{ text: `${system}\n\nFormato JSON: ${JSON.stringify(SCHEMA)}` }],
-      },
-      contents: [{ role: 'user', parts }],
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.2 },
-    }),
-  })
-  const body = await res.json().catch(() => ({}))
-  if (!res.ok) throw new GeminiError(res.status, JSON.stringify(body).slice(0, 400))
-  return extractText(body)
+  throw lastError ?? new Error('Sin transcripción')
 }
 
 async function ask(
@@ -209,31 +195,51 @@ async function ask(
   system: string,
   input: Input,
 ): Promise<{ text: string; model: string }> {
+  const models = input.audio ? AUDIO_MODELS : TEXT_MODELS
   let lastError: unknown = null
-  for (const model of [PRIMARY_MODEL, FALLBACK_MODEL]) {
-    for (const call of [callInteractions, callGenerateContent]) {
+  for (const model of models) {
+    // Primero con modo JSON; si el modelo no lo admite (400), sin él: el
+    // formato ya va pedido en las instrucciones.
+    for (const jsonMode of [true, false]) {
+      const started = Date.now()
       try {
-        const text = await call(model, key, system, input)
+        const text = await callMistral(model, key, system, input, jsonMode)
+        console.log('mistral ok', model, jsonMode ? 'json' : 'libre', `${Date.now() - started}ms`)
         if (text) return { text, model }
       } catch (error) {
+        console.error(
+          'mistral fallo',
+          model,
+          jsonMode ? 'json' : 'libre',
+          `${Date.now() - started}ms`,
+          error instanceof ModelError ? `${error.status} ${error.message}` : String(error),
+        )
         lastError = error
-        // 429: cuota agotada → siguiente modelo. 400/404: formato o modelo no
-        // admitido en esta API → siguiente forma de llamar. Otro: sigue igual.
-        if (error instanceof GeminiError && error.status === 429) break
+        // Un 401/403 (clave) no se arregla probando otros modelos.
+        if (error instanceof ModelError && (error.status === 401 || error.status === 403)) {
+          throw error
+        }
+        // Solo un 400 justifica reintentar el mismo modelo sin modo JSON;
+        // cualquier otro fallo pasa directamente al siguiente modelo.
+        if (!(error instanceof ModelError && error.status === 400)) break
       }
     }
   }
   throw lastError ?? new Error('Sin respuesta del modelo')
 }
 
-function parseResult(text: string): { reply: string; actions: unknown[] } {
-  const cleaned = text
-    .trim()
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/```$/, '')
-  const parsed = JSON.parse(cleaned) as { reply?: unknown; actions?: unknown }
+function parseResult(text: string): { reply: string; heard: string; actions: unknown[] } {
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
+  if (start < 0 || end <= start) throw new SyntaxError('Sin JSON')
+  const parsed = JSON.parse(text.slice(start, end + 1)) as {
+    reply?: unknown
+    heard?: unknown
+    actions?: unknown
+  }
   return {
     reply: typeof parsed.reply === 'string' ? parsed.reply.slice(0, 500) : '',
+    heard: typeof parsed.heard === 'string' ? parsed.heard.slice(0, 1000) : '',
     actions: Array.isArray(parsed.actions)
       ? parsed.actions.filter(
           (a) =>
@@ -278,10 +284,10 @@ Deno.serve(async (req) => {
     const userId = await userFromRequest(req)
     if (!userId) return json({ error: 'Inicia sesión para usar el asistente.' }, 401)
 
-    const key = Deno.env.get('GEMINI_API_KEY')
+    const key = Deno.env.get('MISTRAL_API_KEY')
     if (!key) {
       return json(
-        { error: 'El asistente aún no está configurado: falta la clave de Gemini en Supabase.' },
+        { error: 'El asistente aún no está configurado: falta la clave de Mistral en Supabase.' },
         503,
       )
     }
@@ -297,18 +303,15 @@ Deno.serve(async (req) => {
     if (!body) return json({ error: 'Petición vacía.' }, 400)
 
     const input: Input = {}
-    if (typeof body.text === 'string' && body.text.trim())
+    if (typeof body.text === 'string' && body.text.trim()) {
       input.text = body.text.trim().slice(0, 2000)
-    if (
-      body.audio &&
-      typeof body.audio.data === 'string' &&
-      typeof body.audio.mimeType === 'string' &&
-      body.audio.data.length > 0
-    ) {
-      input.audio = { data: body.audio.data, mimeType: body.audio.mimeType.split(';')[0] }
     }
-    if (!input.text && !input.audio)
+    if (body.audio && typeof body.audio.data === 'string' && body.audio.data.length > 0) {
+      input.audio = body.audio.data
+    }
+    if (!input.text && !input.audio) {
       return json({ error: 'No he recibido nada que procesar.' }, 400)
+    }
 
     // Límite diario, contado antes de llamar al modelo.
     const [usage] = await sql<{ requests: number }[]>`
@@ -321,18 +324,27 @@ Deno.serve(async (req) => {
     }
 
     const context = body.context && typeof body.context === 'object' ? body.context : {}
-    const { text, model } = await ask(key, instructions(context), input)
+    // Con voz: primero se transcribe y luego se interpreta como texto.
+    const heard = input.audio ? await transcribe(key, input.audio) : ''
+    const { text, model } = await ask(
+      key,
+      instructions(context),
+      heard ? { text: input.text ? `${input.text}\n${heard}` : heard } : input,
+    )
     const result = parseResult(text)
-    return json({ ...result, model, remaining: Math.max(0, DAILY_LIMIT - usage.requests) })
+    return json({
+      ...result,
+      heard: heard || result.heard,
+      model,
+      remaining: Math.max(0, DAILY_LIMIT - usage.requests),
+    })
   } catch (error) {
     console.error('assistant', error)
-    if (error instanceof GeminiError && error.status === 429) {
-      return json(
-        {
-          error: 'La IA está saturada o se ha agotado la cuota gratuita de hoy. Prueba más tarde.',
-        },
-        429,
-      )
+    if (error instanceof ModelError && (error.status === 401 || error.status === 403)) {
+      return json({ error: 'La clave de Mistral no es válida o no tiene permiso.' }, 502)
+    }
+    if (error instanceof ModelError && (error.status === 429 || error.status >= 500)) {
+      return json({ error: 'La IA está saturada o sin saldo ahora mismo. Prueba en un rato.' }, 429)
     }
     if (error instanceof SyntaxError) {
       return json({ error: 'No he entendido la respuesta de la IA. Repítelo, por favor.' }, 502)

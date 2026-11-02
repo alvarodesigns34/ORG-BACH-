@@ -227,12 +227,15 @@ describe('contexto que viaja al modelo', () => {
       'active_term',
       'exams_without_grade',
       'grade_max',
+      'next_days',
       'open_tasks',
       'subjects',
       'today',
       'weekday',
     ])
     assert.equal(ctx.weekday, 'lunes')
+    // El jueves de esta semana, para que el modelo no tenga que calcularlo.
+    assert.deepEqual(ctx.next_days[3], { date: '2026-11-05', weekday: 'jueves' })
     assert.equal(ctx.exams_without_grade.length, 1)
   })
 })

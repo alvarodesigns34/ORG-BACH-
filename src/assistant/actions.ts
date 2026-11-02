@@ -13,7 +13,7 @@
  */
 
 import { normalize } from '../domain/tasks.ts'
-import { formatDayMonth } from '../domain/dates.ts'
+import { addDays, formatDayMonth } from '../domain/dates.ts'
 import type { AppData, GradeKind, Priority, Subject, TermId } from '../domain/types.ts'
 import { reducer } from '../state/reducer.ts'
 
@@ -64,6 +64,9 @@ export interface ApplyResult {
 const PRIORITIES: Priority[] = ['baja', 'media', 'alta', 'urgente']
 const TERMS: TermId[] = ['T1', 'T2', 'T3']
 const KINDS: GradeKind[] = ['examen', 'trabajo', 'practica', 'oral', 'participacion', 'otro']
+
+/** Número a la española: «7,5», no «7.5». */
+const es = (n: number) => n.toLocaleString('es-ES', { maximumFractionDigits: 2 })
 
 const isDay = (v: unknown): v is string => {
   if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false
@@ -277,7 +280,7 @@ export function applyAssistantActions(
         })
         applied.push({
           kind: 'nota',
-          text: `${s.name} · ${score}/${maxScore}${weight ? ` · ${weight} %` : ''}`,
+          text: `${s.name} · ${es(score)}/${es(maxScore)}${weight ? ` · ${es(weight)} %` : ''}`,
         })
         break
       }
@@ -420,9 +423,17 @@ export function applyUndo(data: AppData, plan: UndoPlan): AppData {
  * más del curso viaja al modelo.
  */
 export function buildContext(data: AppData, today: string) {
+  const weekday = (day: string) =>
+    new Date(`${day}T12:00:00`).toLocaleDateString('es-ES', { weekday: 'long' })
   return {
     today,
-    weekday: new Date(`${today}T12:00:00`).toLocaleDateString('es-ES', { weekday: 'long' }),
+    weekday: weekday(today),
+    // Calendario de los próximos días: el modelo busca «el jueves» aquí en
+    // lugar de calcularlo, que es donde se equivocaba.
+    next_days: Array.from({ length: 15 }, (_, i) => {
+      const day = addDays(today, i)
+      return { date: day, weekday: weekday(day) }
+    }),
     active_term: data.settings.activeTerm,
     grade_max: data.settings.gradeScale.max,
     subjects: data.subjects

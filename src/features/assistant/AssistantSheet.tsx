@@ -78,6 +78,7 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
   const [phase, setPhase] = useState<Phase>('idle')
   const [text, setText] = useState('')
   const [reply, setReply] = useState('')
+  const [heard, setHeard] = useState('')
   const [applied, setApplied] = useState<AppliedItem[]>([])
   const [skipped, setSkipped] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -92,6 +93,7 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
   const reset = () => {
     setPhase('idle')
     setReply('')
+    setHeard('')
     setApplied([])
     setSkipped([])
     setError(null)
@@ -146,6 +148,7 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
         answer.reply ||
           (result.applied.length > 0 ? 'Hecho.' : 'No he encontrado nada que apuntar.'),
       )
+      setHeard(answer.heard)
       setApplied(result.applied)
       setSkipped(result.skipped)
       setPhase('done')
@@ -223,6 +226,12 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
         </div>
       ) : phase === 'done' ? (
         <div className="flex flex-col gap-4">
+          {heard && (
+            // Lo que ha entendido de tu voz, para comprobar que te oyó bien.
+            <p className="self-end max-w-[85%] rounded-[20px] rounded-br-[6px] bg-accent-fill px-4 py-2.5 text-[0.9375rem] text-white">
+              {heard}
+            </p>
+          )}
           <p className="self-start max-w-[90%] rounded-[20px] rounded-bl-[6px] bg-fill px-4 py-2.5 text-[0.9375rem] text-ink">
             {reply}
           </p>

@@ -1,9 +1,10 @@
 /**
  * Voz y llamada al asistente.
  *
- * Se graba el audio tal cual (MediaRecorder) y se manda a Gemini, que lo
- * entiende directamente: no hace falta un paso de transcripción aparte, y
- * funciona igual en iPhone (graba MP4/AAC) que en Chrome (WebM/Opus).
+ * Se graba con MediaRecorder, se convierte a WAV de 16 kHz mono y se manda a
+ * Voxtral (Mistral), que lo entiende directamente: no hace falta un paso de
+ * transcripción aparte. Funciona igual en iPhone (graba MP4/AAC) que en
+ * Chrome (WebM/Opus).
  */
 
 import { SUPABASE_KEY, SUPABASE_URL } from '../sync/config.ts'
@@ -22,8 +23,8 @@ export function canRecord(): boolean {
   )
 }
 
-/** Formato que acepta el navegador y nombre que entiende Gemini. */
-function pickFormat(): { recorder?: string; gemini: string } {
+/** Formato que acepta el navegador y su tipo MIME, por si no se puede pasar a WAV. */
+function pickFormat(): { recorder?: string; fallbackMime: string } {
   const candidates: [string, string][] = [
     ['audio/webm;codecs=opus', 'audio/webm'],
     ['audio/webm', 'audio/webm'],
@@ -31,11 +32,11 @@ function pickFormat(): { recorder?: string; gemini: string } {
     ['audio/aac', 'audio/aac'],
     ['audio/ogg;codecs=opus', 'audio/ogg'],
   ]
-  for (const [recorder, gemini] of candidates) {
-    if (MediaRecorder.isTypeSupported?.(recorder)) return { recorder, gemini }
+  for (const [recorder, mime] of candidates) {
+    if (MediaRecorder.isTypeSupported?.(recorder)) return { recorder, fallbackMime: mime }
   }
   // Safari antiguo no implementa isTypeSupported: graba MP4 por defecto.
-  return { gemini: 'audio/m4a' }
+  return { fallbackMime: 'audio/m4a' }
 }
 
 export interface Recording {
@@ -103,11 +104,16 @@ export async function startRecording(): Promise<Recording> {
           try {
             const type = recorder.mimeType || format.recorder || 'audio/mp4'
             const blob = new Blob(chunks, { type })
-            resolve({
-              data: await toBase64(blob),
-              mimeType: format.gemini,
-              ms: Date.now() - startedAt,
-            })
+            const ms = Date.now() - startedAt
+            // Mistral recomienda WAV: se convierte aquí, venga el audio del
+            // iPhone (MP4/AAC) o de Chrome (WebM/Opus). Si el navegador no
+            // sabe decodificar su propia grabación, se manda tal cual.
+            const wav = await toWav16k(blob).catch(() => null)
+            resolve(
+              wav
+                ? { data: await toBase64(wav), mimeType: 'audio/wav', ms }
+                : { data: await toBase64(blob), mimeType: format.fallbackMime, ms },
+            )
           } catch (error) {
             reject(error)
           }
@@ -116,6 +122,56 @@ export async function startRecording(): Promise<Recording> {
       })
     },
   }
+}
+
+/** Frecuencia de muestreo del WAV enviado: de sobra para voz, y ligero. */
+const WAV_RATE = 16_000
+
+/** Decodifica la grabación y la reescribe como WAV PCM de 16 bits, mono, 16 kHz. */
+async function toWav16k(blob: Blob): Promise<Blob> {
+  const Ctx =
+    window.AudioContext ??
+    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+  const context = new Ctx()
+  try {
+    const decoded = await context.decodeAudioData(await blob.arrayBuffer())
+    const frames = Math.max(1, Math.ceil(decoded.duration * WAV_RATE))
+    const offline = new OfflineAudioContext(1, frames, WAV_RATE)
+    const source = offline.createBufferSource()
+    source.buffer = decoded
+    source.connect(offline.destination)
+    source.start()
+    const rendered = await offline.startRendering()
+    return encodeWav(rendered.getChannelData(0), WAV_RATE)
+  } finally {
+    void context.close().catch(() => {})
+  }
+}
+
+function encodeWav(samples: Float32Array, rate: number): Blob {
+  const buffer = new ArrayBuffer(44 + samples.length * 2)
+  const view = new DataView(buffer)
+  const write = (offset: number, text: string) => {
+    for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i))
+  }
+  write(0, 'RIFF')
+  view.setUint32(4, 36 + samples.length * 2, true)
+  write(8, 'WAVE')
+  write(12, 'fmt ')
+  view.setUint32(16, 16, true) // tamaño del bloque fmt
+  view.setUint16(20, 1, true) // PCM
+  view.setUint16(22, 1, true) // mono
+  view.setUint32(24, rate, true)
+  view.setUint32(28, rate * 2, true) // bytes por segundo
+  view.setUint16(32, 2, true) // bytes por muestra
+  view.setUint16(34, 16, true) // bits por muestra
+  write(36, 'data')
+  view.setUint32(40, samples.length * 2, true)
+  for (let i = 0; i < samples.length; i++) {
+    const x = Math.max(-1, Math.min(1, samples[i]))
+    view.setInt16(44 + i * 2, x < 0 ? x * 0x8000 : x * 0x7fff, true)
+  }
+  return new Blob([buffer], { type: 'audio/wav' })
 }
 
 function toBase64(blob: Blob): Promise<string> {
@@ -129,6 +185,8 @@ function toBase64(blob: Blob): Promise<string> {
 
 export interface AssistantReply {
   reply: string
+  /** Lo que la IA ha entendido del audio, para que el alumno lo compruebe. */
+  heard: string
   actions: AssistantAction[]
   remaining?: number
 }
@@ -158,6 +216,7 @@ export async function askAssistant(input: {
   if (!res.ok) throw new Error(body.error ?? 'No se pudo hablar con la IA.')
   return {
     reply: body.reply ?? '',
+    heard: body.heard ?? '',
     actions: Array.isArray(body.actions) ? body.actions : [],
     remaining: body.remaining,
   }
