@@ -16,7 +16,11 @@ export interface MenuItem {
 }
 
 interface MenuProps {
-  trigger: (props: { onClick: () => void; 'aria-expanded': boolean; ref: React.Ref<HTMLButtonElement> }) => ReactNode
+  trigger: (props: {
+    onClick: () => void
+    'aria-expanded': boolean
+    ref: React.Ref<HTMLButtonElement>
+  }) => ReactNode
   items: MenuItem[]
   label: string
   align?: 'start' | 'end'
@@ -39,7 +43,7 @@ export function Menu({ trigger, items, label, align = 'end' }: MenuProps) {
     if (!open || !triggerRef.current) return
     const rect = triggerRef.current.getBoundingClientRect()
     const width = 216
-    const estimatedHeight = items.length * 36 + 12
+    const estimatedHeight = items.length * 40 + 12
 
     // Si no cabe debajo, se despliega hacia arriba; y nunca se sale por los lados.
     const below = window.innerHeight - rect.bottom
@@ -48,7 +52,12 @@ export function Menu({ trigger, items, label, align = 'end' }: MenuProps) {
     const left = Math.max(8, Math.min(rawLeft, window.innerWidth - width - 8))
 
     setPosition({ top: Math.max(8, top), left })
-    setActiveIndex(Math.max(0, items.findIndex((i) => i.selected)))
+    setActiveIndex(
+      Math.max(
+        0,
+        items.findIndex((i) => i.selected),
+      ),
+    )
   }, [open, items, align])
 
   useEffect(() => {
@@ -58,8 +67,18 @@ export function Menu({ trigger, items, label, align = 'end' }: MenuProps) {
       if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) return
       setOpen(false)
     }
-    // El menú se cierra al desplazar la página: quedaría flotando fuera de sitio.
-    const onScroll = () => setOpen(false)
+    // El menú se cierra si la página se desplaza de verdad: quedaría flotando
+    // fuera de sitio. Pero no con cualquier evento `scroll`: el último de un
+    // desplazamiento con inercia llega justo después del toque que abre el
+    // menú, y lo cerraba al instante. Solo cuenta si el disparador se ha movido.
+    const origin = triggerRef.current?.getBoundingClientRect()
+    const onScroll = () => {
+      const now = triggerRef.current?.getBoundingClientRect()
+      if (!origin || !now) return setOpen(false)
+      if (Math.abs(now.top - origin.top) > 12 || Math.abs(now.left - origin.left) > 12) {
+        setOpen(false)
+      }
+    }
     document.addEventListener('pointerdown', onPointerDown)
     window.addEventListener('resize', onScroll)
     document.addEventListener('scroll', onScroll, true)
@@ -129,8 +148,8 @@ export function Menu({ trigger, items, label, align = 'end' }: MenuProps) {
             onKeyDown={onKeyDown}
             style={{ top: position.top, left: position.left, width: 216 }}
             className={cx(
-              'fixed z-50 py-1.5 rounded-md outline-none animate-pop',
-              'bg-raised border border-hairline shadow-lg',
+              'fixed z-50 py-1.5 rounded-[14px] outline-none animate-pop origin-top-right',
+              'glass',
             )}
           >
             {items.map((item, index) => (
@@ -145,10 +164,10 @@ export function Menu({ trigger, items, label, align = 'end' }: MenuProps) {
                   }}
                   onPointerEnter={() => setActiveIndex(index)}
                   className={cx(
-                    'w-full flex items-center gap-2.5 px-3 h-9 text-left',
-                    'text-[0.8125rem] transition-colors duration-100',
+                    'w-full flex items-center gap-2.5 px-3.5 h-10 text-left',
+                    'text-[0.875rem] transition-colors duration-100',
                     item.destructive ? 'text-danger' : 'text-ink',
-                    index === activeIndex && (item.destructive ? 'bg-danger-quiet' : 'bg-sunken'),
+                    index === activeIndex && (item.destructive ? 'bg-danger-quiet' : 'bg-fill'),
                   )}
                 >
                   {item.icon && <span className="shrink-0 text-ink-3">{item.icon}</span>}

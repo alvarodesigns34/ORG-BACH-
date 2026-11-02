@@ -225,9 +225,13 @@ class SyncEngine {
         .from('sync_records')
         .select('id', { count: 'exact', head: true })
       if (error) throw error
+      // Sin recuento no se sabe si la cuenta está vacía. Suponerlo subiría los
+      // ajustes de este dispositivo con relojes nuevos y pisaría los de la
+      // cuenta: mejor reintentar.
+      if (count === null) throw new Error('No se pudo comprobar el contenido de la cuenta.')
       const local = store.getData()
 
-      if (!count) {
+      if (count === 0) {
         // Cuenta vacía: este dispositivo la inaugura con todo lo que tiene.
         saveMeta(stampAll(createMeta(userId, nodeId()), local))
       } else if (!hasContent(local)) {
@@ -239,6 +243,9 @@ class SyncEngine {
         return
       }
       this.subscribeRealtime(userId)
+      // Fuera de «vinculando» antes de pedir el ciclo: `kick` no arranca
+      // mientras se está decidiendo cómo vincular.
+      this.set({ phase: 'syncing' })
       this.kick()
     } catch (error) {
       this.fail(error, () => this.userId === userId && void this.link(userId))
