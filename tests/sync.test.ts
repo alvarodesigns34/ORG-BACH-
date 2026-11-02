@@ -290,6 +290,19 @@ describe('conflictos entre dispositivos', () => {
     assert.equal(phone.data.tasks[0].title, 'B')
     assert.equal(laptop.data.tasks[0].title, 'B')
   })
+  it('deshacer un borrado ya sincronizado devuelve la tarea en el otro dispositivo', () => {
+    const { server, phone, laptop } = pair([task()])
+    phone.edit(withTasks(phone.data, []))
+    phone.sync(server)
+    laptop.sync(server)
+    assert.equal(laptop.data.tasks.length, 0)
+
+    phone.edit(withTasks(phone.data, [task()])) // «Deshacer»: mismo id, mismos datos
+    phone.sync(server)
+    laptop.sync(server)
+    assert.equal(laptop.data.tasks.length, 1)
+    assert.equal(laptop.data.tasks[0].title, 'Comentario de texto')
+  })
 })
 
 // --- Robustez --------------------------------------------------------------

@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Clock, Ellipsis, ListTree, Pencil, Trash2 } from 'lucide-react'
 
 import { formatDuration, relativeDay } from '@/domain/dates'
@@ -6,9 +5,9 @@ import { bucketOf, subtaskProgress } from '@/domain/tasks'
 import { PRIORITIES, type Priority, type Subject, type Task } from '@/domain/types'
 import { useDispatch, useToday } from '@/state/StoreProvider'
 import { Checkbox } from '@/ui/fields'
-import { ConfirmDialog } from '@/ui/Modal'
 import { Menu } from '@/ui/Menu'
 import { PriorityMark, PRIORITY_LABEL, SubjectTag, cx } from '@/ui/primitives'
+import { useToast } from '@/ui/Toast'
 
 interface TaskRowProps {
   task: Task
@@ -38,9 +37,25 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className }: TaskR
   const today = useToday()
   const done = task.status === 'completada'
   const progress = subtaskProgress(task)
-  // Borrar desde el menú pide confirmación igual que desde el editor: que la
-  // acción sea rápida no la hace menos irreversible.
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  const toast = useToast()
+
+  // Borrar y completar ocurren al instante y se pueden deshacer unos segundos.
+  const remove = () => {
+    dispatch({ type: 'task/remove', id: task.id })
+    toast({
+      text: 'Tarea eliminada',
+      action: { label: 'Deshacer', run: () => dispatch({ type: 'task/restore', task }) },
+    })
+  }
+  const toggle = () => {
+    dispatch({ type: 'task/toggle', id: task.id })
+    if (!done) {
+      toast({
+        text: 'Tarea completada',
+        action: { label: 'Deshacer', run: () => dispatch({ type: 'task/toggle', id: task.id }) },
+      })
+    }
+  }
 
   return (
     <li
@@ -54,7 +69,7 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className }: TaskR
       <div className="pt-0.5 shrink-0">
         <Checkbox
           checked={done}
-          onChange={() => dispatch({ type: 'task/toggle', id: task.id })}
+          onChange={toggle}
           label={done ? `Marcar «${task.title}» como pendiente` : `Completar «${task.title}»`}
           hideLabel
         />
@@ -153,7 +168,7 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className }: TaskR
               icon: <Trash2 className="size-3.5" />,
               destructive: true,
               separated: true,
-              onSelect: () => setConfirmDelete(true),
+              onSelect: remove,
             },
           ]}
           trigger={({ onClick, ref, ...aria }) => (
@@ -178,19 +193,6 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className }: TaskR
           )}
         />
       </div>
-
-      <ConfirmDialog
-        open={confirmDelete}
-        onCancel={() => setConfirmDelete(false)}
-        onConfirm={() => {
-          dispatch({ type: 'task/remove', id: task.id })
-          setConfirmDelete(false)
-        }}
-        title="Eliminar tarea"
-        message={`«${task.title}» se borrará definitivamente. Esta acción no se puede deshacer.`}
-        confirmLabel="Eliminar"
-        destructive
-      />
     </li>
   )
 }

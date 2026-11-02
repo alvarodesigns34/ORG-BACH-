@@ -3,11 +3,19 @@ import { Plus, Trash2, X } from 'lucide-react'
 
 import { newId } from '@/domain/id'
 import { parseDecimalOr } from '@/domain/number'
-import { PRIORITIES, TASK_STATUSES, type Priority, type Subtask, type Task, type TaskStatus } from '@/domain/types'
+import {
+  PRIORITIES,
+  TASK_STATUSES,
+  type Priority,
+  type Subtask,
+  type Task,
+  type TaskStatus,
+} from '@/domain/types'
 import { useDispatch } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
 import { Checkbox, Field, Input, NumberInput, Select, Textarea } from '@/ui/fields'
-import { ConfirmDialog, Modal } from '@/ui/Modal'
+import { Modal } from '@/ui/Modal'
+import { useToast } from '@/ui/Toast'
 import { Button, IconButton, PRIORITY_LABEL, Progress, cx } from '@/ui/primitives'
 
 interface TaskEditorProps {
@@ -53,7 +61,7 @@ export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
   const [form, setForm] = useState<FormState>(() => toForm(task, defaults))
   const [error, setError] = useState<string | null>(null)
   const [newSubtask, setNewSubtask] = useState('')
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  const toast = useToast()
 
   // Al abrir con otra tarea (o al pasar de editar a crear) el formulario se
   // rehace: reutilizar el estado anterior mostraría datos de la tarea previa.
@@ -133,7 +141,18 @@ export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
             {task && (
               <Button
                 variant="danger"
-                onClick={() => setConfirmDelete(true)}
+                onClick={() => {
+                  if (!task) return
+                  dispatch({ type: 'task/remove', id: task.id })
+                  onClose()
+                  toast({
+                    text: 'Tarea eliminada',
+                    action: {
+                      label: 'Deshacer',
+                      run: () => dispatch({ type: 'task/restore', task }),
+                    },
+                  })
+                }}
                 className="mr-auto"
               >
                 <Trash2 className="size-4" />
@@ -346,7 +365,11 @@ export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
                   }
                 }}
               />
-              <Button onClick={addSubtask} disabled={!newSubtask.trim()} aria-label="Añadir subtarea">
+              <Button
+                onClick={addSubtask}
+                disabled={!newSubtask.trim()}
+                aria-label="Añadir subtarea"
+              >
                 <Plus className="size-4" />
               </Button>
             </div>
@@ -376,20 +399,6 @@ export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
           </Field>
         </div>
       </Modal>
-
-      <ConfirmDialog
-        open={confirmDelete}
-        onCancel={() => setConfirmDelete(false)}
-        onConfirm={() => {
-          if (task) dispatch({ type: 'task/remove', id: task.id })
-          setConfirmDelete(false)
-          onClose()
-        }}
-        title="Eliminar tarea"
-        message={`«${task?.title}» se borrará definitivamente. Esta acción no se puede deshacer.`}
-        confirmLabel="Eliminar"
-        destructive
-      />
     </>
   )
 }

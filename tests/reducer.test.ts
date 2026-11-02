@@ -335,3 +335,40 @@ describe('el enlace examen-nota es de la misma asignatura', () => {
     assert.equal(next.exams.find((e) => e.id === 'e1')?.gradeEntryId, undefined)
   })
 })
+
+describe('deshacer el borrado de una tarea', () => {
+  const task = {
+    id: 'task_x',
+    title: 'Comentario de texto',
+    subjectId: 'mat',
+    priority: 'alta' as const,
+    status: 'pendiente' as const,
+    tags: ['entrega'],
+    subtasks: [{ id: 's1', title: 'Leer', done: true }],
+    createdAt: '2026-10-01T00:00:00.000Z',
+  }
+
+  it('la tarea vuelve idéntica, con el mismo id', () => {
+    const withTask = { ...baseState(), tasks: [task] }
+    const removed = reducer(withTask, { type: 'task/remove', id: 'task_x' })
+    assert.equal(removed.tasks.length, 0)
+    const restored = reducer(removed, { type: 'task/restore', task })
+    assert.deepEqual(restored.tasks, [task])
+  })
+
+  it('deshacer dos veces no la duplica', () => {
+    const state = { ...baseState(), tasks: [task] }
+    assert.equal(reducer(state, { type: 'task/restore', task }), state)
+  })
+
+  it('si su asignatura se borró entretanto, vuelve suelta', () => {
+    const withTask = { ...baseState(), tasks: [task] }
+    const gone = reducer(reducer(withTask, { type: 'task/remove', id: 'task_x' }), {
+      type: 'subject/remove',
+      id: 'mat',
+    })
+    const restored = reducer(gone, { type: 'task/restore', task })
+    assert.equal(restored.tasks[0].subjectId, undefined)
+    assert.equal(restored.tasks[0].title, 'Comentario de texto')
+  })
+})

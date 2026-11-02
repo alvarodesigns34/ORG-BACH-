@@ -44,6 +44,8 @@ export type Action =
   | { type: 'task/add'; task: New<Task> }
   | { type: 'task/update'; id: ID; patch: Partial<Task> }
   | { type: 'task/remove'; id: ID }
+  /** Devuelve una tarea borrada tal cual estaba (mismo id): el «Deshacer». */
+  | { type: 'task/restore'; task: Task }
   | { type: 'task/toggle'; id: ID }
   | { type: 'grade/add'; grade: New<GradeEntry>; linkExamId?: ID }
   | { type: 'grade/update'; id: ID; patch: Partial<GradeEntry> }
@@ -120,7 +122,12 @@ export function reducer(state: AppData, action: Action): AppData {
       return {
         ...state,
         subjects: [...state.subjects, subject],
-        activity: logActivity(state, 'asignatura_creada', `Asignatura añadida: ${subject.name}`, subject.id),
+        activity: logActivity(
+          state,
+          'asignatura_creada',
+          `Asignatura añadida: ${subject.name}`,
+          subject.id,
+        ),
       }
     }
 
@@ -170,7 +177,9 @@ export function reducer(state: AppData, action: Action): AppData {
         subjects: state.subjects.filter((s) => s.id !== action.id),
         grades: state.grades.filter((g) => g.subjectId !== action.id),
         exams: state.exams.filter((e) => e.subjectId !== action.id),
-        tasks: state.tasks.map((t) => (t.subjectId === action.id ? { ...t, subjectId: undefined } : t)),
+        tasks: state.tasks.map((t) =>
+          t.subjectId === action.id ? { ...t, subjectId: undefined } : t,
+        ),
         events: state.events.map((e) =>
           e.subjectId === action.id ? { ...e, subjectId: undefined } : e,
         ),
@@ -197,7 +206,7 @@ export function reducer(state: AppData, action: Action): AppData {
         ...action.task,
         id: newId('task'),
         createdAt: nowISO(),
-        completedAt: completing ? action.task.completedAt ?? nowISO() : undefined,
+        completedAt: completing ? (action.task.completedAt ?? nowISO()) : undefined,
       }
       return {
         ...state,
@@ -241,6 +250,16 @@ export function reducer(state: AppData, action: Action): AppData {
 
     case 'task/remove':
       return { ...state, tasks: state.tasks.filter((t) => t.id !== action.id) }
+
+    case 'task/restore': {
+      if (state.tasks.some((t) => t.id === action.task.id)) return state
+      // La asignatura pudo borrarse mientras tanto: la tarea vuelve suelta.
+      const subjectId =
+        action.task.subjectId && state.subjects.some((s) => s.id === action.task.subjectId)
+          ? action.task.subjectId
+          : undefined
+      return { ...state, tasks: [...state.tasks, { ...action.task, subjectId }] }
+    }
 
     case 'task/toggle': {
       const task = state.tasks.find((t) => t.id === action.id)
@@ -381,7 +400,12 @@ export function reducer(state: AppData, action: Action): AppData {
       return {
         ...state,
         goals: [...state.goals, goal],
-        activity: logActivity(state, 'objetivo_creado', `Objetivo creado: ${goal.title}`, goal.subjectId),
+        activity: logActivity(
+          state,
+          'objetivo_creado',
+          `Objetivo creado: ${goal.title}`,
+          goal.subjectId,
+        ),
       }
     }
 

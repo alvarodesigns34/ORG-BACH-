@@ -20,11 +20,14 @@ import { SettingsView } from '@/views/SettingsView'
 import { Button } from '@/ui/primitives'
 import { LinkChoiceDialog, RecoveryDialog } from '@/features/account/Account'
 import { syncEngine } from '@/sync/engine'
+import { ToastProvider } from '@/ui/Toast'
 
 export function App() {
   return (
     <StoreProvider>
-      <Shell />
+      <ToastProvider>
+        <Shell />
+      </ToastProvider>
     </StoreProvider>
   )
 }
@@ -32,7 +35,8 @@ export function App() {
 function Shell() {
   const { route } = useRoute()
   const settings = useSettings()
-  const { data, hasIllegibleBackup, downloadIllegibleBackup, acknowledgeCorruptStorage } = useStore()
+  const { data, hasIllegibleBackup, downloadIllegibleBackup, acknowledgeCorruptStorage } =
+    useStore()
   const summary = useTaskSummary()
   const [creating, setCreating] = useState(false)
 
@@ -87,8 +91,8 @@ function Shell() {
             No se pudieron leer los datos guardados
           </h1>
           <p className="text-[0.875rem] text-ink-2 leading-relaxed">
-            Hay una copia del contenido original. Descárgala antes de seguir:
-            si empiezas de cero, es lo único que queda del curso.
+            Hay una copia del contenido original. Descárgala antes de seguir: si empiezas de cero,
+            es lo único que queda del curso.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button variant="primary" onClick={downloadIllegibleBackup}>
