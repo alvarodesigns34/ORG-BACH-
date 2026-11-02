@@ -14,6 +14,8 @@ import { STORAGE_KEY } from '@/data/defaults'
 import { today as todayISO } from '@/domain/dates'
 import type { AppData, DateISO, ThemePreference } from '@/domain/types'
 import * as storage from '@/storage/persistence'
+import { registerStore } from '@/sync/bridge'
+import { trackLocalChange } from '@/sync/metaStore'
 import { reducer, type Action } from './reducer'
 
 /**
@@ -99,6 +101,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const persist = useCallback((snapshot: AppData): boolean => {
     const result = storage.save(snapshot)
     if (result.ok) {
+      // Con cuenta vinculada, lo que ha cambiado desde el último guardado se
+      // anota para subirlo. Va DESPUÉS de escribir el curso: si el guardado
+      // falla, el siguiente intento vuelve a comparar desde el mismo punto.
+      trackLocalChange(lastPersisted.current, snapshot)
       lastPersisted.current = snapshot
       pendingWrite.current = false
       setStorageNotice(null)
@@ -206,6 +212,37 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [persist],
   )
 
+  // --- Sincronización ---------------------------------------------------
+  // El motor pide el estado y entrega lo que llega del servidor. Lo remoto se
+  // escribe sin pasar por `trackLocalChange`: no es un cambio de este
+  // dispositivo y no hay que volver a subirlo.
+  useEffect(() => {
+    registerStore({
+      getData: () => latest.current,
+      applyRemote: (merge) => {
+        if (writesFrozen.current) return false
+        // Primero se guarda (y se anota) lo tecleado aquí: así la fusión
+        // trabaja sobre el estado completo y con todos los relojes al día.
+        if (pendingWrite.current) {
+          if (timer.current) {
+            clearTimeout(timer.current)
+            timer.current = null
+          }
+          if (!persist(latest.current)) return false
+        }
+        const next = merge(latest.current)
+        if (!next || next === latest.current) return true
+        const result = storage.save(next)
+        if (!result.ok) setStorageNotice({ level: 'error', text: result.error })
+        lastPersisted.current = next
+        latest.current = next
+        dispatch({ type: 'data/replace', data: next })
+        return true
+      },
+    })
+    return () => registerStore(null)
+  }, [persist])
+
   const downloadIllegibleBackup = useCallback(() => {
     const raw = storage.readBackup()
     if (!raw) return
@@ -282,7 +319,7 @@ function applyTheme(preference: ThemePreference) {
     preference === 'dark' ||
     (preference === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
-  const color = dark ? '#121110' : '#F6F4F0'
+  const color = dark ? '#000000' : '#F2F2F7'
   for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
     meta.setAttribute('content', color)
     meta.removeAttribute('media')

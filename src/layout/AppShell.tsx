@@ -1,13 +1,11 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { TriangleAlert, X } from 'lucide-react'
 
 import { useStore } from '@/state/StoreProvider'
-import { hrefFor, type RouteId } from '@/router'
+import { type RouteId } from '@/router'
 import { IconButton, cx } from '@/ui/primitives'
-import { BrandMark, BrandWordmark } from './Brand'
 import { MobileNav } from './MobileNav'
 import { Sidebar } from './Sidebar'
-import { ThemeToggle } from './ThemeToggle'
 
 interface AppShellProps {
   current: RouteId
@@ -59,23 +57,12 @@ export function AppShell({ current, onCreate, badges, children }: AppShellProps)
       <Sidebar current={current} onCreate={onCreate} badges={badges} />
 
       <div className="flex-1 min-w-0 flex flex-col">
-        {/* Cabecera solo de móvil: en escritorio la identidad vive en el lateral. */}
-        <header
-          className={cx(
-            'lg:hidden sticky top-0 z-20 flex items-center justify-between gap-3',
-            // El fondo llega al borde (status bar translúcida); el contenido
-            // se queda debajo de la hora, el Dynamic Island y la batería.
-            'h-[calc(3.5rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)]',
-            'pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]',
-            'bg-canvas/92 backdrop-blur-md border-b border-hairline',
-          )}
-        >
-          <a href={hrefFor('inicio')} className="flex items-center gap-2.5">
-            <BrandMark size={26} />
-            <BrandWordmark />
-          </a>
-          <ThemeToggle />
-        </header>
+        {/* Material bajo la hora y el Dynamic Island: el contenido que pasa
+            por debajo al desplazarse no se mezcla con los iconos del sistema. */}
+        <div
+          aria-hidden
+          className="lg:hidden fixed top-0 inset-x-0 z-20 h-[env(safe-area-inset-top)] glass-bar"
+        />
 
         <StorageBanner />
 
@@ -83,11 +70,15 @@ export function AppShell({ current, onCreate, badges, children }: AppShellProps)
           id="contenido"
           className={cx(
             'flex-1 min-w-0',
-            // Hueco inferior en móvil para que la barra fija no tape contenido.
-            'pb-[calc(8.5rem+env(safe-area-inset-bottom))] lg:pb-16',
+            'pt-[env(safe-area-inset-top)] lg:pt-0',
+            // Hueco inferior en móvil para que la barra flotante no tape nada.
+            'pb-[calc(7rem+env(safe-area-inset-bottom))] lg:pb-16',
           )}
         >
-          {children}
+          {/* La clave reinicia la animación de entrada en cada sección. */}
+          <div key={current} className="animate-[rise_380ms_var(--ease-out)_both]">
+            {children}
+          </div>
         </main>
       </div>
 
@@ -108,8 +99,82 @@ interface PageProps {
 /** Contenedor de ancho controlado. El texto no debe cruzar toda una pantalla ancha. */
 export function Page({ children, className }: PageProps) {
   return (
-    <div className={cx('mx-auto w-full max-w-[1180px] px-5 sm:px-8 py-7 sm:py-10', className)}>
+    <div
+      className={cx(
+        'mx-auto w-full max-w-[1180px]',
+        'px-[max(1.125rem,env(safe-area-inset-left))] sm:px-8 pt-5 sm:pt-10 pb-6',
+        className,
+      )}
+    >
       {children}
+    </div>
+  )
+}
+
+/** Alto de la barra compacta, sin contar la zona segura. */
+const COMPACT_BAR = 44
+
+/**
+ * ¿Ha pasado el elemento por debajo de la barra compacta?
+ *
+ * Se mide contra la posición real de la barra (zona segura + 44 px), que en
+ * un iPhone con Dynamic Island no es la misma que en un Android o un iPad.
+ */
+export function useScrolledPast(ref: RefObject<HTMLElement | null>): boolean {
+  const [past, setPast] = useState(false)
+  useEffect(() => {
+    let frame = 0
+    const check = () => {
+      frame = 0
+      const node = ref.current
+      if (!node) return
+      const safeTop =
+        parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-top')) || 0
+      const next = window.scrollY > 4 && node.getBoundingClientRect().bottom < safeTop + COMPACT_BAR
+      setPast((prev) => (prev === next ? prev : next))
+    }
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(check)
+    }
+    check()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+    }
+  }, [ref])
+  return past
+}
+
+/**
+ * Barra superior compacta del móvil.
+ *
+ * Aparece cuando el título grande sale de la pantalla, como en las apps de
+ * iOS: el alumno siempre sabe dónde está sin que el título ocupe sitio.
+ * Es decorativa para lectores de pantalla: el `h1` real sigue en la página.
+ */
+export function CompactTitleBar({ title, visible }: { title: string; visible: boolean }) {
+  return (
+    <div
+      aria-hidden
+      className={cx(
+        'lg:hidden fixed top-0 inset-x-0 z-20 pointer-events-none',
+        'pt-[env(safe-area-inset-top)] glass-bar border-b',
+        'transition-[opacity,border-color] duration-300',
+        visible ? 'opacity-100 border-hairline' : 'opacity-0 border-transparent',
+      )}
+    >
+      <p
+        className={cx(
+          'h-11 grid place-items-center px-16 text-[1.0625rem] font-semibold tracking-[-0.02em] truncate',
+          'transition-transform duration-500 ease-[var(--spring)]',
+          visible ? 'translate-y-0' : 'translate-y-2',
+        )}
+      >
+        {title}
+      </p>
     </div>
   )
 }
@@ -123,18 +188,21 @@ interface PageHeaderProps {
 }
 
 export function PageHeader({ title, subtitle, actions, toolbar }: PageHeaderProps) {
+  const heading = useRef<HTMLHeadingElement>(null)
+  const collapsed = useScrolledPast(heading)
   return (
-    <header className="mb-7 sm:mb-9">
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+    <header className="mb-6 sm:mb-8">
+      <CompactTitleBar title={title} visible={collapsed} />
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
-          <h1 className="display text-[1.75rem] sm:text-[2.125rem] leading-[1.1] tracking-[-0.025em]">
+          <h1 ref={heading} className="display text-[2.125rem] sm:text-[2.5rem] leading-[1.08]">
             {title}
           </h1>
-          {subtitle && <p className="text-[0.875rem] text-ink-3 mt-1.5">{subtitle}</p>}
+          {subtitle && <p className="text-[0.9375rem] text-ink-3 mt-1">{subtitle}</p>}
         </div>
         {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
       </div>
-      {toolbar && <div className="mt-6">{toolbar}</div>}
+      {toolbar && <div className="mt-5">{toolbar}</div>}
     </header>
   )
 }

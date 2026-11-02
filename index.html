@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
     <meta name="description" content="Centro de control academico personal: tareas, examenes, notas y estudio en un solo sitio." />
-    <meta name="theme-color" content="#F6F4F0" />
+    <meta name="theme-color" content="#F2F2F7" />
     <title>Bachillerato OS</title>
 
     <link rel="icon" href="/icono.svg" type="image/svg+xml" />
@@ -16,19 +16,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Bachillerato" />
 
-    <link
-      rel="preload"
-      href="/fonts/manrope-latin.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin
-    />
-
     <style>
       /* El CSS llega con el JS. Sin esto, el script de tema pinta data-theme
          sobre un documento blanco hasta que carga el bundle. */
-      html, body { background: #f6f4f0; color: #1b1917; }
-      html[data-theme='dark'], html[data-theme='dark'] body { background: #121110; color: #f2efe9; }
+      html, body { background: #f2f2f7; color: #1d1d1f; }
+      html[data-theme='dark'], html[data-theme='dark'] body { background: #000; color: #f5f5f7; }
     </style>
 
     <script>
@@ -43,7 +35,7 @@
               window.matchMedia('(prefers-color-scheme: dark)').matches)
           document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
           var meta = document.querySelector('meta[name="theme-color"]')
-          if (meta) meta.setAttribute('content', dark ? '#121110' : '#F6F4F0')
+          if (meta) meta.setAttribute('content', dark ? '#000000' : '#F2F2F7')
           // iOS (Añadir a pantalla de inicio) no siempre dispara el media
           // query display-mode; navigator.standalone sí. La clase activa el
           // bloqueo de pellizco y el overscroll de app.

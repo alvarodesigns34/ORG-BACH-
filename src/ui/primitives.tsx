@@ -1,4 +1,11 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type ReactNode,
+} from 'react'
 
 import { colorVar, quietVar } from '@/domain/palette'
 import type { Priority, Subject } from '@/domain/types'
@@ -16,21 +23,18 @@ type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerFill'
 type ButtonSize = 'sm' | 'md' | 'lg'
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary:
-    'bg-accent text-accent-ink border border-transparent hover:bg-accent-strong active:translate-y-px',
-  secondary:
-    'bg-surface text-ink border border-hairline-strong hover:bg-raised hover:border-ink-3/40 active:translate-y-px',
-  ghost: 'bg-transparent text-ink-2 border border-transparent hover:bg-sunken hover:text-ink',
-  danger: 'bg-transparent text-danger border border-transparent hover:bg-danger-quiet',
-  dangerFill:
-    'bg-danger text-white border border-transparent hover:brightness-110 active:translate-y-px',
+  primary: 'bg-accent-fill text-accent-ink hover:brightness-[1.08] shadow-xs',
+  secondary: 'bg-fill text-ink hover:bg-[color-mix(in_srgb,var(--c-fill)_100%,var(--c-ink)_4%)]',
+  ghost: 'bg-transparent text-accent hover:bg-fill',
+  danger: 'bg-transparent text-danger hover:bg-danger-quiet',
+  dangerFill: 'bg-danger text-white hover:brightness-110',
 }
 
 const SIZES: Record<ButtonSize, string> = {
-  // Alturas pensadas para que el dedo acierte: 36px de mínimo real.
-  sm: 'h-9 px-3 text-[0.8125rem] gap-1.5 rounded-sm',
-  md: 'h-10 px-4 text-[0.875rem] gap-2 rounded-sm',
-  lg: 'h-12 px-5 text-[0.9375rem] gap-2 rounded-md',
+  // Cápsulas, como los botones de iOS 26. 36 px de alto mínimo: el dedo acierta.
+  sm: 'h-9 px-3.5 text-[0.8125rem] gap-1.5 rounded-full',
+  md: 'h-11 px-5 text-[0.9375rem] gap-2 rounded-full',
+  lg: 'h-[3.25rem] px-6 text-[1rem] gap-2 rounded-full',
 }
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -52,9 +56,8 @@ export function Button({
     <button
       type={type}
       className={cx(
-        'inline-flex items-center justify-center font-medium whitespace-nowrap',
-        'transition-[background-color,border-color,color,transform] duration-150',
-        'disabled:pointer-events-none disabled:opacity-45',
+        'pressable inline-flex items-center justify-center font-semibold whitespace-nowrap select-none',
+        'disabled:pointer-events-none disabled:opacity-40',
         VARIANTS[variant],
         SIZES[size],
         block && 'w-full',
@@ -87,11 +90,12 @@ export function IconButton({
       aria-label={label}
       title={label}
       className={cx(
-        'inline-flex items-center justify-center rounded-sm shrink-0',
-        'transition-[background-color,border-color,color] duration-150',
-        'disabled:pointer-events-none disabled:opacity-45',
-        VARIANTS[variant],
-        size === 'sm' ? 'size-8' : 'size-10',
+        'pressable inline-flex items-center justify-center rounded-full shrink-0',
+        'disabled:pointer-events-none disabled:opacity-40',
+        variant === 'ghost'
+          ? 'bg-transparent text-ink-2 hover:bg-fill hover:text-ink'
+          : VARIANTS[variant],
+        size === 'sm' ? 'size-9' : 'size-11',
         className,
       )}
       {...props}
@@ -110,17 +114,13 @@ interface CardProps {
   className?: string
   /** Sin relleno interior, para tarjetas que gestionan su propio espaciado. */
   flush?: boolean
+  /** Ancla para enlazar a la tarjeta (`#/ajustes?seccion=cuenta`). */
+  id?: string
 }
 
-export function Card({ children, className, flush }: CardProps) {
+export function Card({ children, className, flush, id }: CardProps) {
   return (
-    <section
-      className={cx(
-        'bg-surface border border-hairline rounded-lg',
-        !flush && 'p-5 sm:p-6',
-        className,
-      )}
-    >
+    <section id={id} className={cx('card scroll-mt-20', !flush && 'p-5 sm:p-6', className)}>
       {children}
     </section>
   )
@@ -137,7 +137,7 @@ export function SectionHeader({ title, hint, action, className }: SectionHeaderP
   return (
     <header className={cx('flex items-baseline justify-between gap-4', className)}>
       <div className="min-w-0">
-        <h2 className="text-[0.9375rem] font-semibold tracking-[-0.01em]">{title}</h2>
+        <h2 className="text-[1.0625rem] font-semibold tracking-[-0.02em]">{title}</h2>
         {hint && <p className="text-[0.8125rem] text-ink-3 mt-0.5">{hint}</p>}
       </div>
       {action && <div className="shrink-0">{action}</div>}
@@ -154,8 +154,8 @@ export function SubjectTag({ subject, className }: { subject?: Subject; classNam
     return (
       <span
         className={cx(
-          'inline-flex items-center rounded-xs px-1.5 py-0.5 text-[0.6875rem] font-semibold',
-          'bg-sunken text-ink-3',
+          'inline-flex items-center rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold',
+          'bg-fill text-ink-3',
           className,
         )}
       >
@@ -166,8 +166,8 @@ export function SubjectTag({ subject, className }: { subject?: Subject; classNam
   return (
     <span
       className={cx(
-        'inline-flex items-center rounded-xs px-1.5 py-0.5',
-        'text-[0.6875rem] font-semibold tracking-[0.01em] whitespace-nowrap',
+        'inline-flex items-center rounded-full px-2 py-0.5',
+        'text-[0.6875rem] font-semibold whitespace-nowrap',
         className,
       )}
       style={{ background: quietVar(subject.color), color: colorVar(subject.color) }}
@@ -248,7 +248,7 @@ export function Progress({ value, className, tone = 'accent', label }: ProgressP
   const pct = Math.max(0, Math.min(100, value))
   return (
     <div
-      className={cx('h-1.5 rounded-full bg-sunken overflow-hidden', className)}
+      className={cx('h-1.5 rounded-full bg-fill overflow-hidden', className)}
       role="progressbar"
       aria-valuenow={Math.round(pct)}
       aria-valuemin={0}
@@ -256,7 +256,7 @@ export function Progress({ value, className, tone = 'accent', label }: ProgressP
       aria-label={label}
     >
       <div
-        className="h-full rounded-full transition-[width] duration-300 ease-out"
+        className="h-full rounded-full transition-[width] duration-500 ease-[var(--spring)]"
         style={{ width: `${pct}%`, background: PROGRESS_TONE[tone] }}
       />
     </div>
@@ -284,16 +284,50 @@ export function Segmented<T extends string>({
   className,
   size = 'md',
 }: SegmentedProps<T>) {
+  // El indicador se mide sobre el botón activo real, así que se desliza bien
+  // aunque las etiquetas tengan anchos distintos o haya que desplazarse.
+  const track = useRef<HTMLDivElement>(null)
+  const [thumb, setThumb] = useState<{ left: number; width: number } | null>(null)
+
+  useLayoutEffect(() => {
+    const node = track.current
+    if (!node) return
+    const measure = () => {
+      const active = node.querySelector<HTMLElement>('[aria-checked="true"]')
+      if (!active) return setThumb(null)
+      setThumb({ left: active.offsetLeft, width: active.offsetWidth })
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [value, options.length])
+
+  // El activo siempre a la vista si la tira se desplaza.
+  useEffect(() => {
+    track.current
+      ?.querySelector<HTMLElement>('[aria-checked="true"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [value])
+
   return (
     <div
+      ref={track}
       role="radiogroup"
       aria-label={label}
       className={cx(
-        'inline-flex items-center gap-0.5 p-0.5 rounded-sm bg-sunken border border-hairline',
-        'overflow-x-auto max-w-full',
+        'relative inline-flex items-center p-[3px] rounded-full bg-fill',
+        'overflow-x-auto no-scrollbar max-w-full',
         className,
       )}
     >
+      {thumb && (
+        <span
+          aria-hidden
+          className="absolute top-[3px] bottom-[3px] left-0 rounded-full bg-raised shadow-sm transition-[transform,width] duration-500 ease-[var(--spring)]"
+          style={{ width: thumb.width, transform: `translateX(${thumb.left}px)` }}
+        />
+      )}
       {options.map((option) => {
         const active = option.value === value
         return (
@@ -304,12 +338,10 @@ export function Segmented<T extends string>({
             aria-checked={active}
             onClick={() => onChange(option.value)}
             className={cx(
-              'inline-flex items-center gap-1.5 rounded-[5px] font-medium whitespace-nowrap',
-              'transition-[background-color,color,box-shadow] duration-150',
-              size === 'sm' ? 'h-7 px-2.5 text-[0.75rem]' : 'h-8 px-3 text-[0.8125rem]',
-              active
-                ? 'bg-surface text-ink shadow-xs'
-                : 'text-ink-3 hover:text-ink-2 hover:bg-surface/60',
+              'relative z-[1] shrink-0 inline-flex items-center justify-center gap-1.5 rounded-full whitespace-nowrap',
+              'transition-colors duration-200',
+              size === 'sm' ? 'h-7 px-3 text-[0.75rem]' : 'h-8 px-3.5 text-[0.8125rem]',
+              active ? 'text-ink font-semibold' : 'text-ink-2 font-medium hover:text-ink',
             )}
           >
             {option.label}
@@ -362,9 +394,9 @@ export function EmptyState({
       {icon && (
         <div
           className={cx(
-            'flex items-center justify-center rounded-md mb-4',
-            'bg-sunken text-ink-3',
-            compact ? 'size-9' : 'size-12',
+            'flex items-center justify-center rounded-full mb-4',
+            'bg-accent-quiet text-accent',
+            compact ? 'size-10' : 'size-14',
           )}
         >
           {icon}
@@ -409,9 +441,9 @@ export function Numeral({
 }) {
   const sizes = {
     sm: 'text-[1.375rem]',
-    md: 'text-[1.75rem]',
-    lg: 'text-[2.5rem]',
-    xl: 'text-[3.25rem]',
+    md: 'text-[1.875rem]',
+    lg: 'text-[2.625rem]',
+    xl: 'text-[3.5rem]',
   }
   const tones = {
     ok: 'text-ok',
@@ -420,9 +452,16 @@ export function Numeral({
     accent: 'text-accent',
   }
   return (
-    <span className={cx('numeral inline-flex items-baseline gap-1', sizes[size], tone && tones[tone], className)}>
+    <span
+      className={cx(
+        'numeral inline-flex items-baseline gap-1',
+        sizes[size],
+        tone && tones[tone],
+        className,
+      )}
+    >
       {value}
-      {suffix && <span className="text-[0.5em] font-sans font-semibold text-ink-3">{suffix}</span>}
+      {suffix && <span className="text-[0.5em] font-semibold text-ink-3">{suffix}</span>}
     </span>
   )
 }

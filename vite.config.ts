@@ -20,7 +20,7 @@ export default defineConfig({
       // Un SW casero que se olvida de eso sirve una versión vieja para
       // siempre, que es peor que no tener SW.
       registerType: 'autoUpdate',
-      includeAssets: ['icono.svg', 'apple-touch-icon.png', 'fonts/*.woff2'],
+      includeAssets: ['icono.svg', 'apple-touch-icon.png'],
       manifest: {
         id: base,
         name: 'Bachillerato OS',
@@ -30,10 +30,10 @@ export default defineConfig({
         lang: 'es',
         start_url: base,
         scope: base,
-        // Azul de marca en la barra del sistema; papel cálido en el splash de
-        // arranque — los mismos tonos que usa la propia interfaz.
-        theme_color: '#2c4a8f',
-        background_color: '#f6f4f0',
+        // El mismo gris agrupado que el fondo de la interfaz: la barra del
+        // sistema y el splash de arranque se funden con la aplicación.
+        theme_color: '#f2f2f7',
+        background_color: '#f2f2f7',
         display: 'standalone',
         orientation: 'any',
         icons: [
@@ -50,7 +50,11 @@ export default defineConfig({
       workbox: {
         // Todo lo que sale del build, disponible sin conexión desde el primer
         // arranque online: JS, CSS, el HTML y las fuentes auto-alojadas.
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png}'],
+        // Avisos push (resumen diario): el manejador vive en public/ y el
+        // Service Worker generado lo importa. Así Workbox sigue gestionando
+        // el caché y las versiones, y el push no hay que reescribirlo.
+        importScripts: ['push-sw.js'],
         // El enrutado de la aplicación es por hash ('#/tareas'): para el
         // navegador es siempre la misma URL de documento, así que basta con
         // que esa página se sirva desde el caché cuando no hay red.

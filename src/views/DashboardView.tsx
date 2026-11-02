@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   ArrowRight,
+  ChevronRight,
   BookOpen,
   CalendarPlus,
   CircleAlert,
@@ -23,12 +24,15 @@ import {
   useTaskSummary,
   useUpcomingExams,
 } from '@/state/selectors'
-import { Page } from '@/layout/AppShell'
+import { CompactTitleBar, Page, useScrolledPast } from '@/layout/AppShell'
+import { SyncBadge } from '@/features/account/SyncBadge'
 import { TaskEditor } from '@/features/tasks/TaskEditor'
 import { TaskRow } from '@/features/tasks/TaskRow'
 import { ExamEditor } from '@/features/exams/ExamEditor'
 import { ExamCard } from '@/features/exams/ExamCard'
 import { Button, Card, EmptyState, Numeral, SectionHeader, cx } from '@/ui/primitives'
+
+const ALERT_ORDER = { critico: 0, aviso: 1, info: 2 } as const
 
 export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
   const settings = useSettings()
@@ -46,18 +50,24 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
   const [editingExam, setEditingExam] = useState<Exam | null>(null)
 
   const firstName = settings.userName.split(' ')[0]
+  const heading = useRef<HTMLHeadingElement>(null)
+  const collapsed = useScrolledPast(heading)
 
   return (
     <Page>
+      <CompactTitleBar title="Inicio" visible={collapsed} />
       {/* --- Saludo --- */}
-      <header className="mb-6 sm:mb-9">
-        <h1 className="display text-[2rem] sm:text-[2.625rem] leading-[1.05] tracking-[-0.03em]">
+      <header className="mb-5 sm:mb-8">
+        <h1 ref={heading} className="display text-[2.125rem] sm:text-[2.75rem] leading-[1.06]">
           {greeting()}
           {firstName && <>, {firstName}</>}
         </h1>
-        <p className="text-[0.9375rem] text-ink-3 mt-2 first-letter:uppercase">
-          {formatLongDate(today)}
-        </p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+          <p className="text-[0.9375rem] text-ink-3 first-letter:uppercase">
+            {formatLongDate(today)}
+          </p>
+          <SyncBadge />
+        </div>
       </header>
 
       {/* --- Métricas del día --- */}
@@ -72,42 +82,65 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
         showStudy={data.sessions.length > 0}
       />
 
-      {/* --- Alertas ---
-          Como mucho dos. Tres barras de colores a pantalla completa empujaban
-          las tareas de hoy fuera de la vista, que es justo lo contrario de lo
-          que tiene que hacer esta pantalla. */}
+      {/* --- Avisos ---
+          Una sola lista agrupada y como mucho tres filas, por orden de
+          gravedad. Antes eran tarjetas sueltas sin límite: con cuatro avisos,
+          las tareas de hoy quedaban fuera de la pantalla del móvil, que es
+          justo lo contrario de lo que tiene que hacer esta pantalla. */}
       {alerts.length > 0 && (
-        <div className="mt-5 flex flex-col gap-2">
-          {alerts.map((alert, i) => (
-            <a
-              key={alert.id}
-              href={alert.href ?? hrefFor('inicio')}
-              style={{ '--i': i } as React.CSSProperties}
-              className={cx(
-                'animate-rise stagger group flex items-start gap-3 px-4 py-2.5 rounded-md border',
-                'transition-colors duration-150',
-                alert.level === 'critico'
-                  ? 'bg-danger-quiet border-danger/25 hover:border-danger/45'
-                  : alert.level === 'aviso'
-                    ? 'bg-warn-quiet border-warn/25 hover:border-warn/45'
-                    : 'bg-surface border-hairline hover:border-hairline-strong',
-              )}
-            >
-              {alert.level === 'critico' ? (
-                <TriangleAlert className="size-4 text-danger shrink-0 mt-0.5" strokeWidth={2.2} />
-              ) : alert.level === 'aviso' ? (
-                <CircleAlert className="size-4 text-warn shrink-0 mt-0.5" strokeWidth={2.2} />
-              ) : (
-                <Sparkles className="size-4 text-ink-3 shrink-0 mt-0.5" strokeWidth={2.2} />
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="text-[0.875rem] font-semibold text-ink">{alert.title}</p>
-                <p className="text-[0.8125rem] text-ink-2 mt-0.5">{alert.detail}</p>
-              </div>
-              <ArrowRight className="size-4 text-ink-3 shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
-            </a>
-          ))}
-        </div>
+        <ul className="card mt-4 overflow-hidden">
+          {[...alerts]
+            .sort((a, b) => ALERT_ORDER[a.level] - ALERT_ORDER[b.level])
+            .slice(0, 3)
+            .map((alert, i) => (
+              <li
+                key={alert.id}
+                style={{ '--i': i } as React.CSSProperties}
+                className="animate-rise stagger"
+              >
+                <a
+                  href={alert.href ?? hrefFor('inicio')}
+                  className="group flex items-center gap-3 pl-4 pr-3 py-3 transition-colors duration-150 active:bg-fill hover:bg-fill/60"
+                >
+                  <span
+                    className={cx(
+                      'grid place-items-center size-8 rounded-full shrink-0',
+                      alert.level === 'critico'
+                        ? 'bg-danger-quiet text-danger'
+                        : alert.level === 'aviso'
+                          ? 'bg-warn-quiet text-warn'
+                          : 'bg-accent-quiet text-accent',
+                    )}
+                  >
+                    {alert.level === 'critico' ? (
+                      <TriangleAlert className="size-4" strokeWidth={2.3} />
+                    ) : alert.level === 'aviso' ? (
+                      <CircleAlert className="size-4" strokeWidth={2.3} />
+                    ) : (
+                      <Sparkles className="size-4" strokeWidth={2.3} />
+                    )}
+                  </span>
+                  <span
+                    className={cx(
+                      'min-w-0 flex-1 flex items-center gap-2',
+                      i > 0 &&
+                        'relative before:absolute before:-top-3 before:left-0 before:right-0 before:h-px before:bg-hairline',
+                    )}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[0.875rem] font-semibold text-ink truncate">
+                        {alert.title}
+                      </span>
+                      <span className="block text-[0.8125rem] text-ink-3 truncate">
+                        {alert.detail}
+                      </span>
+                    </span>
+                    <ChevronRight className="size-4 text-ink-3 shrink-0" strokeWidth={2.4} />
+                  </span>
+                </a>
+              </li>
+            ))}
+        </ul>
       )}
 
       {/* --- Cuerpo: 7/5, no dos mitades iguales --- */}
@@ -178,11 +211,7 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
 
       <TaskEditor open={!!editing} task={editing} onClose={() => setEditing(null)} />
       <ExamEditor open={creatingExam} onClose={() => setCreatingExam(false)} />
-      <ExamEditor
-        open={!!editingExam}
-        exam={editingExam}
-        onClose={() => setEditingExam(null)}
-      />
+      <ExamEditor open={!!editingExam} exam={editingExam} onClose={() => setEditingExam(null)} />
     </Page>
   )
 }
@@ -244,7 +273,7 @@ function MetricStrip({
   ]
 
   return (
-    <div className="relative bg-surface border border-hairline rounded-lg overflow-hidden">
+    <div className="relative card overflow-hidden">
       {/* En móvil es una franja que se desliza con el dedo; a partir de sm,
           una rejilla. Apilarlas en dos columnas ocupaba media pantalla y
           empujaba las tareas de hoy fuera de la vista. */}
@@ -259,7 +288,7 @@ function MetricStrip({
         {metrics.map((metric) => (
           <div
             key={metric.label}
-            className="px-4 sm:px-5 py-4 sm:py-5 shrink-0 snap-start min-w-[8.75rem] sm:min-w-0"
+            className="px-4 sm:px-5 py-4 sm:py-5 shrink-0 snap-start min-w-[7.25rem] sm:min-w-0"
           >
             <dt className="eyebrow whitespace-nowrap">{metric.label}</dt>
             <dd className="mt-2">
@@ -442,7 +471,10 @@ function ActivityBlock() {
 
   return (
     <Card flush>
-      <SectionHeader title="Actividad reciente" className="px-5 sm:px-6 pt-5 pb-4 border-b border-hairline" />
+      <SectionHeader
+        title="Actividad reciente"
+        className="px-5 sm:px-6 pt-5 pb-4 border-b border-hairline"
+      />
       {entries.length === 0 ? (
         <EmptyState
           compact
@@ -454,7 +486,10 @@ function ActivityBlock() {
         <ul className="px-5 sm:px-6 py-4 flex flex-col gap-3.5">
           {entries.map((entry) => (
             <li key={entry.id} className="flex items-start gap-3">
-              <span aria-hidden className="mt-1.5 size-1.5 rounded-full bg-hairline-strong shrink-0" />
+              <span
+                aria-hidden
+                className="mt-1.5 size-1.5 rounded-full bg-hairline-strong shrink-0"
+              />
               <div className="min-w-0 flex-1">
                 <p className="text-[0.8125rem] text-ink-2 leading-snug">{entry.text}</p>
                 <p className="text-[0.6875rem] text-ink-3 mt-0.5 tabular-nums">

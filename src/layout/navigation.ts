@@ -41,3 +41,19 @@ export const NAV_GROUPS: { id: NavItem['group']; label: string }[] = [
 
 /** Las cuatro secciones de la barra inferior en móvil; el resto va en «Más». */
 export const MOBILE_PRIMARY: RouteId[] = ['inicio', 'tareas', 'calendario', 'notas']
+
+/**
+ * Color de cada sección en las listas con icono (hoja «Más», menú lateral),
+ * al estilo de Ajustes de iOS. Es decorativo: el nombre siempre va escrito.
+ */
+export const NAV_TINTS: Record<RouteId, string> = {
+  inicio: '#0a84ff',
+  tareas: '#5e5ce6',
+  calendario: '#ff453a',
+  asignaturas: '#ff9f0a',
+  notas: '#bf5af2',
+  estadisticas: '#30b158',
+  estudio: '#ff6b2c',
+  objetivos: '#ff375f',
+  ajustes: '#8e8e93',
+}

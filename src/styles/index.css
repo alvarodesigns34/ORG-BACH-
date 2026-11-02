@@ -1,145 +1,181 @@
 @import 'tailwindcss';
-@import './fonts.css';
 
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 /* ==========================================================================
    TOKENS
-   Se declaran como variables CSS crudas (--c-*) para poder reasignarlas por
-   tema, y se exponen a Tailwind con `@theme inline`, que emite `var(--c-*)`
-   en lugar de copiar el valor. Un solo sitio donde cambiar el color.
+   Variables CSS crudas (--c-*) reasignadas por tema y expuestas a Tailwind con
+   `@theme inline`, que emite `var(--c-*)` en lugar de copiar el valor.
+
+   Lenguaje visual: el de las apps de Apple. Fondo agrupado gris claro (negro
+   en oscuro), tarjetas blancas sin borde, un solo azul de acento, materiales
+   translúcidos para la navegación y tipografía del sistema (SF en Apple).
+
+   Contraste: todos los textos pasan WCAG AA (4,5:1) sobre el fondo MÁS claro
+   en el que aparecen. Por eso el azul de texto (#0066CC) es más oscuro que el
+   azul de sistema de iOS (#007AFF, 4:1), y el gris terciario (#66666B) más
+   que el «secondaryLabel» de iOS.
    ========================================================================== */
 
 :root {
   color-scheme: light;
 
-  /* --- Superficies: papel calido, nunca blanco puro --- */
-  --c-canvas: #f6f4f0;
-  --c-surface: #fcfbf9;
+  /* --- Superficies --- */
+  --c-canvas: #f2f2f7;
+  --c-surface: #ffffff;
   --c-raised: #ffffff;
-  --c-sunken: #ece9e3;
+  --c-sunken: #eeeef2;
+  --c-fill: rgb(118 118 128 / 0.12);
 
-  /* --- Tinta: negro calido, nunca #000 ni grises puros.
-         ink-3 esta calculado para pasar AA (4.5:1) sobre el MAS claro de los
-         fondos del tema, que es --c-sunken. Aclararlo mas rompe el contraste
-         en las cabeceras de categoria y en las filas hundidas. --- */
-  --c-ink: #1b1917;
-  --c-ink-2: #57514a;
-  --c-ink-3: #706860;
+  /* --- Texto --- */
+  --c-ink: #1d1d1f;
+  --c-ink-2: #48484a;
+  --c-ink-3: #66666b;
 
-  /* --- Lineas de 1px: casi siempre mejor que una sombra --- */
-  --c-hairline: #e4e0d8;
-  --c-hairline-strong: #d4cec3;
+  /* --- Separadores --- */
+  --c-hairline: #e5e5ea;
+  --c-hairline-strong: #d1d1d6;
 
-  /* --- UN acento: azul tinta sobre papel --- */
-  --c-accent: #2c4a8f;
-  --c-accent-strong: #233c77;
+  /* --- Acento --- */
+  --c-accent: #0066cc;
+  --c-accent-strong: #0055ad;
+  --c-accent-fill: #0071e3;
   --c-accent-ink: #ffffff;
-  --c-accent-quiet: #e7ecf7;
+  --c-accent-quiet: #e8f1fd;
 
-  /* --- Estados. Solo para significado, nunca decorativos --- */
-  --c-danger: #af382a;
-  --c-danger-quiet: #f7e8e5;
-  --c-warn: #96590f;
-  --c-warn-quiet: #f6eedf;
-  --c-ok: #3c6a49;
-  --c-ok-quiet: #e5efe8;
+  /* --- Estados: solo con significado --- */
+  --c-danger: #d70015;
+  --c-danger-quiet: #ffebed;
+  --c-warn: #a64b00;
+  --c-warn-quiet: #fff2e2;
+  --c-ok: #1e7a35;
+  --c-ok-quiet: #e3f4e7;
+  --c-switch-on: #34c759;
 
-  /* --- Paleta de asignaturas: apagada, distinguible, 10 tonos --- */
-  --sub-sky: #2e6e9e;
-  --sub-sky-quiet: #e3edf4;
-  --sub-sage: #4f7a57;
-  --sub-sage-quiet: #e7eee7;
-  --sub-amber: #8f6410;
-  --sub-amber-quiet: #f4ecdb;
-  --sub-terracotta: #a24c36;
-  --sub-terracotta-quiet: #f4e7e1;
-  --sub-plum: #75467b;
-  --sub-plum-quiet: #efe6f1;
-  --sub-teal: #216b66;
-  --sub-teal-quiet: #e0eeed;
-  --sub-indigo: #464f9a;
-  --sub-indigo-quiet: #e8e9f5;
-  --sub-moss: #63722a;
-  --sub-moss-quiet: #eef0df;
-  --sub-clay: #83553f;
-  --sub-clay-quiet: #f1e8e2;
-  --sub-slate: #505b69;
-  --sub-slate-quiet: #e8ebee;
+  /* --- Paleta de asignaturas: distinguible y AA sobre su fondo suave --- */
+  --sub-sky: #1f6fae;
+  --sub-sky-quiet: #e2effa;
+  --sub-sage: #3f7a4a;
+  --sub-sage-quiet: #e5f1e7;
+  --sub-amber: #8f5d00;
+  --sub-amber-quiet: #fbefd8;
+  --sub-terracotta: #b0442b;
+  --sub-terracotta-quiet: #fbe8e2;
+  --sub-plum: #8a3f96;
+  --sub-plum-quiet: #f4e6f6;
+  --sub-teal: #0f716b;
+  --sub-teal-quiet: #def2f0;
+  --sub-indigo: #4b4fc4;
+  --sub-indigo-quiet: #e9e9fb;
+  --sub-moss: #5b6e12;
+  --sub-moss-quiet: #eef2da;
+  --sub-clay: #8a5235;
+  --sub-clay-quiet: #f4e9e2;
+  --sub-slate: #4a5868;
+  --sub-slate-quiet: #e7ebef;
 
-  /* --- Profundidad: por capas, no una sombra uniforme para todo --- */
-  --shadow-xs: 0 1px 2px rgb(27 25 23 / 0.05);
-  --shadow-sm: 0 1px 2px rgb(27 25 23 / 0.04), 0 2px 6px rgb(27 25 23 / 0.05);
-  --shadow-md: 0 2px 4px rgb(27 25 23 / 0.04), 0 8px 20px rgb(27 25 23 / 0.07);
-  --shadow-lg: 0 4px 10px rgb(27 25 23 / 0.06), 0 24px 56px rgb(27 25 23 / 0.14);
+  /* --- Profundidad: amplia y suave --- */
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.04);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.04), 0 2px 8px rgb(0 0 0 / 0.04);
+  --shadow-md: 0 2px 6px rgb(0 0 0 / 0.04), 0 10px 28px rgb(0 0 0 / 0.08);
+  --shadow-lg: 0 6px 16px rgb(0 0 0 / 0.06), 0 28px 64px rgb(0 0 0 / 0.16);
 
-  --scrim: rgb(27 25 23 / 0.32);
+  /* --- Material de cristal (barra inferior, cabeceras, menús) --- */
+  --glass-bg: rgb(255 255 255 / 0.64);
+  --glass-bg-strong: rgb(250 250 252 / 0.86);
+  --glass-rim: rgb(255 255 255 / 0.85);
+  --glass-edge: rgb(0 0 0 / 0.07);
+  --glass-shadow: 0 10px 30px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.05);
+  --glass-tint: rgb(0 0 0 / 0.055);
+
+  --scrim: rgb(0 0 0 / 0.28);
+
+  /* Zona segura superior, legible desde JS (barra compacta). */
+  --safe-top: env(safe-area-inset-top, 0px);
 }
 
 [data-theme='dark'] {
   color-scheme: dark;
 
-  --c-canvas: #121110;
-  --c-surface: #1a1917;
-  --c-raised: #221f1d;
-  --c-sunken: #0c0b0a;
+  --c-canvas: #000000;
+  --c-surface: #1c1c1e;
+  --c-raised: #2c2c2e;
+  --c-sunken: #2c2c2e;
+  --c-fill: rgb(118 118 128 / 0.24);
 
-  --c-ink: #f2efe9;
-  --c-ink-2: #a9a196;
-  --c-ink-3: #8d867b;  /* AA sobre --c-raised, el fondo mas claro del tema oscuro */
+  --c-ink: #f5f5f7;
+  --c-ink-2: #c7c7cc;
+  --c-ink-3: #98989f; /* AA sobre --c-raised, el fondo más claro del tema */
 
-  --c-hairline: #2c2926;
-  --c-hairline-strong: #3c3833;
+  --c-hairline: #2e2e31;
+  --c-hairline-strong: #48484a;
 
-  --c-accent: #8ba7e9;
-  --c-accent-strong: #a5bcf0;
-  --c-accent-ink: #0f1320;
-  --c-accent-quiet: #1b2134;
+  --c-accent: #4aa0ff;
+  --c-accent-strong: #6db3ff;
+  --c-accent-fill: #0071e3;
+  --c-accent-ink: #ffffff;
+  --c-accent-quiet: #0d2440;
 
-  --c-danger: #e58573;
-  --c-danger-quiet: #2b1a16;
-  --c-warn: #dfa45c;
-  --c-warn-quiet: #2a2114;
-  --c-ok: #82b592;
-  --c-ok-quiet: #16241b;
+  --c-danger: #ff6961;
+  --c-danger-quiet: #3a1513;
+  --c-warn: #ffb340;
+  --c-warn-quiet: #33240b;
+  --c-ok: #30d158;
+  --c-ok-quiet: #0f2c17;
+  --c-switch-on: #30d158;
 
-  --sub-sky: #7fb4d8;
-  --sub-sky-quiet: #15242e;
-  --sub-sage: #8fb795;
-  --sub-sage-quiet: #17251a;
-  --sub-amber: #d6aa5e;
-  --sub-amber-quiet: #292013;
-  --sub-terracotta: #de9078;
-  --sub-terracotta-quiet: #2c1b15;
-  --sub-plum: #c093c6;
-  --sub-plum-quiet: #241827;
-  --sub-teal: #6fb5af;
-  --sub-teal-quiet: #112524;
-  --sub-indigo: #949cdc;
-  --sub-indigo-quiet: #1a1d2e;
-  --sub-moss: #b0bc72;
-  --sub-moss-quiet: #20250f;
-  --sub-clay: #c79a82;
-  --sub-clay-quiet: #2a1e17;
-  --sub-slate: #9aa6b4;
-  --sub-slate-quiet: #1c2026;
+  --sub-sky: #6cb6f5;
+  --sub-sky-quiet: #10283d;
+  --sub-sage: #7fca8c;
+  --sub-sage-quiet: #13291a;
+  --sub-amber: #f0b54c;
+  --sub-amber-quiet: #30230b;
+  --sub-terracotta: #ff8f73;
+  --sub-terracotta-quiet: #36190f;
+  --sub-plum: #d58be0;
+  --sub-plum-quiet: #2d1631;
+  --sub-teal: #5fd0c6;
+  --sub-teal-quiet: #0e2a28;
+  --sub-indigo: #9da1ff;
+  --sub-indigo-quiet: #1c1d3d;
+  --sub-moss: #bfd166;
+  --sub-moss-quiet: #232a0c;
+  --sub-clay: #dba383;
+  --sub-clay-quiet: #2f1f16;
+  --sub-slate: #a7b4c3;
+  --sub-slate-quiet: #1d232b;
 
-  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4), 0 2px 6px rgb(0 0 0 / 0.3);
-  --shadow-md: 0 2px 4px rgb(0 0 0 / 0.35), 0 8px 20px rgb(0 0 0 / 0.45);
-  --shadow-lg: 0 4px 10px rgb(0 0 0 / 0.4), 0 24px 56px rgb(0 0 0 / 0.6);
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.5);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.5), 0 2px 8px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 2px 6px rgb(0 0 0 / 0.4), 0 10px 28px rgb(0 0 0 / 0.5);
+  --shadow-lg: 0 6px 16px rgb(0 0 0 / 0.5), 0 28px 64px rgb(0 0 0 / 0.7);
 
-  --scrim: rgb(0 0 0 / 0.62);
+  --glass-bg: rgb(36 36 40 / 0.55);
+  --glass-bg-strong: rgb(28 28 30 / 0.84);
+  --glass-rim: rgb(255 255 255 / 0.14);
+  --glass-edge: rgb(255 255 255 / 0.06);
+  --glass-shadow: 0 10px 30px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
+  --glass-tint: rgb(255 255 255 / 0.1);
+
+  --scrim: rgb(0 0 0 / 0.55);
 }
 
 @theme inline {
-  --font-display: 'Newsreader', ui-serif, Georgia, 'Times New Roman', serif;
-  --font-sans: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Tipografía del sistema: SF Pro en Apple, Segoe en Windows, Roboto en
+     Android. Cero bytes de descarga y el aspecto nativo de cada plataforma. */
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-display: system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* Cifras: SF Pro Rounded en Apple; el resto cae en la del sistema. */
+  --font-rounded: ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, 'Segoe UI', Roboto,
+    sans-serif;
 
   --color-canvas: var(--c-canvas);
   --color-surface: var(--c-surface);
   --color-raised: var(--c-raised);
   --color-sunken: var(--c-sunken);
+  --color-fill: var(--c-fill);
 
   --color-ink: var(--c-ink);
   --color-ink-2: var(--c-ink-2);
@@ -150,6 +186,7 @@
 
   --color-accent: var(--c-accent);
   --color-accent-strong: var(--c-accent-strong);
+  --color-accent-fill: var(--c-accent-fill);
   --color-accent-ink: var(--c-accent-ink);
   --color-accent-quiet: var(--c-accent-quiet);
 
@@ -160,22 +197,35 @@
   --color-ok: var(--c-ok);
   --color-ok-quiet: var(--c-ok-quiet);
 
-  /* Radios distintos por tamano de superficie: sin variacion no hay
-     jerarquia de profundidad. */
-  --radius-xs: 4px;
-  --radius-sm: 7px;
-  --radius-md: 11px;
-  --radius-lg: 16px;
-  --radius-xl: 22px;
+  /* Radios generosos y escalonados: de la etiqueta a la hoja modal. */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
 
   --shadow-xs: var(--shadow-xs);
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);
 
-  /* Entrar rapido y frenar despacio. Nada de ease-in-out simetrico. */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-std: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Muelles. `linear()` aproxima la curva de un muelle amortiguado: arranca
+   rápido, se pasa un poco y se asienta, como las animaciones de iOS. Donde no
+   se admite, el navegador cae en `--ease-out`. */
+:root {
+  --spring: var(--ease-out);
+}
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --spring: linear(
+      0, 0.009, 0.035 2.1%, 0.141 4.4%, 0.723 12.9%, 0.938 16.7%, 1.017 19.4%, 1.067, 1.084 24.4%,
+      1.077 26.5%, 1.03 31.5%, 1.006 35.3%, 0.993 40%, 0.996 50%, 1
+    );
+  }
 }
 
 /* ==========================================================================
@@ -192,10 +242,11 @@
     -webkit-tap-highlight-color: transparent;
     /* Doble toque: Safari lo trata como zoom. En una app, es un accidente. */
     touch-action: manipulation;
+    background: var(--c-canvas);
   }
 
-  /* Cromo: el globo «Copiar / Consultar / Compartir» sobre Tareas o el FAB
-     no tiene sentido. El texto del contenido sigue siendo seleccionable. */
+  /* Cromo: el globo «Copiar / Consultar» sobre la navegación no tiene
+     sentido. El texto del contenido sigue siendo seleccionable. */
   nav,
   header,
   button,
@@ -211,41 +262,34 @@
     color: var(--c-ink);
     font-family: var(--font-sans);
     font-size: 0.9375rem;
-    line-height: 1.6;
-    font-optical-sizing: auto;
+    line-height: 1.5;
+    letter-spacing: -0.006em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'kern';
   }
 
-  /* Cuanto mas grande el texto, mas apretado el tracking. */
   h1,
   h2,
   h3 {
-    font-weight: 600;
+    font-weight: 650;
     letter-spacing: -0.02em;
     text-wrap: balance;
   }
 
-  /* Los numeros no deben bailar al actualizarse. */
-  input[type='number'] {
-    font-variant-numeric: tabular-nums;
-  }
-
   ::selection {
-    background: var(--c-accent-quiet);
-    color: var(--c-ink);
+    background: color-mix(in srgb, var(--c-accent) 26%, transparent);
   }
 
   :focus-visible {
-    outline: 2px solid var(--c-accent);
+    outline: 2.5px solid var(--c-accent);
     outline-offset: 2px;
-    border-radius: 3px;
+    border-radius: 6px;
   }
 
-  /* El scroll de la app vive en el area de contenido, no en el body. */
   ::-webkit-scrollbar {
-    width: 11px;
-    height: 11px;
+    width: 10px;
+    height: 10px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
@@ -255,15 +299,11 @@
     border: 3px solid var(--c-canvas);
     border-radius: 99px;
   }
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--c-ink-3);
-  }
 }
 
 /* En la PWA (icono de inicio) no hay pellizco ni el rebote que recarga la
-   página. Safari como pestaña no entra: Apple ignora maximum-scale y el
-   display-mode no es standalone. iOS antiguo no dispara el media query;
-   index.html pone .is-standalone vía navigator.standalone. */
+   página. index.html pone .is-standalone vía navigator.standalone en iOS
+   antiguos, que no disparan el media query. */
 @media (display-mode: standalone) {
   html,
   body {
@@ -282,27 +322,26 @@ html.is-standalone body {
    UTILIDADES DE PROYECTO
    ========================================================================== */
 
+/* Titulares: la del sistema en negrita y con el tracking apretado de iOS. */
 @utility display {
   font-family: var(--font-display);
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  font-optical-sizing: auto;
+  font-weight: 700;
+  letter-spacing: -0.025em;
 }
 
-/* Cifras academicas: serif, tabulares y con altura de linea corta. */
+/* Cifras académicas: redondeadas, tabulares, sin baile al actualizarse. */
 @utility numeral {
-  font-family: var(--font-display);
-  font-variant-numeric: lining-nums tabular-nums;
-  font-weight: 500;
+  font-family: var(--font-rounded);
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
   letter-spacing: -0.02em;
   line-height: 1;
 }
 
 @utility eyebrow {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   line-height: 1.2;
   color: var(--c-ink-3);
 }
@@ -311,8 +350,6 @@ html.is-standalone body {
   border-top: 1px solid var(--c-hairline);
 }
 
-/* Franja deslizable sin barra visible: la barra en una tira de cifras
-   estorba más de lo que orienta. */
 @utility no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -323,20 +360,99 @@ html.is-standalone body {
 
 @utility card {
   background: var(--c-surface);
-  border: 1px solid var(--c-hairline);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+}
+
+/* Material translúcido. Se degrada a opaco donde no hay desenfoque o el
+   sistema pide menos transparencia. */
+@utility glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(22px) saturate(185%);
+  backdrop-filter: blur(22px) saturate(185%);
+  box-shadow:
+    inset 0 0.5px 0 var(--glass-rim),
+    inset 0 0 0 0.5px var(--glass-edge),
+    var(--glass-shadow);
+}
+
+@utility glass-bar {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass,
+  .glass-bar {
+    background: var(--c-surface);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass-bar {
+    background: var(--c-surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* Lente de la barra de pestañas (Liquid Glass). Desenfoca lo que tiene
+   debajo, deja ver encima una copia aumentada y dibuja un borde que refracta:
+   brillo arriba a la izquierda, sombra abajo y un leve corrimiento de color
+   en los laterales, como el cristal real. */
+.lens {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(8px) saturate(190%) brightness(1.04);
+  backdrop-filter: blur(8px) saturate(190%) brightness(1.04);
+  box-shadow:
+    inset 0 0 0 0.75px var(--glass-rim),
+    inset 2px 3px 7px -3px rgb(255 255 255 / 0.95),
+    inset -3px -4px 9px -4px rgb(0 0 0 / 0.14),
+    inset 4px 0 6px -4px rgb(255 70 140 / 0.38),
+    inset -4px 0 6px -4px rgb(30 170 255 / 0.42),
+    0 8px 22px rgb(0 0 0 / 0.16);
+}
+[data-theme='dark'] .lens {
+  box-shadow:
+    inset 0 0 0 0.75px rgb(255 255 255 / 0.22),
+    inset 2px 3px 7px -3px rgb(255 255 255 / 0.35),
+    inset -3px -4px 9px -4px rgb(0 0 0 / 0.5),
+    inset 4px 0 6px -4px rgb(255 70 140 / 0.45),
+    inset -4px 0 6px -4px rgb(30 170 255 / 0.5),
+    0 8px 22px rgb(0 0 0 / 0.5);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .lens {
+    background: var(--c-raised);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* Respuesta táctil: el elemento se hunde un poco bajo el dedo y vuelve con
+   un muelle. Solo `transform`: no provoca relayout. */
+@utility pressable {
+  transition: transform 380ms var(--spring), background-color 160ms var(--ease-std),
+    color 160ms var(--ease-std), box-shadow 200ms var(--ease-std), opacity 160ms var(--ease-std);
+  &:active:not(:disabled) {
+    transform: scale(0.965);
+    transition-duration: 90ms;
+    transition-timing-function: var(--ease-std);
+  }
 }
 
 /* ==========================================================================
    MOVIMIENTO
-   Recorridos cortos, salidas mas rapidas que entradas, y estado final
+   Recorridos cortos, salidas más rápidas que entradas, y estado final
    directo cuando el sistema pide menos movimiento.
    ========================================================================== */
 
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -356,7 +472,48 @@ html.is-standalone body {
 @keyframes pop {
   from {
     opacity: 0;
-    transform: translateY(8px) scale(0.98);
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes check-draw {
+  from {
+    stroke-dashoffset: 16;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes check-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
   }
   to {
     opacity: 1;
@@ -365,20 +522,28 @@ html.is-standalone body {
 }
 
 @utility animate-rise {
-  animation: rise 340ms var(--ease-out) both;
+  animation: rise 420ms var(--ease-out) both;
 }
 
 @utility animate-fade {
-  animation: fade 180ms var(--ease-std) both;
+  animation: fade 200ms var(--ease-std) both;
 }
 
 @utility animate-pop {
-  animation: pop 240ms var(--ease-out) both;
+  animation: pop 320ms var(--spring) both;
 }
 
-/* Stagger de 60ms: mas lento parece perezoso, sin stagger parece mecanico. */
+@utility animate-sheet {
+  animation: sheet-up 460ms var(--spring) both;
+}
+
+@utility animate-toast {
+  animation: toast-in 420ms var(--spring) both;
+}
+
+/* Stagger de 45 ms: más lento parece perezoso, sin stagger parece mecánico. */
 @utility stagger {
-  animation-delay: calc(var(--i, 0) * 60ms);
+  animation-delay: calc(var(--i, 0) * 45ms);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -397,11 +562,11 @@ html.is-standalone body {
   left: 0.75rem;
   top: -3rem;
   z-index: 100;
-  padding: 0.5rem 0.75rem;
-  background: var(--c-accent, #2c4a8f);
+  padding: 0.5rem 0.875rem;
+  background: var(--c-accent-fill, #0071e3);
   color: #fff;
-  border-radius: 0.25rem;
-  font: 600 0.875rem/1.2 Manrope, system-ui, sans-serif;
+  border-radius: 999px;
+  font: 600 0.875rem/1.2 system-ui, -apple-system, sans-serif;
 }
 .skip-link:focus {
   top: max(0.75rem, env(safe-area-inset-top));

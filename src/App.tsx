@@ -18,6 +18,8 @@ import { StudyView } from '@/views/StudyView'
 import { GoalsView } from '@/views/GoalsView'
 import { SettingsView } from '@/views/SettingsView'
 import { Button } from '@/ui/primitives'
+import { LinkChoiceDialog, RecoveryDialog } from '@/features/account/Account'
+import { syncEngine } from '@/sync/engine'
 
 export function App() {
   return (
@@ -43,6 +45,10 @@ function Shell() {
   )
 
   const openCreate = useCallback(() => setCreating(true), [])
+
+  // La sincronización arranca dentro del proveedor: necesita el puente con el
+  // almacén. Sin cuenta configurada no hace nada.
+  useEffect(() => syncEngine.start(), [])
 
   // Atajo global: «c» crea una tarea desde cualquier sección, salvo mientras
   // se está escribiendo en un campo.
@@ -103,6 +109,8 @@ function Shell() {
       <>
         <StorageBanner />
         <Onboarding />
+        <LinkChoiceDialog />
+        <RecoveryDialog />
       </>
     )
   }
@@ -114,6 +122,8 @@ function Shell() {
       </AppShell>
 
       <TaskEditor open={creating} onClose={() => setCreating(false)} />
+      <LinkChoiceDialog />
+      <RecoveryDialog />
     </>
   )
 }
@@ -137,7 +147,7 @@ function renderRoute(route: Route, subjectCount: number) {
     case 'objetivos':
       return <GoalsView />
     case 'ajustes':
-      return <SettingsView />
+      return <SettingsView section={route.params.get('seccion')} />
     case 'inicio':
     default:
       return <DashboardView hasSubjects={subjectCount > 0} />

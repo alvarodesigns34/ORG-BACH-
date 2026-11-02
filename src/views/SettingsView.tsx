@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Download, RotateCcw, Upload } from 'lucide-react'
 
 import { createEmptyData } from '@/data/defaults'
@@ -8,14 +8,29 @@ import { useDispatch, useSettings, useStore } from '@/state/StoreProvider'
 import * as storage from '@/storage/persistence'
 import { Page, PageHeader } from '@/layout/AppShell'
 import { ThemeToggle } from '@/layout/ThemeToggle'
+import { AccountCard } from '@/features/account/Account'
+import { DigestCard } from '@/features/notifications/DigestCard'
+import { useSync } from '@/sync/useSync'
 import { Field, Input, NumberField, Select, Switch } from '@/ui/fields'
 import { ConfirmDialog } from '@/ui/Modal'
 import { Button, Card, SectionHeader, cx } from '@/ui/primitives'
 
-export function SettingsView() {
+export function SettingsView({ section }: { section?: string | null }) {
   const settings = useSettings()
   const dispatch = useDispatch()
   const { data, replaceAndSave } = useStore()
+  const sync = useSync()
+  const synced = !!sync.email
+
+  // `#/ajustes?seccion=cuenta` (desde el indicador de sincronización) lleva
+  // directamente a la tarjeta de la cuenta.
+  useEffect(() => {
+    if (!section) return
+    const id = requestAnimationFrame(() =>
+      document.getElementById(section)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    )
+    return () => cancelAnimationFrame(id)
+  }, [section])
 
   const fileInput = useRef<HTMLInputElement>(null)
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn' | 'danger'; text: string } | null>(
@@ -82,9 +97,12 @@ export function SettingsView() {
 
   return (
     <Page className="max-w-[760px]">
-      <PageHeader title="Ajustes" subtitle="Todo esto se guarda en este navegador." />
+      <PageHeader title="Ajustes" />
 
       <div className="flex flex-col gap-5">
+        <AccountCard />
+        <DigestCard />
+
         {/* --- Perfil --- */}
         <Card>
           <SectionHeader title="Tu perfil" className="mb-5" />
@@ -334,7 +352,11 @@ export function SettingsView() {
         <Card>
           <SectionHeader
             title="Tus datos"
-            hint="Se guardan solo en este navegador. Si lo borras, se pierden."
+            hint={
+              synced
+                ? 'Se guardan en este dispositivo y en tu cuenta.'
+                : 'Se guardan solo en este dispositivo. Inicia sesión arriba para tener una copia en la nube.'
+            }
             className="mb-5"
           />
 
@@ -429,7 +451,11 @@ export function SettingsView() {
           setConfirmReset(false)
         }}
         title="Borrar todos los datos"
-        message="Se eliminarán asignaturas, tareas, exámenes, notas y sesiones de estudio, y volverás a la pantalla de bienvenida. Si quieres conservarlos, exporta antes una copia. Esta acción no se puede deshacer."
+        message={
+          synced
+            ? 'Se eliminarán asignaturas, tareas, exámenes, notas y sesiones de estudio en este dispositivo y en tu cuenta, así que desaparecerán también de tus otros dispositivos. Si quieres conservarlos, exporta antes una copia. Esta acción no se puede deshacer.'
+            : 'Se eliminarán asignaturas, tareas, exámenes, notas y sesiones de estudio, y volverás a la pantalla de bienvenida. Si quieres conservarlos, exporta antes una copia. Esta acción no se puede deshacer.'
+        }
         confirmLabel="Borrar todo"
         destructive
       />

@@ -15,17 +15,23 @@ export function BrandMark({ size = 30 }: { size?: number }) {
       aria-hidden
       className="shrink-0"
     >
-      <rect width="30" height="30" rx="8" fill="var(--c-accent)" />
+      <defs>
+        <linearGradient id="brand-fill" x1="0" y1="0" x2="0" y2="30" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#2f8cff" />
+          <stop offset="1" stopColor="#0062d6" />
+        </linearGradient>
+      </defs>
+      <rect width="30" height="30" rx="8.5" fill="url(#brand-fill)" />
       <path
         d="M10.5 7v16"
-        stroke="var(--c-accent-ink)"
+        stroke="#fff"
         strokeOpacity="0.45"
         strokeWidth="1.25"
         strokeLinecap="round"
       />
       <path
         d="M13.5 12.5h8M13.5 17.5h5.5"
-        stroke="var(--c-accent-ink)"
+        stroke="#fff"
         strokeWidth="1.75"
         strokeLinecap="round"
       />

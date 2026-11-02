@@ -5,18 +5,17 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react'
-import { Check } from 'lucide-react'
 
 import { parseDecimal, sanitizeNumericInput, toDecimalInput } from '@/domain/number'
 import { cx } from './primitives'
 
 /** Estilo común a todo control de formulario, para que no deriven entre sí. */
 const CONTROL = [
-  'w-full bg-raised text-ink rounded-sm border border-hairline-strong',
-  'px-3 text-[1rem] placeholder:text-ink-3/70',
-  'transition-[border-color,box-shadow] duration-150',
-  'hover:border-ink-3/45',
-  'focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/18',
+  'w-full bg-fill text-ink rounded-[12px] border border-transparent',
+  'px-3.5 text-[1rem] placeholder:text-ink-3',
+  'transition-[border-color,box-shadow,background-color] duration-200',
+  'focus:outline-none focus:bg-raised focus:border-accent focus:ring-4 focus:ring-accent/15',
+  'aria-[invalid=true]:border-danger',
   'disabled:opacity-50 disabled:pointer-events-none',
 ].join(' ')
 
@@ -59,10 +58,7 @@ export function Field({
     <div className={cx('flex flex-col gap-1.5', className)}>
       <label
         htmlFor={id}
-        className={cx(
-          'text-[0.8125rem] font-medium text-ink-2',
-          hideLabel && 'sr-only',
-        )}
+        className={cx('text-[0.8125rem] font-semibold text-ink-2', hideLabel && 'sr-only')}
       >
         {label}
         {required && (
@@ -92,24 +88,49 @@ export function Field({
 // ---------------------------------------------------------------------------
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cx(CONTROL, 'h-10', className)} {...props} />
+  return <input className={cx(CONTROL, 'h-11', className)} {...props} />
 }
 
-export function Textarea({ className, rows = 3, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea rows={rows} className={cx(CONTROL, 'py-2.5 resize-y min-h-20', className)} {...props} />
+export function Textarea({
+  className,
+  rows = 3,
+  ...props
+}: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <textarea
+      rows={rows}
+      className={cx(CONTROL, 'py-2.5 resize-y min-h-20', className)}
+      {...props}
+    />
+  )
 }
 
 export function Select({
   className,
   children,
+  pill,
+  active,
   ...props
-}: SelectHTMLAttributes<HTMLSelectElement>) {
+}: SelectHTMLAttributes<HTMLSelectElement> & {
+  /** Píldora compacta para filas de filtros. */
+  pill?: boolean
+  /** En modo píldora: hay un filtro aplicado. */
+  active?: boolean
+}) {
   return (
-    <div className="relative">
+    <div className={cx('relative', pill && 'shrink-0')}>
       <select
         className={cx(
-          CONTROL,
-          'h-10 appearance-none pr-9 cursor-pointer',
+          pill
+            ? cx(
+                'h-9 rounded-full pl-3.5 pr-8 text-[0.8125rem] whitespace-nowrap',
+                'appearance-none cursor-pointer transition-colors duration-200',
+                'focus:outline-none focus-visible:ring-4 focus-visible:ring-accent/20',
+                active
+                  ? 'bg-accent-quiet text-accent font-semibold'
+                  : 'bg-fill text-ink-2 font-medium',
+              )
+            : cx(CONTROL, 'h-11 appearance-none pr-9 cursor-pointer'),
           // El bloque select nativo no hereda la fuente en algunos navegadores.
           'font-sans',
           className,
@@ -121,9 +142,20 @@ export function Select({
       <svg
         aria-hidden
         viewBox="0 0 12 12"
-        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 size-3 text-ink-3"
+        className={cx(
+          'pointer-events-none absolute top-1/2 -translate-y-1/2 size-3',
+          pill ? 'right-3' : 'right-3.5',
+          active ? 'text-accent' : 'text-ink-3',
+        )}
       >
-        <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        <path
+          d="M2.5 4.5 6 8l3.5-3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     </div>
   )
@@ -153,7 +185,7 @@ export function NumberInput({
         type="text"
         inputMode="decimal"
         autoComplete="off"
-        className={cx(CONTROL, 'h-10 tabular-nums', suffix && 'pr-10', className)}
+        className={cx(CONTROL, 'h-11 tabular-nums', suffix && 'pr-10', className)}
         onChange={(event) => {
           if (!onChange) return
           const cleaned = sanitizeNumericInput(event.target.value)
@@ -174,8 +206,10 @@ export function NumberInput({
 // Campo numérico con confirmación diferida
 // ---------------------------------------------------------------------------
 
-interface NumberFieldProps
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'min' | 'max'> {
+interface NumberFieldProps extends Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  'value' | 'onChange' | 'min' | 'max'
+> {
   value: number
   /** Se llama al salir del campo o al pulsar Intro, no en cada tecla. */
   onCommit: (value: number) => void
@@ -254,7 +288,7 @@ export function NumberField({
         className={cx(
           CONTROL,
           'tabular-nums',
-          inputSize === 'sm' ? 'h-9 leading-none' : 'h-10',
+          inputSize === 'sm' ? 'h-9 leading-none' : 'h-11',
           suffix && (inputSize === 'sm' ? 'pr-7' : 'pr-10'),
           className,
         )}
@@ -310,13 +344,13 @@ export function Checkbox({
   className,
   size = 'md',
 }: CheckboxProps) {
-  const box = size === 'sm' ? 'size-[17px]' : 'size-[19px]'
+  const box = size === 'sm' ? 'size-[20px]' : 'size-[24px]'
   return (
     <label
       className={cx(
         'group inline-flex items-center gap-2.5 cursor-pointer select-none',
-        // Zona táctil cómoda aunque la casilla dibujada sea pequeña.
-        hideLabel && 'p-1.5 -m-1.5',
+        // Zona táctil de 44 px aunque el círculo dibujado sea más pequeño.
+        hideLabel && 'p-2.5 -m-2.5',
         className,
       )}
     >
@@ -331,24 +365,37 @@ export function Checkbox({
         aria-hidden
         className={cx(
           box,
-          'grid place-items-center rounded-xs border shrink-0',
-          'transition-[background-color,border-color] duration-150',
-          'peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-accent peer-focus-visible:outline-offset-2',
+          'grid place-items-center rounded-full border-[1.75px] shrink-0',
+          'transition-[background-color,border-color,transform] duration-300 ease-[var(--spring)]',
+          'group-active:scale-90',
+          'peer-focus-visible:outline peer-focus-visible:outline-[2.5px] peer-focus-visible:outline-accent peer-focus-visible:outline-offset-2',
           checked
-            ? 'bg-accent border-accent text-accent-ink'
-            : 'bg-raised border-hairline-strong group-hover:border-ink-3',
+            ? 'bg-accent-fill border-accent-fill text-white'
+            : 'bg-transparent border-hairline-strong group-hover:border-ink-3',
         )}
       >
-        <Check
-          className={cx(
-            size === 'sm' ? 'size-3' : 'size-3.5',
-            'transition-opacity duration-150',
-            checked ? 'opacity-100' : 'opacity-0',
-          )}
-          strokeWidth={3}
-        />
+        {checked && (
+          <svg
+            viewBox="0 0 12 12"
+            className={cx(
+              size === 'sm' ? 'size-2.5' : 'size-3',
+              'animate-[check-pop_380ms_var(--spring)]',
+            )}
+          >
+            <path
+              d="M2.2 6.3 4.9 9 9.8 3.4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray="16"
+              className="animate-[check-draw_260ms_ease-out_both]"
+            />
+          </svg>
+        )}
       </span>
-      {!hideLabel && <span className="text-[0.875rem] text-ink">{label}</span>}
+      {!hideLabel && <span className="text-[0.9375rem] text-ink">{label}</span>}
     </label>
   )
 }
@@ -372,7 +419,7 @@ export function Switch({
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
-        <label htmlFor={id} className="text-[0.875rem] font-medium text-ink cursor-pointer">
+        <label htmlFor={id} className="text-[0.9375rem] font-medium text-ink cursor-pointer">
           {label}
         </label>
         {description && <p className="text-[0.8125rem] text-ink-3 mt-0.5">{description}</p>}
@@ -384,16 +431,19 @@ export function Switch({
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={cx(
-          'relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 mt-0.5',
-          checked ? 'bg-accent' : 'bg-hairline-strong',
+          'group relative shrink-0 w-[51px] h-[31px] rounded-full transition-colors duration-300',
+          checked ? 'bg-[var(--c-switch-on)]' : 'bg-fill',
         )}
       >
         <span
           aria-hidden
           className={cx(
-            'absolute top-0.5 size-5 rounded-full bg-raised shadow-xs',
-            'transition-transform duration-200 ease-out',
-            checked ? 'translate-x-[22px]' : 'translate-x-0.5',
+            'absolute top-[2px] left-[2px] h-[27px] w-[27px] rounded-full bg-white',
+            'shadow-[0_3px_8px_rgb(0_0_0/0.15),0_1px_1px_rgb(0_0_0/0.16)]',
+            'transition-[transform,width] duration-500 ease-[var(--spring)]',
+            // Al pulsar, la bola se estira como en iOS.
+            'group-active:w-[33px]',
+            checked ? 'translate-x-[20px] group-active:translate-x-[14px]' : 'translate-x-0',
           )}
         />
       </button>

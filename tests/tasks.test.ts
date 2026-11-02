@@ -50,7 +50,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
 describe('bucketOf', () => {
   it('clasifica por cercanía del plazo', () => {
     assert.equal(bucketOf(makeTask({ dueDate: '2026-10-13' }), TODAY), 'atrasada')
-    assert.equal(bucketOf(makeTask({ dueDate: TODAY }), TODAY), 'hoy')
+    assert.equal(bucketOf(makeTask({ dueDate: TODAY }), TODAY, todayAt(12)), 'hoy')
     assert.equal(bucketOf(makeTask({ dueDate: '2026-10-15' }), TODAY), 'manana')
     assert.equal(bucketOf(makeTask({ dueDate: '2026-10-20' }), TODAY), 'proxima')
     assert.equal(bucketOf(makeTask(), TODAY), 'sin_fecha')
@@ -242,7 +242,7 @@ describe('filtros', () => {
 
   it('la vista de hoy incluye lo atrasado', () => {
     // Si no, lo que se pasó desaparece del radar justo cuando más urge.
-    const hoy = filterTasks(tasks, { ...EMPTY_FILTERS, view: 'hoy' }, TODAY)
+    const hoy = filterTasks(tasks, { ...EMPTY_FILTERS, view: 'hoy' }, TODAY, todayAt(12))
     assert.equal(hoy.length, 2)
   })
 
@@ -252,7 +252,9 @@ describe('filtros', () => {
   })
 
   it('los recuentos cuadran con los filtros', () => {
-    const counts = countByView(tasks, TODAY)
+    // «Ahora» fijado a mediodía de TODAY: con el reloj real, la tarea de hoy
+    // pasaba a atrasada en cuanto la fecha de la prueba quedaba en el pasado.
+    const counts = countByView(tasks, TODAY, todayAt(12))
     assert.equal(counts.atrasadas, 1)
     assert.equal(counts.completadas, 1)
     assert.equal(counts.hoy, 2)

@@ -107,7 +107,8 @@ export function TasksView() {
               }`
         }
         actions={
-          <Button variant="primary" onClick={() => setCreating(true)}>
+          // En el móvil ya está el «+» de la barra inferior.
+          <Button variant="primary" onClick={() => setCreating(true)} className="max-lg:hidden">
             <Plus className="size-4" strokeWidth={2.5} />
             Nueva tarea
           </Button>
@@ -121,35 +122,38 @@ export function TasksView() {
               options={VIEW_LABELS.map((v) => ({ ...v, count: counts[v.value] }))}
             />
 
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative flex-1 min-w-[200px] max-w-sm">
-                <Search
-                  className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-ink-3 pointer-events-none"
-                  aria-hidden
-                />
-                <Input
-                  value={filters.query}
-                  aria-label="Buscar tareas"
-                  placeholder="Buscar…"
-                  className="pl-9 pr-9"
-                  onChange={(e) => setFilters((prev) => ({ ...prev, query: e.target.value }))}
-                />
-                {filters.query && (
-                  <button
-                    type="button"
-                    aria-label="Borrar búsqueda"
-                    onClick={() => setFilters((prev) => ({ ...prev, query: '' }))}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 size-5 grid place-items-center rounded-xs text-ink-3 hover:text-ink hover:bg-sunken"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                )}
-              </div>
+            <div className="relative max-w-md">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-ink-3 pointer-events-none"
+                aria-hidden
+              />
+              <Input
+                value={filters.query}
+                aria-label="Buscar tareas"
+                placeholder="Buscar…"
+                className="pl-9 pr-9"
+                onChange={(e) => setFilters((prev) => ({ ...prev, query: e.target.value }))}
+              />
+              {filters.query && (
+                <button
+                  type="button"
+                  aria-label="Borrar búsqueda"
+                  onClick={() => setFilters((prev) => ({ ...prev, query: '' }))}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 size-6 grid place-items-center rounded-full bg-ink-3/25 text-surface hover:bg-ink-3/40"
+                >
+                  <X className="size-3.5" strokeWidth={3} />
+                </button>
+              )}
+            </div>
 
+            {/* Filtros como píldoras en una fila que se desliza: apilados,
+                ocupaban media pantalla del móvil antes de la primera tarea. */}
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-[1.125rem] px-[1.125rem] sm:mx-0 sm:px-0 pb-0.5">
               <Select
                 aria-label="Filtrar por asignatura"
                 value={filters.subjectId ?? ''}
-                className="w-auto min-w-[9rem]"
+                pill
+                active={!!filters.subjectId}
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, subjectId: e.target.value || null }))
                 }
@@ -165,7 +169,8 @@ export function TasksView() {
               <Select
                 aria-label="Filtrar por prioridad"
                 value={filters.priority ?? ''}
-                className="w-auto min-w-[8rem]"
+                pill
+                active={!!filters.priority}
                 onChange={(e) =>
                   setFilters((prev) => ({
                     ...prev,
@@ -197,13 +202,12 @@ export function TasksView() {
                     aria-haspopup="menu"
                     {...aria}
                     className={cx(
-                      'inline-flex items-center gap-2 h-10 px-3 rounded-sm',
-                      'bg-surface border border-hairline-strong text-[0.8125rem] text-ink-2',
-                      'hover:border-ink-3/45 hover:text-ink transition-colors duration-150',
+                      'pressable shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full',
+                      'bg-fill text-[0.8125rem] font-medium text-ink-2 hover:text-ink whitespace-nowrap',
                     )}
                   >
-                    <ArrowUpDown className="size-4" />
-                    <span className="hidden sm:inline">{SORT_LABELS[sort]}</span>
+                    <ArrowUpDown className="size-3.5" strokeWidth={2.4} />
+                    {SORT_LABELS[sort]}
                   </button>
                 )}
               />
@@ -212,11 +216,12 @@ export function TasksView() {
                 <Button
                   variant="ghost"
                   size="sm"
+                  className="shrink-0"
                   onClick={() =>
                     setFilters((prev) => ({ ...prev, query: '', subjectId: null, priority: null }))
                   }
                 >
-                  Limpiar filtros
+                  Limpiar
                 </Button>
               )}
             </div>

@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
@@ -130,14 +130,79 @@ export function Modal({
     return () => document.removeEventListener('keydown', onKeyDown, true)
   }, [open, onClose])
 
-  if (!open) return null
+  // --- Salida animada ----------------------------------------------------
+  // Al cerrar, el panel sigue montado lo que dura su animación de salida, con
+  // el último contenido que tuvo abierto: si se pintara con las props nuevas
+  // (p. ej. `task = null`), el formulario parpadearía vacío mientras baja.
+  const [rendered, setRendered] = useState(open)
+  const [closing, setClosing] = useState(false)
+  const snapshot = useRef({ title, description, children, footer })
+  if (open) snapshot.current = { title, description, children, footer }
 
+  useEffect(() => {
+    if (open) {
+      setRendered(true)
+      setClosing(false)
+      return
+    }
+    if (!rendered) return
+    setClosing(true)
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const id = setTimeout(
+      () => {
+        setRendered(false)
+        setClosing(false)
+      },
+      reduce ? 0 : 260,
+    )
+    return () => clearTimeout(id)
+  }, [open, rendered])
+
+  // --- Arrastrar para cerrar (hoja de móvil) ------------------------------
+  const drag = useRef<{ startY: number; startT: number; dy: number } | null>(null)
+  const [dragY, setDragY] = useState(0)
+
+  const onGrabStart = (event: React.PointerEvent) => {
+    if (window.matchMedia('(min-width: 640px)').matches) return
+    if ((event.target as HTMLElement).closest('button')) return
+    drag.current = { startY: event.clientY, startT: performance.now(), dy: 0 }
+    ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+  }
+  const onGrabMove = (event: React.PointerEvent) => {
+    if (!drag.current) return
+    const dy = Math.max(0, event.clientY - drag.current.startY)
+    drag.current.dy = dy
+    setDragY(dy)
+  }
+  const onGrabEnd = () => {
+    const state = drag.current
+    drag.current = null
+    if (!state) return
+    const velocity = state.dy / Math.max(1, performance.now() - state.startT)
+    if (state.dy > 110 || (state.dy > 30 && velocity > 0.6)) onClose()
+    else setDragY(0)
+  }
+  useEffect(() => {
+    if (!open) setDragY(0)
+  }, [open])
+
+  if (!rendered) return null
+
+  const view = open ? { title, description, children, footer } : snapshot.current
   const widths = { sm: 'sm:max-w-md', md: 'sm:max-w-xl', lg: 'sm:max-w-3xl' }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex sm:items-center justify-center items-end">
+    <div
+      className={cx(
+        'fixed inset-0 z-50 flex sm:items-center justify-center items-end',
+        closing && 'pointer-events-none',
+      )}
+    >
       <div
-        className="absolute inset-0 animate-fade"
+        className={cx(
+          'absolute inset-0 transition-opacity duration-300',
+          closing ? 'opacity-0' : 'animate-fade',
+        )}
         style={{ background: 'var(--scrim)' }}
         onClick={onClose}
         aria-hidden
@@ -148,50 +213,77 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        aria-describedby={description ? descId : undefined}
+        aria-describedby={view.description ? descId : undefined}
         tabIndex={-1}
         className={cx(
           'relative w-full flex flex-col outline-none',
-          'bg-surface border border-hairline shadow-lg',
-          // Hoja anclada abajo en móvil, tarjeta centrada a partir de sm.
-          'rounded-t-xl sm:rounded-xl',
-          'max-h-[92dvh] sm:max-h-[86dvh]',
-          'animate-pop',
+          'bg-surface shadow-lg',
+          'rounded-t-[28px] sm:rounded-[28px] sm:mx-4',
+          'max-h-[94dvh] sm:max-h-[86dvh]',
+          closing
+            ? 'translate-y-full sm:translate-y-0 sm:scale-95 sm:opacity-0 transition-[transform,opacity] duration-[260ms] ease-[var(--ease-std)]'
+            : dragY > 0
+              ? ''
+              : 'animate-sheet sm:animate-pop transition-transform duration-500 ease-[var(--spring)]',
           widths[size],
         )}
+        style={dragY > 0 ? { transform: `translateY(${dragY}px)` } : undefined}
       >
-        <header className="flex items-start justify-between gap-4 px-5 sm:px-6 pt-5 pb-4 border-b border-hairline shrink-0">
-          <div className="min-w-0">
-            <h2 id={titleId} className="text-[1.0625rem] font-semibold tracking-[-0.015em]">
-              {title}
-            </h2>
-            {description && (
-              <p id={descId} className="text-[0.8125rem] text-ink-3 mt-1">
-                {description}
-              </p>
-            )}
+        <header
+          className="relative shrink-0 px-5 sm:px-6 pt-2 sm:pt-5 pb-3 touch-none sm:touch-auto"
+          onPointerDown={onGrabStart}
+          onPointerMove={onGrabMove}
+          onPointerUp={onGrabEnd}
+          onPointerCancel={onGrabEnd}
+        >
+          {/* Tirador: indica que la hoja se puede bajar con el dedo. */}
+          <div
+            aria-hidden
+            className="sm:hidden mx-auto mb-2.5 h-[5px] w-9 rounded-full bg-hairline-strong"
+          />
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 pt-1">
+              <h2
+                id={titleId}
+                className="text-[1.25rem] font-bold tracking-[-0.022em] leading-tight"
+              >
+                {view.title}
+              </h2>
+              {view.description && (
+                <p id={descId} className="text-[0.8125rem] text-ink-3 mt-1">
+                  {view.description}
+                </p>
+              )}
+            </div>
+            <IconButton
+              label="Cerrar"
+              size="sm"
+              variant="secondary"
+              onClick={onClose}
+              className="-mr-1 shrink-0"
+            >
+              <X className="size-[18px]" strokeWidth={2.4} />
+            </IconButton>
           </div>
-          <IconButton label="Cerrar" size="sm" onClick={onClose} className="-mr-1.5 -mt-0.5">
-            <X className="size-4" />
-          </IconButton>
         </header>
 
-        <div ref={content} className="overflow-y-auto px-5 sm:px-6 py-5 grow">
-          {children}
+        <div
+          ref={content}
+          className="overflow-y-auto overscroll-contain px-5 sm:px-6 pt-2 pb-5 grow"
+        >
+          {view.children}
         </div>
 
-        {footer && (
+        {view.footer && (
           <footer
             ref={actions}
             className={cx(
-              'flex items-center justify-end gap-2 px-5 sm:px-6 py-4 shrink-0',
-              'border-t border-hairline bg-surface',
-              // Respeta el área segura de los móviles con gesto inferior.
-              'pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4',
-              'rounded-b-none sm:rounded-b-xl',
+              'flex items-center justify-end gap-2 px-5 sm:px-6 pt-3 shrink-0',
+              'border-t border-hairline',
+              'pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:pb-5',
             )}
           >
-            {footer}
+            {view.footer}
           </footer>
         )}
       </div>
@@ -235,10 +327,7 @@ export function ConfirmDialog({
           <Button variant="ghost" onClick={onCancel}>
             Cancelar
           </Button>
-          <Button
-            variant={destructive ? 'dangerFill' : 'primary'}
-            onClick={onConfirm}
-          >
+          <Button variant={destructive ? 'dangerFill' : 'primary'} onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </>

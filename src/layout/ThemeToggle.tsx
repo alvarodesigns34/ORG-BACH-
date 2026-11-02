@@ -23,7 +23,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       role="radiogroup"
       aria-label="Tema de la aplicación"
       className={cx(
-        'inline-flex items-center gap-0.5 p-0.5 rounded-sm bg-sunken border border-hairline',
+        'inline-flex items-center gap-0.5 p-[3px] rounded-full bg-fill',
         className,
       )}
     >
@@ -39,8 +39,8 @@ export function ThemeToggle({ className }: { className?: string }) {
             title={label}
             onClick={() => dispatch({ type: 'settings/update', patch: { theme: value } })}
             className={cx(
-              'size-7 grid place-items-center rounded-[5px] transition-colors duration-150',
-              active ? 'bg-surface text-ink shadow-xs' : 'text-ink-3 hover:text-ink-2',
+              'size-8 grid place-items-center rounded-full transition-[background-color,color,box-shadow] duration-200',
+              active ? 'bg-raised text-ink shadow-sm' : 'text-ink-3 hover:text-ink',
             )}
           >
             <Icon className="size-[15px]" strokeWidth={2} />
