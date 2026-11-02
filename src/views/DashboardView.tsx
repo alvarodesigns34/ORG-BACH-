@@ -85,7 +85,7 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
         onClick={openAssistant}
         className="pressable card w-full flex items-center gap-3 pl-4 pr-2 h-14 mb-4 text-left"
       >
-        <span className="flex-1 text-[1rem] text-ink-3">Dime qué apuntar…</span>
+        <span className="flex-1 text-[1rem] text-ink-3">Pregúntame o dime qué apuntar…</span>
         <span className="grid place-items-center size-10 rounded-full bg-accent-fill text-white shrink-0">
           <Mic className="size-5" strokeWidth={2.3} />
         </span>

@@ -304,35 +304,57 @@ navegador.
 - Las claves VAPID y el secreto del cron se generan dentro de la base de datos
   (esquema `private`, no expuesto por la API): no pasan por el repositorio.
 
-## Asistente de voz (IA)
+## Asistente (IA): conversación por voz o texto
 
-Le dices lo que quieres apuntar y la app lo hace: «añade repasar el tema 4 para
-hoy», «examen de Biología el jueves», «he sacado un 8 en el examen de Física,
-vale un 40 % de la primera evaluación», «he estudiado una hora de Historia».
-También se puede escribir. Está en el micrófono de la barra superior, en la
-barra «Dime qué apuntar…» de Inicio y en el menú lateral.
+Es un chat: le dices lo que quieres apuntar y la app lo hace, o le preguntas
+por tu curso y te responde con tus datos. Y puedes seguir hablando del mismo
+tema sin empezar de cero:
 
-- **Modelos (Mistral)**: la voz la transcribe Voxtral (`voxtral-small-latest`)
-  y la interpreta el modelo grande (`mistral-large-latest`), con el mediano y el
-  pequeño de reserva. Separar los dos pasos fue deliberado: en las pruebas,
-  Voxtral entendía bien la frase pero contaba mal los días de la semana. Al
-  modelo se le pasa además un calendario de los próximos 15 días para que
-  busque «el jueves» en lugar de calcularlo. La app te enseña lo que ha
-  entendido de tu voz («Has dicho…»).
-- **La IA no toca tus datos.** Devuelve acciones estructuradas y la app las
-  valida y aplica con su propia lógica (`src/assistant/actions.ts`, con
-  pruebas): lo que crea la IA es igual que lo que creas a mano, se sincroniza
-  igual y se deshace de golpe con «Deshacer». Lo dudoso (una asignatura que no
-  existe, una nota mayor que el máximo, un examen sin fecha) se descarta con
-  un aviso en lugar de inventarse.
+> «Examen de mates el jueves de la semana que viene a las 9» → «Mejor muévelo
+> al viernes» → «¿Qué nota necesito en ese examen para llegar a mi objetivo?»
+
+Está en el micrófono de la barra superior, en la barra «Pregúntame o dime qué
+apuntar…» de Inicio y en el menú lateral.
+
+- **Qué sabe hacer**: crear, cambiar, completar, reabrir y borrar tareas
+  (también dividirlas en pasos); crear, mover y borrar exámenes; apuntar,
+  corregir y borrar notas (con peso y evaluación); eventos; objetivos por
+  asignatura; registrar estudio; planes de repaso; y responder preguntas
+  («¿qué tengo esta semana?», «¿cuál es mi media?», «¿qué necesito para un 7?»).
+- **Memoria de la conversación**: se reenvían al modelo los últimos 16
+  mensajes. Cada respuesta suya va acompañada de lo que la app aplicó DE
+  VERDAD, con los ids, así «bórralo» o «era un 7,5» actúan sobre eso y no
+  sobre algo parecido. La charla se guarda en el dispositivo (por cuenta)
+  hasta que pulsas «Nueva conversación».
+- **Menos errores**:
+  - El modelo razona antes de contestar (un campo `thinking` que no se
+    enseña) y busca las fechas en un calendario de los próximos 21 días y los 7
+    anteriores en lugar de calcularlas.
+  - Las cuentas (medias por evaluación, % evaluado, nota necesaria para el
+    objetivo) las hace la app con su propio motor de notas y se las pasa ya
+    hechas.
+  - El servidor revisa cada respuesta contra tus datos (ids que existen,
+    fechas válidas, campos obligatorios, notas dentro de la escala). Si algo no
+    cuadra, se lo devuelve al modelo con los problemas concretos para que lo
+    corrija una vez antes de contestarte.
+  - Y la app vuelve a validar al aplicar (`src/assistant/actions.ts`, con
+    pruebas): lo dudoso se descarta con un aviso en lugar de inventarse.
+- **Deshacer por respuesta**: cada respuesta que cambió algo tiene su
+  «Deshacer», que revierte creaciones, ediciones y borrados. Solo devuelve un
+  campo a su valor anterior si nadie lo ha vuelto a tocar después.
+- **Modelos (Mistral)**: la voz se transcribe con el servicio de transcripción
+  de Voxtral (`voxtral-mini-latest`, en español y con los nombres de tus
+  asignaturas como pistas de vocabulario) y la interpreta el modelo grande
+  (`mistral-large-latest`; el mediano y el pequeño quedan de reserva). Tu
+  mensaje de voz aparece transcrito en el chat para que veas lo que entendió.
 - **Voz**: se graba con el micrófono y la app la convierte a WAV de 16 kHz
-  mono (el formato que recomienda Mistral), venga del iPhone (MP4/AAC) o de
-  Chrome (WebM/Opus).
+  mono, venga del iPhone (MP4/AAC) o de Chrome (WebM/Opus).
 - **Servidor**: la Edge Function `assistant` exige sesión, cuenta un máximo de
   150 peticiones diarias por usuario y guarda la clave en el secreto
   `MISTRAL_API_KEY` de Supabase, nunca en la app ni en el repositorio.
-- Al modelo solo viaja lo necesario: la frase o el audio, la fecha de hoy, tus
-  asignaturas, tus tareas abiertas y los exámenes sin nota.
+- **Qué viaja al modelo**: la conversación reciente y un resumen del curso
+  (asignaturas con sus medias, tareas abiertas y recién completadas, exámenes,
+  notas recientes, eventos próximos y minutos de estudio).
 
 ## Aplicación instalable (PWA)
 

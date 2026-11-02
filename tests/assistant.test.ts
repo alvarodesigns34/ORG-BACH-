@@ -76,7 +76,14 @@ describe('aplicar acciones', () => {
   it('«añade esta tarea para hoy»', () => {
     const { data, applied } = applyAssistantActions(
       course(),
-      [{ type: 'add_task', title: 'Hacer ejercicios 4 y 5', subject_name: 'mates', date: TODAY }],
+      [
+        {
+          type: 'add_task',
+          title: 'Hacer ejercicios 4 y 5',
+          subject_name: 'mates',
+          date: TODAY,
+        },
+      ],
       TODAY,
     )
     // «mates» no coincide con «Matemáticas I»: la tarea no se guarda con una
@@ -157,7 +164,12 @@ describe('aplicar acciones', () => {
       course(),
       [
         { type: 'add_subject', subject_name: 'Latín I' },
-        { type: 'add_exam', subject_name: 'Latín I', date: '2026-11-10', title: 'Declinaciones' },
+        {
+          type: 'add_exam',
+          subject_name: 'Latín I',
+          date: '2026-11-10',
+          title: 'Declinaciones',
+        },
       ],
       TODAY,
     )
@@ -220,22 +232,223 @@ describe('deshacer lo que hizo la IA', () => {
   })
 })
 
+describe('editar, borrar y seguir la conversación', () => {
+  const withTask = () =>
+    applyAssistantActions(
+      course(),
+      [
+        {
+          type: 'add_task',
+          title: 'Resumen tema 2',
+          subject_id: 'bio',
+          date: TODAY,
+        },
+      ],
+      TODAY,
+    )
+
+  it('el memo lleva el id, para que «muévelo al viernes» sepa de qué hablas', () => {
+    const { data, applied } = withTask()
+    assert.ok(applied[0].memo.includes(data.tasks[0].id))
+  })
+
+  it('«muévelo al viernes»: cambia la fecha sin tocar el título', () => {
+    const base = withTask().data
+    const id = base.tasks[0].id
+    const { data, applied } = applyAssistantActions(
+      base,
+      [
+        {
+          type: 'update_task',
+          task_id: id,
+          date: '2026-11-06',
+          priority: 'alta',
+        },
+      ],
+      TODAY,
+    )
+    assert.equal(applied[0].kind, 'editada')
+    assert.equal(data.tasks[0].dueDate, '2026-11-06')
+    assert.equal(data.tasks[0].priority, 'alta')
+    assert.equal(data.tasks[0].title, 'Resumen tema 2')
+  })
+
+  it('quitar la fecha con date: null', () => {
+    const base = withTask().data
+    const { data } = applyAssistantActions(
+      base,
+      [{ type: 'update_task', task_id: base.tasks[0].id, date: null }],
+      TODAY,
+    )
+    assert.equal(data.tasks[0].dueDate, undefined)
+  })
+
+  it('una edición sin cambios no se aplica', () => {
+    const base = withTask().data
+    const { applied, skipped } = applyAssistantActions(
+      base,
+      [{ type: 'update_task', task_id: base.tasks[0].id }],
+      TODAY,
+    )
+    assert.equal(applied.length, 0)
+    assert.equal(skipped.length, 1)
+  })
+
+  it('subtareas, mover un examen y corregir una nota', () => {
+    const base = withTask().data
+    const step = applyAssistantActions(
+      base,
+      [
+        {
+          type: 'add_subtasks',
+          task_id: base.tasks[0].id,
+          items: ['Leer', 'Esquema', ' '],
+        },
+        {
+          type: 'update_exam',
+          exam_id: 'ex_bio',
+          date: '2026-11-12',
+          time: '09:30',
+        },
+        {
+          type: 'add_grade',
+          subject_id: 'bio',
+          score: 6,
+          weight: 40,
+          exam_id: 'ex_bio',
+        },
+      ],
+      TODAY,
+    )
+    assert.equal(step.applied.length, 3)
+    assert.deepEqual(
+      step.data.tasks[0].subtasks.map((s) => s.title),
+      ['Leer', 'Esquema'],
+    )
+    assert.equal(step.data.exams[0].date, '2026-11-12')
+    const gradeId = step.data.grades[0].id
+    const fixed = applyAssistantActions(
+      step.data,
+      [{ type: 'update_grade', grade_id: gradeId, score: 7 }],
+      TODAY,
+    )
+    assert.equal(fixed.data.grades[0].score, 7)
+    assert.equal(fixed.data.grades[0].weight, 40)
+  })
+
+  it('reabrir y fijar objetivo', () => {
+    const base = withTask().data
+    const id = base.tasks[0].id
+    const done = applyAssistantActions(base, [{ type: 'complete_task', task_id: id }], TODAY).data
+    assert.equal(done.tasks[0].status, 'completada')
+    const { data } = applyAssistantActions(
+      done,
+      [
+        { type: 'reopen_task', task_id: id },
+        { type: 'set_target', subject_name: 'mates', target: 8 },
+        { type: 'set_target', subject_id: 'mat', target: 8 },
+      ],
+      TODAY,
+    )
+    assert.equal(data.tasks[0].status, 'pendiente')
+    assert.equal(data.subjects.find((s) => s.id === 'mat')?.targetGrade, 8)
+  })
+})
+
+describe('deshacer ediciones y borrados', () => {
+  it('devuelve lo borrado y lo editado, incluido el enlace nota–examen', () => {
+    const start = applyAssistantActions(
+      course(),
+      [
+        { type: 'add_task', title: 'Comentario', date: TODAY },
+        { type: 'add_grade', subject_id: 'bio', score: 8, exam_id: 'ex_bio' },
+      ],
+      TODAY,
+    ).data
+    const taskId = start.tasks[0].id
+    const gradeId = start.grades[0].id
+    const { data: after } = applyAssistantActions(
+      start,
+      [
+        { type: 'update_task', task_id: taskId, date: '2026-11-09' },
+        { type: 'delete_grade', grade_id: gradeId },
+        { type: 'delete_exam', exam_id: 'ex_bio' },
+      ],
+      TODAY,
+    )
+    assert.equal(after.grades.length, 0)
+    assert.equal(after.exams.length, 0)
+
+    // El plan viaja por JSON (se guarda con la conversación).
+    const plan = JSON.parse(JSON.stringify(planUndo(start, after)))
+    const reverted = applyUndo(after, plan)
+    assert.equal(reverted.tasks[0].dueDate, TODAY)
+    assert.equal(reverted.grades[0].id, gradeId)
+    assert.equal(reverted.exams[0].gradeEntryId, gradeId)
+  })
+
+  it('no pisa lo que cambiaste a mano después', () => {
+    const start = applyAssistantActions(course(), [{ type: 'add_task', title: 'X' }], TODAY).data
+    const id = start.tasks[0].id
+    const { data: after } = applyAssistantActions(
+      start,
+      [
+        {
+          type: 'update_task',
+          task_id: id,
+          date: '2026-11-09',
+          priority: 'alta',
+        },
+      ],
+      TODAY,
+    )
+    const plan = planUndo(start, after)
+    const edited = {
+      ...after,
+      tasks: after.tasks.map((t) => ({ ...t, dueDate: '2026-11-20' })),
+    }
+    const reverted = applyUndo(edited, plan)
+    assert.equal(reverted.tasks[0].dueDate, '2026-11-20')
+    assert.equal(reverted.tasks[0].priority, 'media')
+  })
+})
+
 describe('contexto que viaja al modelo', () => {
-  it('lleva asignaturas, tareas abiertas y exámenes sin nota, y nada más', () => {
-    const ctx = buildContext(course(), TODAY)
-    assert.deepEqual(Object.keys(ctx).sort(), [
-      'active_term',
-      'exams_without_grade',
-      'grade_max',
-      'next_days',
-      'open_tasks',
-      'subjects',
-      'today',
-      'weekday',
-    ])
+  it('lleva el calendario, las cuentas hechas y los ids', () => {
+    const data = course()
+    data.subjects[0].targetGrade = 7
+    data.grades = [
+      {
+        id: 'g1',
+        subjectId: 'bio',
+        categoryId: null,
+        term: 'T1',
+        name: 'Parcial',
+        kind: 'examen',
+        score: 6,
+        maxScore: 10,
+        weight: 40,
+        date: '2026-10-20',
+        createdAt: '2026-10-20T00:00:00.000Z',
+      },
+    ]
+    const ctx = buildContext(data, TODAY)
     assert.equal(ctx.weekday, 'lunes')
     // El jueves de esta semana, para que el modelo no tenga que calcularlo.
-    assert.deepEqual(ctx.next_days[3], { date: '2026-11-05', weekday: 'jueves' })
-    assert.equal(ctx.exams_without_grade.length, 1)
+    assert.deepEqual(ctx.next_days[3], {
+      date: '2026-11-05',
+      weekday: 'jueves',
+    })
+    assert.deepEqual(ctx.past_days[0], {
+      date: '2026-11-01',
+      weekday: 'domingo',
+    })
+    const bio = ctx.subjects.find((s) => s.id === 'bio')!
+    assert.deepEqual(bio.terms.T1, { avg: 6, evaluated_pct: 40 })
+    // (7·100 − 6·40) / 60 = 7,67 en el 60 % restante.
+    assert.equal(bio.needed_for_target?.needed, 7.67)
+    assert.equal(bio.needed_for_target?.status, 'alcanzable')
+    assert.equal(ctx.recent_grades[0].id, 'g1')
+    assert.equal(ctx.exams[0].id, 'ex_bio')
   })
 })

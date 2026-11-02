@@ -1,15 +1,16 @@
 /**
  * Voz y llamada al asistente.
  *
- * Se graba con MediaRecorder, se convierte a WAV de 16 kHz mono y se manda a
- * Voxtral (Mistral), que lo entiende directamente: no hace falta un paso de
- * transcripción aparte. Funciona igual en iPhone (graba MP4/AAC) que en
- * Chrome (WebM/Opus).
+ * Se graba con MediaRecorder y se convierte a WAV de 16 kHz mono; el servidor
+ * lo transcribe con Voxtral (Mistral) y el modelo de texto lo interpreta junto
+ * con la conversación. Funciona igual en iPhone (graba MP4/AAC) que en Chrome
+ * (WebM/Opus).
  */
 
 import { SUPABASE_KEY, SUPABASE_URL } from '../sync/config.ts'
 import { syncEngine } from '../sync/engine.ts'
-import type { AssistantAction } from './actions.ts'
+import type { AssistantAction, AssistantContext } from './actions.ts'
+import type { HistoryTurn } from './conversation.ts'
 
 const ASSISTANT_URL = `${SUPABASE_URL}/functions/v1/assistant`
 /** Tope de una grabación: más que suficiente para dictar varias cosas. */
@@ -112,7 +113,11 @@ export async function startRecording(): Promise<Recording> {
             resolve(
               wav
                 ? { data: await toBase64(wav), mimeType: 'audio/wav', ms }
-                : { data: await toBase64(blob), mimeType: format.fallbackMime, ms },
+                : {
+                    data: await toBase64(blob),
+                    mimeType: format.fallbackMime,
+                    ms,
+                  },
             )
           } catch (error) {
             reject(error)
@@ -194,7 +199,10 @@ export interface AssistantReply {
 export async function askAssistant(input: {
   text?: string
   audio?: { data: string; mimeType: string }
-  context: unknown
+  context: AssistantContext
+  /** Mensajes anteriores de la conversación, para seguir el mismo tema. */
+  history: HistoryTurn[]
+  signal?: AbortSignal
 }): Promise<AssistantReply> {
   const token = await syncEngine.accessToken()
   if (!token) throw new Error('Inicia sesión en Ajustes para usar el asistente.')
@@ -207,10 +215,21 @@ export async function askAssistant(input: {
         Authorization: `Bearer ${token}`,
         apikey: SUPABASE_KEY,
       },
-      body: JSON.stringify(input),
+      body: JSON.stringify({
+        text: input.text,
+        audio: input.audio,
+        context: input.context,
+        history: input.history,
+      }),
+      signal: input.signal,
     })
-  } catch {
-    throw new Error('Sin conexión. El asistente necesita internet.')
+  } catch (error) {
+    if (input.signal?.aborted) throw error
+    throw new Error(
+      navigator.onLine === false
+        ? 'Sin conexión. El asistente necesita internet.'
+        : 'No se pudo conectar con el asistente. Inténtalo otra vez.',
+    )
   }
   const body = (await res.json().catch(() => ({}))) as Partial<AssistantReply> & { error?: string }
   if (!res.ok) throw new Error(body.error ?? 'No se pudo hablar con la IA.')

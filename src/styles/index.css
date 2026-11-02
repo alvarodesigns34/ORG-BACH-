@@ -575,6 +575,25 @@ html.is-standalone body {
   }
 }
 
+@keyframes typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: none;
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* Los tres puntos de «escribiendo…» del asistente. */
+@utility animate-typing {
+  animation: typing 1.2s var(--ease-std) infinite;
+  animation-delay: calc(var(--i, 0) * 160ms);
+}
+
 @utility animate-rise {
   animation: rise 420ms var(--ease-out) both;
 }

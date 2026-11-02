@@ -19,6 +19,8 @@ interface ModalProps {
   /** Barra fija inferior con las acciones. */
   footer?: ReactNode
   size?: 'sm' | 'md' | 'lg'
+  /** Acción extra en la cabecera, junto a «Cerrar» (p. ej. «Nueva conversación»). */
+  headerAction?: ReactNode
 }
 
 /**
@@ -36,6 +38,7 @@ export function Modal({
   children,
   footer,
   size = 'md',
+  headerAction,
 }: ModalProps) {
   const panel = useRef<HTMLDivElement>(null)
   const content = useRef<HTMLDivElement>(null)
@@ -44,9 +47,15 @@ export function Modal({
   const titleId = useId()
   const descId = useId()
 
+  // Montado del panel: sigue montado durante la animación de salida (abajo).
+  const [rendered, setRendered] = useState(open)
+
   // Al abrir: recordar quién tenía el foco y llevarlo dentro del diálogo.
+  // Depende también de `rendered`: un diálogo que vive montado y cerrado (el
+  // del asistente) no tiene panel en el primer render tras abrirse, y sin
+  // esperar a que exista el foco se quedaba en la página de detrás.
   useEffect(() => {
-    if (!open) return
+    if (!open || !rendered) return
     restoreFocus.current = document.activeElement as HTMLElement | null
 
     const node = panel.current
@@ -58,7 +67,13 @@ export function Modal({
       // corre después. Se busca primero en el cuerpo (el primer campo del
       // formulario) y luego en las acciones (en una confirmación, «Cancelar»,
       // que es la salida segura). Cerrar queda como último recurso.
+      // Un campo marcado con data-autofocus manda, pero solo con ratón: en
+      // el móvil abriría el teclado cada vez que se abre la hoja.
+      const preferred = window.matchMedia('(pointer: fine)').matches
+        ? node.querySelector<HTMLElement>('[data-autofocus]')
+        : null
       const first =
+        preferred ??
         content.current?.querySelector<HTMLElement>(FOCUSABLE) ??
         actions.current?.querySelector<HTMLElement>(FOCUSABLE) ??
         node.querySelector<HTMLElement>(FOCUSABLE)
@@ -68,7 +83,7 @@ export function Modal({
     }
 
     return () => restoreFocus.current?.focus({ preventScroll: true })
-  }, [open])
+  }, [open, rendered])
 
   // Bloquear el desplazamiento del fondo, compensando el ancho de la barra
   // para que la página no dé un salto lateral al abrirse.
@@ -134,7 +149,6 @@ export function Modal({
   // Al cerrar, el panel sigue montado lo que dura su animación de salida, con
   // el último contenido que tuvo abierto: si se pintara con las props nuevas
   // (p. ej. `task = null`), el formulario parpadearía vacío mientras baja.
-  const [rendered, setRendered] = useState(open)
   const [closing, setClosing] = useState(false)
   const snapshot = useRef({ title, description, children, footer })
   if (open) snapshot.current = { title, description, children, footer }
@@ -255,15 +269,18 @@ export function Modal({
                 </p>
               )}
             </div>
-            <IconButton
-              label="Cerrar"
-              size="sm"
-              variant="secondary"
-              onClick={onClose}
-              className="-mr-1 shrink-0"
-            >
-              <X className="size-[18px]" strokeWidth={2.4} />
-            </IconButton>
+            <div className="flex items-center gap-2 -mr-1 shrink-0">
+              {open && headerAction}
+              <IconButton
+                label="Cerrar"
+                size="sm"
+                variant="secondary"
+                onClick={onClose}
+                className="shrink-0"
+              >
+                <X className="size-[18px]" strokeWidth={2.4} />
+              </IconButton>
+            </div>
           </div>
         </header>
 
