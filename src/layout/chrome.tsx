@@ -7,7 +7,7 @@ import {
   type RefObject,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronLeft, Plus } from 'lucide-react'
+import { ChevronLeft, Mic, Plus } from 'lucide-react'
 
 import { hrefFor } from '@/router'
 import { useSettings } from '@/state/StoreProvider'
@@ -21,9 +21,11 @@ import { cx } from '@/ui/primitives'
 interface Chrome {
   /** Abre «Nueva tarea» desde cualquier pantalla. */
   openCreate: () => void
+  /** Abre el asistente de voz. */
+  openAssistant: () => void
 }
 
-const ChromeContext = createContext<Chrome>({ openCreate: () => {} })
+const ChromeContext = createContext<Chrome>({ openCreate: () => {}, openAssistant: () => {} })
 
 export function ChromeProvider({ value, children }: { value: Chrome; children: ReactNode }) {
   return <ChromeContext.Provider value={value}>{children}</ChromeContext.Provider>
@@ -150,9 +152,17 @@ export function TopBar({
 
 /** «+» y avatar. En escritorio no hacen falta: están en la barra lateral. */
 export function ChromeActions({ className }: { className?: string }) {
-  const { openCreate } = useChrome()
+  const { openCreate, openAssistant } = useChrome()
   return (
     <div className={cx('flex items-center gap-2', className)}>
+      <button
+        type="button"
+        onClick={openAssistant}
+        aria-label="Asistente de voz"
+        className="pressable grid place-items-center size-9 rounded-full bg-fill text-accent"
+      >
+        <Mic className="size-[19px]" strokeWidth={2.3} />
+      </button>
       <button
         type="button"
         onClick={openCreate}

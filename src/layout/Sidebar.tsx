@@ -1,9 +1,9 @@
-import { Plus } from 'lucide-react'
+import { Mic, Plus } from 'lucide-react'
 
 import { useSettings } from '@/state/StoreProvider'
 import { hrefFor, type RouteId } from '@/router'
 import { SyncBadge } from '@/features/account/SyncBadge'
-import { AccountAvatar } from './chrome'
+import { AccountAvatar, useChrome } from './chrome'
 import { Button, cx } from '@/ui/primitives'
 import { BrandMark, BrandWordmark } from './Brand'
 import { NAV_GROUPS, NAV_ITEMS, NAV_TINTS } from './navigation'
@@ -18,6 +18,7 @@ interface SidebarProps {
 /** Barra lateral de escritorio, al estilo de las apps de macOS. */
 export function Sidebar({ current, onCreate, badges }: SidebarProps) {
   const settings = useSettings()
+  const { openAssistant } = useChrome()
 
   return (
     <aside
@@ -50,6 +51,10 @@ export function Sidebar({ current, onCreate, badges }: SidebarProps) {
           <kbd className="ml-auto text-[0.6875rem] font-semibold opacity-70 tabular-nums rounded-[5px] bg-white/20 px-1.5 py-px">
             C
           </kbd>
+        </Button>
+        <Button block onClick={openAssistant} className="justify-start mt-2">
+          <Mic className="size-4" strokeWidth={2.4} />
+          Asistente
         </Button>
       </div>
 

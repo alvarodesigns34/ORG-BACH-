@@ -304,6 +304,31 @@ navegador.
 - Las claves VAPID y el secreto del cron se generan dentro de la base de datos
   (esquema `private`, no expuesto por la API): no pasan por el repositorio.
 
+## Asistente de voz (IA)
+
+Le dices lo que quieres apuntar y la app lo hace: «añade repasar el tema 4 para
+hoy», «examen de Biología el jueves», «he sacado un 8 en el examen de Física,
+vale un 40 % de la primera evaluación», «he estudiado una hora de Historia».
+También se puede escribir. Está en el micrófono de la barra superior, en la
+barra «Dime qué apuntar…» de Inicio y en el menú lateral.
+
+- **Modelo**: Gemini (`gemini-3.8-flash`, con `gemini-3.5-flash-lite` de
+  reserva si se agota la cuota). Ambos tienen plan gratuito en la API de Google;
+  en ese plan, Google puede usar lo enviado para mejorar sus productos.
+- **La IA no toca tus datos.** Devuelve acciones estructuradas y la app las
+  valida y aplica con su propia lógica (`src/assistant/actions.ts`, con
+  pruebas): lo que crea la IA es igual que lo que creas a mano, se sincroniza
+  igual y se deshace de golpe con «Deshacer». Lo dudoso (una asignatura que no
+  existe, una nota mayor que el máximo, un examen sin fecha) se descarta con
+  un aviso en lugar de inventarse.
+- **Voz**: se graba el audio y Gemini lo entiende directamente, sin
+  transcriptor aparte; funciona en iPhone (MP4/AAC) y en Chrome (WebM/Opus).
+- **Servidor**: la Edge Function `assistant` exige sesión, cuenta un máximo de
+  150 peticiones diarias por usuario y guarda la clave en el secreto
+  `GEMINI_API_KEY` de Supabase, nunca en la app ni en el repositorio.
+- Al modelo solo viaja lo necesario: la frase o el audio, la fecha de hoy, tus
+  asignaturas, tus tareas abiertas y los exámenes sin nota.
+
 ## Aplicación instalable (PWA)
 
 Se puede instalar en la pantalla de inicio del móvil, del iPad o como

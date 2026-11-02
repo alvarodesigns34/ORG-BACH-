@@ -22,6 +22,7 @@ import { LinkChoiceDialog, RecoveryDialog } from '@/features/account/Account'
 import { syncEngine } from '@/sync/engine'
 import { ToastProvider } from '@/ui/Toast'
 import { ChromeProvider } from '@/layout/chrome'
+import { AssistantSheet } from '@/features/assistant/AssistantSheet'
 
 export function App() {
   return (
@@ -50,7 +51,9 @@ function Shell() {
   )
 
   const openCreate = useCallback(() => setCreating(true), [])
-  const chrome = useMemo(() => ({ openCreate }), [openCreate])
+  const [assistantOpen, setAssistantOpen] = useState(false)
+  const openAssistant = useCallback(() => setAssistantOpen(true), [])
+  const chrome = useMemo(() => ({ openCreate, openAssistant }), [openCreate, openAssistant])
 
   // La sincronización arranca dentro del proveedor: necesita el puente con el
   // almacén. Sin cuenta configurada no hace nada.
@@ -130,6 +133,7 @@ function Shell() {
       </ChromeProvider>
 
       <TaskEditor open={creating} onClose={() => setCreating(false)} />
+      <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} />
       <LinkChoiceDialog />
       <RecoveryDialog />
     </>

@@ -5,6 +5,7 @@ import {
   CircleAlert,
   GraduationCap,
   ListChecks,
+  Mic,
   Sparkles,
   Timer,
   TriangleAlert,
@@ -26,6 +27,7 @@ import {
   useUpcomingExams,
 } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
+import { useChrome } from '@/layout/chrome'
 import { NAV_TINTS } from '@/layout/navigation'
 import { TaskEditor } from '@/features/tasks/TaskEditor'
 import { TaskRow } from '@/features/tasks/TaskRow'
@@ -45,6 +47,7 @@ const ALERT_ORDER = { critico: 0, aviso: 1, info: 2 } as const
 export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
   const settings = useSettings()
   const today = useToday()
+  const { openAssistant } = useChrome()
   const { data } = useStore()
   const summary = useTaskSummary()
   const exams = useUpcomingExams(4)
@@ -75,6 +78,18 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
         title={`${greeting()}${firstName ? `, ${firstName}` : ''}`}
         compactTitle="Inicio"
       />
+
+      {/* --- Asistente: lo primero a mano, como la barra de Siri/Spotlight --- */}
+      <button
+        type="button"
+        onClick={openAssistant}
+        className="pressable card w-full flex items-center gap-3 pl-4 pr-2 h-14 mb-4 text-left"
+      >
+        <span className="flex-1 text-[1rem] text-ink-3">Dime qué apuntar…</span>
+        <span className="grid place-items-center size-10 rounded-full bg-accent-fill text-white shrink-0">
+          <Mic className="size-5" strokeWidth={2.3} />
+        </span>
+      </button>
 
       {/* --- Widgets --- */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
