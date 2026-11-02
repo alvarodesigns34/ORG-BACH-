@@ -11,10 +11,11 @@
    en oscuro), tarjetas blancas sin borde, un solo azul de acento, materiales
    translúcidos para la navegación y tipografía del sistema (SF en Apple).
 
-   Contraste: todos los textos pasan WCAG AA (4,5:1) sobre el fondo MÁS claro
-   en el que aparecen. Por eso el azul de texto (#0066CC) es más oscuro que el
-   azul de sistema de iOS (#007AFF, 4:1), y el gris terciario (#66666B) más
-   que el «secondaryLabel» de iOS.
+   Contraste: todos los textos pasan WCAG AA (4,5:1) en el PEOR fondo en que
+   pueden aparecer, que es el relleno gris (--c-fill) sobre el fondo de la app
+   —el buscador, los filtros—, no la tarjeta blanca. Por eso el azul de texto
+   (#005FBF) es más oscuro que el de sistema de iOS (#007AFF, 4:1) y el gris
+   terciario más que el «secondaryLabel» de iOS. Comprobado numéricamente.
    ========================================================================== */
 
 :root {
@@ -30,32 +31,32 @@
   /* --- Texto --- */
   --c-ink: #1d1d1f;
   --c-ink-2: #48484a;
-  --c-ink-3: #66666b;
+  --c-ink-3: #606065;
 
   /* --- Separadores --- */
   --c-hairline: #e5e5ea;
   --c-hairline-strong: #d1d1d6;
 
   /* --- Acento --- */
-  --c-accent: #0066cc;
-  --c-accent-strong: #0055ad;
+  --c-accent: #005fbf;
+  --c-accent-strong: #0050a3;
   --c-accent-fill: #0071e3;
   --c-accent-ink: #ffffff;
   --c-accent-quiet: #e8f1fd;
 
   /* --- Estados: solo con significado --- */
-  --c-danger: #d70015;
+  --c-danger: #c40014;
   --c-danger-quiet: #ffebed;
   --c-warn: #a64b00;
   --c-warn-quiet: #fff2e2;
-  --c-ok: #1e7a35;
+  --c-ok: #1a6e2f;
   --c-ok-quiet: #e3f4e7;
   --c-switch-on: #34c759;
 
   /* --- Paleta de asignaturas: distinguible y AA sobre su fondo suave --- */
-  --sub-sky: #1f6fae;
+  --sub-sky: #1d69a6;
   --sub-sky-quiet: #e2effa;
-  --sub-sage: #3f7a4a;
+  --sub-sage: #3a7144;
   --sub-sage-quiet: #e5f1e7;
   --sub-amber: #8f5d00;
   --sub-amber-quiet: #fbefd8;
@@ -105,18 +106,18 @@
 
   --c-ink: #f5f5f7;
   --c-ink-2: #c7c7cc;
-  --c-ink-3: #98989f; /* AA sobre --c-raised, el fondo más claro del tema */
+  --c-ink-3: #a1a1a8;
 
   --c-hairline: #2e2e31;
   --c-hairline-strong: #48484a;
 
-  --c-accent: #4aa0ff;
-  --c-accent-strong: #6db3ff;
+  --c-accent: #5aa8ff;
+  --c-accent-strong: #7dbaff;
   --c-accent-fill: #0071e3;
   --c-accent-ink: #ffffff;
   --c-accent-quiet: #0d2440;
 
-  --c-danger: #ff6961;
+  --c-danger: #ff7a72;
   --c-danger-quiet: #3a1513;
   --c-warn: #ffb340;
   --c-warn-quiet: #33240b;
