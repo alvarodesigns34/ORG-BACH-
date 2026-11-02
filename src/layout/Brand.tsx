@@ -29,12 +29,7 @@ export function BrandMark({ size = 30 }: { size?: number }) {
         strokeWidth="1.25"
         strokeLinecap="round"
       />
-      <path
-        d="M13.5 12.5h8M13.5 17.5h5.5"
-        stroke="#fff"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-      />
+      <path d="M13.5 12.5h8M13.5 17.5h5.5" stroke="#fff" strokeWidth="1.75" strokeLinecap="round" />
     </svg>
   )
 }

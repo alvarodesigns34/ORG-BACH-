@@ -1,12 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { CloudCheck, LogOut, Mail, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
+import { Cloud, CloudCheck, CloudOff, Mail, ShieldCheck } from 'lucide-react'
 
 import { syncEngine } from '@/sync/engine'
 import { useSync } from '@/sync/useSync'
 import { Checkbox, Field, Input } from '@/ui/fields'
 import { ConfirmDialog, Modal } from '@/ui/Modal'
-import { Button, Card, SectionHeader, Segmented, cx } from '@/ui/primitives'
-import { SyncBadge } from './SyncBadge'
+import { Button, Segmented } from '@/ui/primitives'
+import { ListGroup, ListRow } from '@/ui/list'
 
 // ---------------------------------------------------------------------------
 // Formulario de acceso
@@ -169,8 +169,32 @@ function relativeTime(at: number | null): string {
   return new Date(at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
 }
 
-export function AccountCard() {
+/** Texto corto del estado, para la fila «Estado». */
+function statusText(status: ReturnType<typeof useSync>): string {
+  switch (status.phase) {
+    case 'syncing':
+    case 'linking':
+      return 'Sincronizando…'
+    case 'offline':
+      return status.pending > 0 ? `Sin conexión · ${status.pending} por subir` : 'Sin conexión'
+    case 'error':
+      return 'Error'
+    case 'needs-choice':
+      return 'Falta elegir cómo combinar'
+    default:
+      return `Al día · ${relativeTime(status.lastSyncAt)}`
+  }
+}
+
+/**
+ * Cuenta y sincronización, como grupo de una lista de Ajustes.
+ *
+ * Sin sesión: una sola fila que abre la hoja de acceso. Con sesión: la
+ * cuenta, el estado y las acciones, con las destructivas en rojo y al final.
+ */
+export function AccountSection() {
   const status = useSync()
+  const [signingIn, setSigningIn] = useState(false)
   const [confirmOut, setConfirmOut] = useState(false)
   const [wipe, setWipe] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -186,84 +210,71 @@ export function AccountCard() {
   const signedIn = !!status.email
 
   return (
-    <Card id="cuenta">
-      <SectionHeader
-        title="Cuenta y sincronización"
-        hint={
-          signedIn
-            ? 'Tu curso se guarda en este dispositivo y en tu cuenta.'
-            : 'Usa tu curso en el móvil y en el ordenador, con o sin conexión.'
+    <>
+      <ListGroup
+        id="cuenta"
+        header="Cuenta y sincronización"
+        footer={
+          status.error ? (
+            <span className="text-danger">{status.error}</span>
+          ) : message ? (
+            message
+          ) : signedIn ? (
+            'Los cambios se guardan al instante aquí y se sincronizan solos con tus otros dispositivos, también al recuperar la conexión.'
+          ) : (
+            'Opcional. Con una cuenta tienes tu curso en el móvil y en el ordenador, y recibes el resumen diario.'
+          )
         }
-        className="mb-5"
-      />
+      >
+        {status.phase === 'loading' ? (
+          <ListRow icon={Cloud} tint="#0a84ff" label="Comprobando la sesión…" />
+        ) : !signedIn ? (
+          <ListRow
+            icon={Cloud}
+            tint="#0a84ff"
+            label="Iniciar sesión o crear cuenta"
+            onClick={() => setSigningIn(true)}
+          />
+        ) : (
+          <>
+            <ListRow icon={Mail} tint="#0a84ff" label="Cuenta" value={status.email} />
+            <ListRow
+              icon={status.phase === 'offline' ? CloudOff : CloudCheck}
+              tint={status.phase === 'error' ? 'var(--c-danger)' : '#30b158'}
+              label="Estado"
+              value={statusText(status)}
+            />
+            <ListRow
+              label="Sincronizar ahora"
+              action="accent"
+              disabled={status.phase === 'syncing'}
+              onClick={() => syncEngine.kick()}
+            />
+            <ListRow label="Cerrar sesión" action="accent" onClick={() => setConfirmOut(true)} />
+            <ListRow
+              label="Eliminar cuenta"
+              action="danger"
+              onClick={() => setConfirmDelete(true)}
+            />
+          </>
+        )}
+      </ListGroup>
 
-      {status.phase === 'loading' ? (
-        <p className="text-[0.875rem] text-ink-3">Comprobando la sesión…</p>
-      ) : !signedIn ? (
-        <>
-          <ul className="flex flex-col gap-2.5 mb-6 text-[0.875rem] text-ink-2">
-            <li className="flex gap-2.5">
-              <CloudCheck className="size-[18px] text-accent shrink-0 mt-px" />
-              Los cambios se guardan al instante en el dispositivo y se sincronizan solos al
-              recuperar la conexión.
-            </li>
-            <li className="flex gap-2.5">
-              <ShieldCheck className="size-[18px] text-accent shrink-0 mt-px" />
-              Solo tú puedes ver tus datos. Si editas lo mismo en dos sitios sin conexión, se
-              conservan los cambios de ambos.
-            </li>
-          </ul>
-          <AuthForm />
-        </>
-      ) : (
-        <div className="flex flex-col gap-5">
-          <div className="flex items-center gap-3.5">
-            <span className="grid place-items-center size-11 rounded-full bg-accent-quiet text-accent text-[1.0625rem] font-bold uppercase shrink-0">
-              {status.email!.slice(0, 1)}
-            </span>
-            <div className="min-w-0">
-              <p className="text-[0.9375rem] font-semibold truncate">{status.email}</p>
-              <div className="flex flex-wrap items-center gap-x-2 text-[0.75rem] text-ink-3">
-                <SyncBadge />
-                <span aria-hidden>·</span>
-                <span>Última sincronización: {relativeTime(status.lastSyncAt)}</span>
-              </div>
-            </div>
-          </div>
-
-          {status.error && (
-            <p
-              role="alert"
-              className="text-[0.8125rem] text-danger bg-danger-quiet rounded-[12px] px-3.5 py-2.5"
-            >
-              {status.error}
-            </p>
-          )}
-          {message && (
-            <p
-              role="status"
-              className="text-[0.8125rem] text-ink-2 bg-fill rounded-[12px] px-3.5 py-2.5"
-            >
-              {message}
-            </p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => syncEngine.kick()} disabled={status.phase === 'syncing'}>
-              <RefreshCw className={cx('size-4', status.phase === 'syncing' && 'animate-spin')} />
-              Sincronizar ahora
-            </Button>
-            <Button variant="ghost" onClick={() => setConfirmOut(true)}>
-              <LogOut className="size-4" />
-              Cerrar sesión
-            </Button>
-            <Button variant="danger" onClick={() => setConfirmDelete(true)} className="sm:ml-auto">
-              <Trash2 className="size-4" />
-              Eliminar cuenta
-            </Button>
-          </div>
-        </div>
-      )}
+      <Modal open={signingIn} onClose={() => setSigningIn(false)} title="Tu cuenta" size="sm">
+        <ul className="flex flex-col gap-3 mb-6 text-[0.875rem] text-ink-2">
+          <li className="flex gap-3">
+            <CloudCheck className="size-5 text-accent shrink-0" />
+            Los cambios se guardan al instante en el dispositivo y se sincronizan solos al recuperar
+            la conexión.
+          </li>
+          <li className="flex gap-3">
+            <ShieldCheck className="size-5 text-accent shrink-0" />
+            Solo tú puedes ver tus datos. Si editas lo mismo en dos sitios sin conexión, se
+            conservan los cambios de ambos.
+          </li>
+        </ul>
+        <AuthForm onDone={() => setSigningIn(false)} />
+      </Modal>
 
       <Modal
         open={confirmOut}
@@ -318,7 +329,7 @@ export function AccountCard() {
         confirmLabel="Eliminar cuenta"
         destructive
       />
-    </Card>
+    </>
   )
 }
 

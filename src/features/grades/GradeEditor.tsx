@@ -4,13 +4,7 @@ import { Trash2, TriangleAlert } from 'lucide-react'
 import { today as todayISO } from '@/domain/dates'
 import { formatPercent, round } from '@/domain/grades'
 import { parseDecimal, toDecimalInput } from '@/domain/number'
-import {
-  GRADE_KINDS,
-  TERMS,
-  type GradeEntry,
-  type GradeKind,
-  type TermId,
-} from '@/domain/types'
+import { GRADE_KINDS, TERMS, type GradeEntry, type GradeKind, type TermId } from '@/domain/types'
 import { useDispatch, useSettings, useStore } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
 import { Field, Input, NumberInput, Select, Textarea } from '@/ui/fields'
@@ -54,7 +48,9 @@ export function GradeEditor({ open, onClose, grade, defaults }: GradeEditorProps
   const { data } = useStore()
   const subjects = useSubjects()
 
-  const [form, setForm] = useState<FormState>(() => blank(settings.gradeScale.max, settings.activeTerm))
+  const [form, setForm] = useState<FormState>(() =>
+    blank(settings.gradeScale.max, settings.activeTerm),
+  )
   const [errors, setErrors] = useState<Partial<Record<'subjectId' | 'name' | 'score', string>>>({})
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -179,7 +175,10 @@ export function GradeEditor({ open, onClose, grade, defaults }: GradeEditorProps
       name: form.name.trim(),
       kind: form.kind,
       score: parsed.score,
-      maxScore: Number.isFinite(parsed.maxScore) && parsed.maxScore > 0 ? parsed.maxScore : settings.gradeScale.max,
+      maxScore:
+        Number.isFinite(parsed.maxScore) && parsed.maxScore > 0
+          ? parsed.maxScore
+          : settings.gradeScale.max,
       weight: Number.isFinite(parsed.weight) && parsed.weight > 0 ? parsed.weight : 0,
       date: form.date || todayISO(),
       comment: form.comment.trim() || undefined,
@@ -425,8 +424,8 @@ export function GradeEditor({ open, onClose, grade, defaults }: GradeEditorProps
                 >
                   <TriangleAlert className="size-4 shrink-0 mt-px" />
                   <span>
-                    Con este peso, las notas de esta categoría suman más del 100 %. Puedes
-                    guardarlo igual: la media se repartirá proporcionalmente.
+                    Con este peso, las notas de esta categoría suman más del 100 %. Puedes guardarlo
+                    igual: la media se repartirá proporcionalmente.
                   </span>
                 </p>
               )}

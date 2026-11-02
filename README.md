@@ -335,13 +335,21 @@ Inspirado en las apps de Apple: claro, tranquilo y con el contenido delante.
   tarjetas sin borde y un solo azul de acento. El azul y los grises de texto se
   han oscurecido respecto a los de iOS para pasar **WCAG AA** sobre cualquier
   fondo en que aparecen.
-- **Barra inferior Liquid Glass**: cápsula flotante translúcida y botón «+»
-  aparte. Al tocarla, el indicador se convierte en una lente de cristal que
-  sigue al dedo, aumenta lo que tiene debajo y se asienta con un muelle en la
-  pestaña elegida. Son enlaces reales (teclado y lectores de pantalla), y la
-  lente es decorativa.
-- **Títulos grandes** que se convierten en una barra compacta translúcida al
-  desplazarse; **hojas** modales con tirador, que se cierran arrastrando.
+- **Navegación como en iOS**: barra de pestañas de lado a lado con material
+  translúcido (Inicio, Tareas, Calendario, Notas y Más). Al tocarla, el
+  indicador se convierte en una lente de cristal que sigue al dedo, aumenta lo
+  que tiene debajo y se asienta con un muelle en la pestaña elegida. Crear
+  («+») y Ajustes (el avatar con tu inicial) están arriba a la derecha, en la
+  barra superior, como en la App Store o Salud; en escritorio, Ajustes está en
+  el pie del menú lateral. Son enlaces reales (teclado y lectores de pantalla).
+- **Listas agrupadas**: títulos de sección fuera de las tarjetas, separadores
+  que empiezan donde empieza el texto y filas con icono de color. Ajustes es
+  una lista como la de iOS, con valores e interruptores en cada fila.
+- **Calendario** con la vista de mes de iOS: números limpios, puntos de color
+  (con forma distinta para los exámenes) y la agenda del día debajo.
+- **Títulos grandes** que se resumen en la barra superior al desplazarse, y
+  botón «‹ Atrás» en las fichas; **hojas** modales con tirador, que se cierran
+  arrastrando.
 - **Movimiento**: muelles amortiguados (`linear()`), solo `transform` y
   `opacity`. Con «reducir movimiento» no hay animaciones; con «reducir
   transparencia» el cristal pasa a ser opaco.

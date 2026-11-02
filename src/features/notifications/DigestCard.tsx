@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BellRing, Send, Share } from 'lucide-react'
+import { BellRing, Clock, Send } from 'lucide-react'
 
 import {
   DEFAULT_DIGEST_HOUR,
@@ -12,19 +12,18 @@ import {
   updateDigestHour,
 } from '@/push/push'
 import { useSync } from '@/sync/useSync'
-import { Field, Select, Switch } from '@/ui/fields'
-import { Button, Card, SectionHeader, cx } from '@/ui/primitives'
+import { ListGroup, ListRow, RowSelect, RowSwitch } from '@/ui/list'
 
 const HOURS = Array.from({ length: 18 }, (_, i) => i + 6) // 06:00 – 23:00
 
 /**
- * Resumen diario por notificación.
+ * Resumen diario por notificación, como grupo de Ajustes.
  *
  * Es voluntario: no se pide permiso hasta que el alumno activa el interruptor,
  * y nunca al abrir la aplicación. Se guarda por dispositivo (cada uno con su
  * hora) y se puede apagar aquí mismo o en los ajustes del sistema.
  */
-export function DigestCard() {
+export function DigestSection() {
   const sync = useSync()
   const support = pushSupport()
   const [prefs, setPrefs] = useState(loadPrefs)
@@ -35,6 +34,7 @@ export function DigestCard() {
   const signedIn = !!sync.email
   const blocked = permission() === 'denied'
   const enabled = prefs.enabled && permission() === 'granted'
+  const available = support.ok && signedIn
 
   const run = async (task: () => Promise<void>, ok?: string) => {
     setBusy(true)
@@ -57,99 +57,60 @@ export function DigestCard() {
     else void run(disableDigest)
   }
 
+  const footer = message ? (
+    <span className={message.tone === 'ok' ? 'text-ok' : 'text-danger'}>{message.text}</span>
+  ) : !support.ok && support.reason === 'needs-install' ? (
+    <>
+      En iPhone y iPad las notificaciones solo funcionan con la app instalada: pulsa{' '}
+      <strong className="text-ink-2">Compartir → Añadir a pantalla de inicio</strong> y ábrela desde
+      el icono.
+    </>
+  ) : !support.ok ? (
+    'Este navegador no admite notificaciones push.'
+  ) : !signedIn ? (
+    'Inicia sesión para activarlo: el resumen se prepara en el servidor con tus datos sincronizados, por eso llega aunque la app esté cerrada.'
+  ) : blocked ? (
+    'Las notificaciones están bloqueadas para esta app. Actívalas en los ajustes del sistema.'
+  ) : (
+    'Las tareas de hoy y los próximos exámenes, a la hora elegida (peninsular española), aunque la app esté cerrada. Si no hay nada pendiente, no se envía.'
+  )
+
   return (
-    <Card>
-      <SectionHeader
-        title="Resumen diario"
-        hint="Una notificación con las tareas de hoy y los próximos exámenes, aunque la app esté cerrada."
-        className="mb-5"
+    <ListGroup header="Notificaciones" footer={footer}>
+      <RowSwitch
+        icon={BellRing}
+        tint="#ff453a"
+        label="Resumen diario"
+        checked={enabled}
+        onChange={toggle}
+        disabled={!available || busy}
       />
-
-      {!support.ok && support.reason === 'needs-install' ? (
-        <div className="flex gap-3 rounded-[14px] bg-fill px-4 py-3.5 text-[0.875rem] text-ink-2">
-          <Share className="size-5 text-accent shrink-0 mt-0.5" />
-          <p>
-            En iPhone y iPad las notificaciones solo funcionan con la app instalada. Pulsa{' '}
-            <strong className="text-ink">Compartir → Añadir a pantalla de inicio</strong>, abre la
-            app desde el icono y vuelve aquí.
-          </p>
-        </div>
-      ) : !support.ok ? (
-        <p className="text-[0.875rem] text-ink-3">Este navegador no admite notificaciones push.</p>
-      ) : !signedIn ? (
-        <div className="flex gap-3 rounded-[14px] bg-fill px-4 py-3.5 text-[0.875rem] text-ink-2">
-          <BellRing className="size-5 text-accent shrink-0 mt-0.5" />
-          <p>
-            Inicia sesión arriba para activarlo. El resumen se prepara en el servidor con tus datos
-            sincronizados: por eso llega aunque la app esté cerrada.
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-5">
-          <Switch
-            checked={enabled}
-            onChange={toggle}
-            label="Recibir el resumen en este dispositivo"
-            description={
-              blocked
-                ? 'Las notificaciones están bloqueadas. Actívalas para esta app en los ajustes del sistema.'
-                : 'Si un día no hay nada pendiente, no se envía.'
-            }
+      {enabled && (
+        <>
+          <RowSelect
+            icon={Clock}
+            tint="#ff9f0a"
+            label="Hora"
+            value={String(prefs.hour)}
+            onChange={(value) => {
+              const hour = Number(value)
+              setPrefs((p) => ({ ...p, hour }))
+              void run(() => updateDigestHour(hour))
+            }}
+            options={HOURS.map((h) => ({
+              value: String(h),
+              label: `${String(h).padStart(2, '0')}:00${h === DEFAULT_DIGEST_HOUR ? ' (recomendada)' : ''}`,
+            }))}
           />
-
-          {enabled && (
-            <div className="flex flex-wrap items-end gap-3 pt-5 border-t border-hairline">
-              <Field
-                label="Hora del aviso"
-                hint="Hora peninsular española, con el cambio de hora incluido."
-              >
-                {({ id, describedBy }) => (
-                  <Select
-                    id={id}
-                    aria-describedby={describedBy}
-                    className="max-w-[9rem]"
-                    value={String(prefs.hour)}
-                    disabled={busy}
-                    onChange={(e) => {
-                      const hour = Number(e.target.value)
-                      setPrefs((p) => ({ ...p, hour }))
-                      void run(() => updateDigestHour(hour))
-                    }}
-                  >
-                    {HOURS.map((h) => (
-                      <option key={h} value={h}>
-                        {String(h).padStart(2, '0')}:00
-                        {h === DEFAULT_DIGEST_HOUR ? ' (recomendada)' : ''}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </Field>
-              <Button
-                disabled={busy}
-                onClick={() =>
-                  void run(sendTestDigest, 'Enviado. Debería llegarte en unos segundos.')
-                }
-              >
-                <Send className="size-4" />
-                Enviar prueba
-              </Button>
-            </div>
-          )}
-
-          {message && (
-            <p
-              role="status"
-              className={cx(
-                'text-[0.8125rem] rounded-[12px] px-3.5 py-2.5',
-                message.tone === 'ok' ? 'bg-ok-quiet text-ok' : 'bg-danger-quiet text-danger',
-              )}
-            >
-              {message.text}
-            </p>
-          )}
-        </div>
+          <ListRow
+            icon={Send}
+            tint="#5e5ce6"
+            label="Enviar una prueba"
+            disabled={busy}
+            onClick={() => void run(sendTestDigest, 'Enviado. Debería llegarte en unos segundos.')}
+          />
+        </>
       )}
-    </Card>
+    </ListGroup>
   )
 }

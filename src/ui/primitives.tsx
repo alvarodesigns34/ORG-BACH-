@@ -145,6 +145,32 @@ export function SectionHeader({ title, hint, action, className }: SectionHeaderP
   )
 }
 
+/**
+ * Título de un grupo de filas, FUERA de la tarjeta, como en las listas
+ * agrupadas de iOS («Hoy» … «Ver todas»).
+ */
+export function GroupTitle({
+  title,
+  hint,
+  action,
+  className,
+}: {
+  title: string
+  hint?: string
+  action?: ReactNode
+  className?: string
+}) {
+  return (
+    <div className={cx('flex items-end justify-between gap-4 px-1 mb-2.5', className)}>
+      <div className="min-w-0">
+        <h2 className="text-[1.375rem] font-bold tracking-[-0.022em] leading-tight">{title}</h2>
+        {hint && <p className="text-[0.8125rem] text-ink-3 mt-0.5">{hint}</p>}
+      </div>
+      {action && <div className="shrink-0 pb-0.5">{action}</div>}
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Etiquetas
 // ---------------------------------------------------------------------------

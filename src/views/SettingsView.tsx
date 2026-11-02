@@ -1,5 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
-import { Download, RotateCcw, Upload } from 'lucide-react'
+import {
+  Award,
+  CalendarClock,
+  CalendarDays,
+  CalendarRange,
+  Check,
+  Coffee,
+  Database,
+  Download,
+  GraduationCap,
+  Hash,
+  Layers,
+  Sigma,
+  SunMoon,
+  Timer,
+  TriangleAlert,
+  Upload,
+  UserRound,
+  Volume2,
+} from 'lucide-react'
 
 import { createEmptyData } from '@/data/defaults'
 import { today as todayISO } from '@/domain/dates'
@@ -7,13 +26,16 @@ import { TERMS, type AverageMode, type TermId } from '@/domain/types'
 import { useDispatch, useSettings, useStore } from '@/state/StoreProvider'
 import * as storage from '@/storage/persistence'
 import { Page, PageHeader } from '@/layout/AppShell'
+import { AccountAvatar } from '@/layout/chrome'
 import { ThemeToggle } from '@/layout/ThemeToggle'
-import { AccountCard } from '@/features/account/Account'
-import { DigestCard } from '@/features/notifications/DigestCard'
+import { AccountSection } from '@/features/account/Account'
+import { DigestSection } from '@/features/notifications/DigestCard'
 import { useSync } from '@/sync/useSync'
-import { Field, Input, NumberField, Select, Switch } from '@/ui/fields'
+import { ListGroup, ListRow, RowInput, RowNumber, RowSelect, RowSwitch } from '@/ui/list'
 import { ConfirmDialog } from '@/ui/Modal'
-import { Button, Card, SectionHeader, cx } from '@/ui/primitives'
+import { cx } from '@/ui/primitives'
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
 export function SettingsView({ section }: { section?: string | null }) {
   const settings = useSettings()
@@ -38,12 +60,14 @@ export function SettingsView({ section }: { section?: string | null }) {
   )
   const [confirmReset, setConfirmReset] = useState(false)
   /** Copia ya leída y validada, a la espera de que el alumno confirme. */
-  const [pendingImport, setPendingImport] = useState<
-    Extract<ReturnType<typeof storage.importJSON>, { ok: true }> | null
-  >(null)
+  const [pendingImport, setPendingImport] = useState<Extract<
+    ReturnType<typeof storage.importJSON>,
+    { ok: true }
+  > | null>(null)
 
-  const update = (patch: Parameters<typeof dispatch>[0] extends never ? never : Partial<typeof settings>) =>
-    dispatch({ type: 'settings/update', patch })
+  const update = (
+    patch: Parameters<typeof dispatch>[0] extends never ? never : Partial<typeof settings>,
+  ) => dispatch({ type: 'settings/update', patch })
 
   // --- Exportar ---
   const exportData = () => {
@@ -89,337 +113,257 @@ export function SettingsView({ section }: { section?: string | null }) {
   }
 
   const counts = [
-    { label: 'Asignaturas', value: data.subjects.length },
-    { label: 'Tareas', value: data.tasks.length },
-    { label: 'Exámenes', value: data.exams.length },
-    { label: 'Notas', value: data.grades.length },
-  ]
+    plural(data.subjects.length, 'asignatura', 'asignaturas'),
+    plural(data.tasks.length, 'tarea', 'tareas'),
+    plural(data.grades.length, 'nota', 'notas'),
+  ].join(' · ')
 
   return (
-    <Page className="max-w-[760px]">
+    <Page className="max-w-[680px]">
       <PageHeader title="Ajustes" />
 
-      <div className="flex flex-col gap-5">
-        <AccountCard />
-        <DigestCard />
-
-        {/* --- Perfil --- */}
-        <Card>
-          <SectionHeader title="Tu perfil" className="mb-5" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Nombre">
-              {({ id }) => (
-                <Input
-                  id={id}
-                  value={settings.userName}
-                  onChange={(e) => update({ userName: e.target.value })}
-                />
-              )}
-            </Field>
-            <Field label="Curso">
-              {({ id }) => (
-                <Input
-                  id={id}
-                  value={settings.course}
-                  onChange={(e) => update({ course: e.target.value })}
-                />
-              )}
-            </Field>
-            <Field label="Curso académico">
-              {({ id }) => (
-                <Input
-                  id={id}
-                  value={settings.academicYear}
-                  placeholder="2026/2027"
-                  onChange={(e) => update({ academicYear: e.target.value })}
-                />
-              )}
-            </Field>
-            <Field label="Evaluación actual" hint="Determina qué notas se muestran por defecto.">
-              {({ id, describedBy }) => (
-                <Select
-                  id={id}
-                  aria-describedby={describedBy}
-                  value={settings.activeTerm}
-                  onChange={(e) => update({ activeTerm: e.target.value as TermId })}
-                >
-                  {TERMS.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-          </div>
-        </Card>
-
-        {/* --- Apariencia --- */}
-        <Card>
-          <SectionHeader title="Apariencia" className="mb-5" />
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <p className="text-[0.875rem] font-medium text-ink">Tema</p>
-              <p className="text-[0.8125rem] text-ink-3 mt-0.5">
-                «Automático» sigue la configuración de tu dispositivo.
-              </p>
-            </div>
-            <ThemeToggle />
-          </div>
-
-          <div className="mt-5 pt-5 border-t border-hairline">
-            <Field label="La semana empieza en">
-              {({ id }) => (
-                <Select
-                  id={id}
-                  className="max-w-[14rem]"
-                  value={String(settings.weekStartsOn)}
-                  onChange={(e) => update({ weekStartsOn: Number(e.target.value) as 0 | 1 })}
-                >
-                  <option value="1">Lunes</option>
-                  <option value="0">Domingo</option>
-                </Select>
-              )}
-            </Field>
-          </div>
-        </Card>
-
-        {/* --- Notas --- */}
-        <Card>
-          <SectionHeader
-            title="Sistema de calificación"
-            hint="Afecta a todos los cálculos de medias."
-            className="mb-5"
-          />
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Field label="Nota máxima">
-              {({ id }) => (
-                <NumberField
-                  id={id}
-                  min={1}
-                  max={100}
-                  value={settings.gradeScale.max}
-                  fallback={10}
-                  onCommit={(max) =>
-                    update({
-                      gradeScale: {
-                        ...settings.gradeScale,
-                        max,
-                        // El aprobado nunca puede quedar por encima del máximo.
-                        pass: Math.min(settings.gradeScale.pass, max),
-                      },
-                    })
-                  }
-                />
-              )}
-            </Field>
-            <Field label="Aprobado a partir de">
-              {({ id }) => (
-                <NumberField
-                  id={id}
-                  min={0}
-                  max={settings.gradeScale.max}
-                  value={settings.gradeScale.pass}
-                  fallback={5}
-                  onCommit={(pass) =>
-                    update({ gradeScale: { ...settings.gradeScale, pass } })
-                  }
-                />
-              )}
-            </Field>
-            <Field label="Decimales">
-              {({ id }) => (
-                <Select
-                  id={id}
-                  value={String(settings.gradeScale.decimals)}
-                  onChange={(e) =>
-                    update({
-                      gradeScale: { ...settings.gradeScale, decimals: Number(e.target.value) },
-                    })
-                  }
-                >
-                  <option value="0">Sin decimales</option>
-                  <option value="1">1 decimal</option>
-                  <option value="2">2 decimales</option>
-                </Select>
-              )}
-            </Field>
-          </div>
-
-          <div className="mt-4">
-            <Field
-              label="Cómo se calcula la media global"
-              hint={
-                settings.averageMode === 'aritmetica'
-                  ? 'Todas las asignaturas valen lo mismo.'
-                  : 'Cada asignatura pesa según sus horas semanales.'
-              }
-            >
-              {({ id, describedBy }) => (
-                <Select
-                  id={id}
-                  aria-describedby={describedBy}
-                  className="max-w-[20rem]"
-                  value={settings.averageMode}
-                  onChange={(e) => update({ averageMode: e.target.value as AverageMode })}
-                >
-                  <option value="aritmetica">Media aritmética de asignaturas</option>
-                  <option value="ponderada">Media ponderada por horas</option>
-                </Select>
-              )}
-            </Field>
-          </div>
-        </Card>
-
-        {/* --- Alertas --- */}
-        <Card>
-          <SectionHeader title="Avisos" className="mb-5" />
-          <div className="flex flex-col gap-5">
-            <Switch
-              checked={settings.alertsEnabled}
-              onChange={(alertsEnabled) => update({ alertsEnabled })}
-              label="Mostrar avisos en el inicio"
-              description="Tareas atrasadas, exámenes cercanos y asignaturas por debajo de su objetivo."
-            />
-            {settings.alertsEnabled && (
-              <Field label="Avisar de un examen con esta antelación">
-                {({ id }) => (
-                  <NumberField
-                    id={id}
-                    min={1}
-                    max={30}
-                    integer
-                    suffix="días"
-                    className="max-w-[12rem]"
-                    value={settings.examAlertDays}
-                    fallback={7}
-                    onCommit={(examAlertDays) => update({ examAlertDays })}
-                  />
-                )}
-              </Field>
-            )}
-          </div>
-        </Card>
-
-        {/* --- Estudio --- */}
-        <Card>
-          <SectionHeader
-            title="Temporizador de estudio"
-            hint="Duraciones del pomodoro."
-            className="mb-5"
-          />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Tramo de trabajo">
-              {({ id }) => (
-                <NumberField
-                  id={id}
-                  min={5}
-                  max={120}
-                  integer
-                  suffix="min"
-                  value={settings.pomodoroMinutes}
-                  fallback={25}
-                  onCommit={(pomodoroMinutes) => update({ pomodoroMinutes })}
-                />
-              )}
-            </Field>
-            <Field label="Descanso">
-              {({ id }) => (
-                <NumberField
-                  id={id}
-                  min={1}
-                  max={60}
-                  integer
-                  suffix="min"
-                  value={settings.pomodoroBreakMinutes}
-                  fallback={5}
-                  onCommit={(pomodoroBreakMinutes) => update({ pomodoroBreakMinutes })}
-                />
-              )}
-            </Field>
-          </div>
-          <div className="mt-5 pt-5 border-t border-hairline">
-            <Switch
-              checked={settings.pomodoroSound}
-              onChange={(pomodoroSound) => update({ pomodoroSound })}
-              label="Aviso sonoro al terminar un tramo"
-              description="Dos tonos cortos, para enterarte con la pestaña de fondo."
-            />
-          </div>
-        </Card>
-
-        {/* --- Datos --- */}
-        <Card>
-          <SectionHeader
-            title="Tus datos"
-            hint={
-              synced
-                ? 'Se guardan en este dispositivo y en tu cuenta.'
-                : 'Se guardan solo en este dispositivo. Inicia sesión arriba para tener una copia en la nube.'
-            }
-            className="mb-5"
-          />
-
-          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
-            {counts.map((item) => (
-              <div key={item.label}>
-                <dt className="eyebrow">{item.label}</dt>
-                <dd className="text-[1.125rem] font-semibold text-ink mt-1 tabular-nums">
-                  {item.value}
-                </dd>
-              </div>
-            ))}
-          </dl>
-
-          {notice && (
-            <p
-              role="status"
-              className={cx(
-                'text-[0.8125rem] rounded-sm px-3 py-2 mb-4',
-                notice.tone === 'ok' && 'bg-ok-quiet text-ok',
-                notice.tone === 'warn' && 'bg-warn-quiet text-warn',
-                notice.tone === 'danger' && 'bg-danger-quiet text-danger',
-              )}
-            >
-              {notice.text}
+      <div className="flex flex-col gap-8">
+        {/* --- Perfil: como la tarjeta del ID de Apple --- */}
+        <div className="card flex items-center gap-4 px-4 py-4">
+          <AccountAvatar size={60} decorative />
+          <div className="min-w-0">
+            <p className="text-[1.25rem] font-semibold tracking-[-0.02em] truncate">
+              {settings.userName || 'Sin nombre'}
             </p>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={exportData}>
-              <Download className="size-4" />
-              Exportar copia
-            </Button>
-
-            <Button onClick={() => fileInput.current?.click()} aria-label="Importar copia JSON">
-              <Upload className="size-4" />
-              Importar copia
-            </Button>
-            <input
-              ref={fileInput}
-              type="file"
-              accept="application/json,.json"
-              className="sr-only"
-              tabIndex={-1}
-              aria-hidden
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) void importFile(file)
-                e.target.value = ''
-              }}
-            />
-
-            <Button variant="danger" onClick={() => setConfirmReset(true)} className="ml-auto">
-              <RotateCcw className="size-4" />
-              Empezar de cero
-            </Button>
+            <p className="text-[0.875rem] text-ink-3 truncate">
+              {sync.email ?? `${settings.course} · ${settings.academicYear}`}
+            </p>
           </div>
+        </div>
 
-          <p className="text-[0.75rem] text-ink-3 mt-4 leading-relaxed">
-            La copia es un archivo JSON legible. Guárdala de vez en cuando: es lo que te permite
-            cambiar de navegador o de ordenador sin perder el curso.
-          </p>
-        </Card>
+        <AccountSection />
+        <DigestSection />
+
+        <ListGroup header="Perfil">
+          <RowInput
+            icon={UserRound}
+            tint="#8e8e93"
+            label="Nombre"
+            value={settings.userName}
+            placeholder="Tu nombre"
+            onChange={(userName) => update({ userName })}
+          />
+          <RowInput
+            icon={GraduationCap}
+            tint="#bf5af2"
+            label="Curso"
+            value={settings.course}
+            onChange={(course) => update({ course })}
+          />
+          <RowInput
+            icon={CalendarRange}
+            tint="#ff9f0a"
+            label="Curso académico"
+            value={settings.academicYear}
+            placeholder="2026/2027"
+            onChange={(academicYear) => update({ academicYear })}
+          />
+          <RowSelect
+            icon={Layers}
+            tint="#0a84ff"
+            label="Evaluación actual"
+            value={settings.activeTerm}
+            onChange={(activeTerm) => update({ activeTerm: activeTerm as TermId })}
+            options={TERMS.map((t) => ({ value: t.id, label: t.name }))}
+          />
+        </ListGroup>
+
+        <ListGroup
+          header="Apariencia"
+          footer="«Automático» sigue la configuración de tu dispositivo."
+        >
+          <ListRow icon={SunMoon} tint="#5e5ce6" label="Tema" accessory={<ThemeToggle />} />
+          <RowSelect
+            icon={CalendarDays}
+            tint="#ff453a"
+            label="La semana empieza"
+            value={String(settings.weekStartsOn)}
+            onChange={(v) => update({ weekStartsOn: Number(v) as 0 | 1 })}
+            options={[
+              { value: '1', label: 'En lunes' },
+              { value: '0', label: 'En domingo' },
+            ]}
+          />
+        </ListGroup>
+
+        <ListGroup
+          header="Calificación"
+          footer={
+            settings.averageMode === 'aritmetica'
+              ? 'En la media global todas las asignaturas valen lo mismo.'
+              : 'En la media global cada asignatura pesa según sus horas semanales.'
+          }
+        >
+          <RowNumber
+            icon={Award}
+            tint="#30b158"
+            label="Nota máxima"
+            min={1}
+            max={100}
+            value={settings.gradeScale.max}
+            fallback={10}
+            onCommit={(max) =>
+              update({
+                gradeScale: {
+                  ...settings.gradeScale,
+                  max,
+                  // El aprobado nunca puede quedar por encima del máximo.
+                  pass: Math.min(settings.gradeScale.pass, max),
+                },
+              })
+            }
+          />
+          <RowNumber
+            icon={Check}
+            tint="#30b158"
+            label="Aprobado desde"
+            min={0}
+            max={settings.gradeScale.max}
+            value={settings.gradeScale.pass}
+            fallback={5}
+            onCommit={(pass) => update({ gradeScale: { ...settings.gradeScale, pass } })}
+          />
+          <RowSelect
+            icon={Hash}
+            tint="#64d2ff"
+            label="Decimales"
+            value={String(settings.gradeScale.decimals)}
+            onChange={(v) =>
+              update({ gradeScale: { ...settings.gradeScale, decimals: Number(v) } })
+            }
+            options={[
+              { value: '0', label: 'Ninguno' },
+              { value: '1', label: '1' },
+              { value: '2', label: '2' },
+            ]}
+          />
+          <RowSelect
+            icon={Sigma}
+            tint="#0a84ff"
+            label="Media global"
+            value={settings.averageMode}
+            onChange={(averageMode) => update({ averageMode: averageMode as AverageMode })}
+            options={[
+              { value: 'aritmetica', label: 'Aritmética' },
+              { value: 'ponderada', label: 'Por horas' },
+            ]}
+          />
+        </ListGroup>
+
+        <ListGroup
+          header="Avisos en Inicio"
+          footer="Asignaturas por debajo de su objetivo y semanas con demasiadas tareas juntas."
+        >
+          <RowSwitch
+            icon={TriangleAlert}
+            tint="#ff9f0a"
+            label="Mostrar avisos"
+            checked={settings.alertsEnabled}
+            onChange={(alertsEnabled) => update({ alertsEnabled })}
+          />
+          {settings.alertsEnabled && (
+            <RowNumber
+              icon={CalendarClock}
+              tint="#ff453a"
+              label="Antelación"
+              suffix="días antes"
+              min={1}
+              max={30}
+              integer
+              value={settings.examAlertDays}
+              fallback={7}
+              onCommit={(examAlertDays) => update({ examAlertDays })}
+            />
+          )}
+        </ListGroup>
+
+        <ListGroup header="Temporizador de estudio">
+          <RowNumber
+            icon={Timer}
+            tint="#ff6b2c"
+            label="Tramo de trabajo"
+            suffix="min"
+            min={5}
+            max={120}
+            integer
+            value={settings.pomodoroMinutes}
+            fallback={25}
+            onCommit={(pomodoroMinutes) => update({ pomodoroMinutes })}
+          />
+          <RowNumber
+            icon={Coffee}
+            tint="#a2845e"
+            label="Descanso"
+            suffix="min"
+            min={1}
+            max={60}
+            integer
+            value={settings.pomodoroBreakMinutes}
+            fallback={5}
+            onCommit={(pomodoroBreakMinutes) => update({ pomodoroBreakMinutes })}
+          />
+          <RowSwitch
+            icon={Volume2}
+            tint="#ff375f"
+            label="Sonido al terminar"
+            checked={settings.pomodoroSound}
+            onChange={(pomodoroSound) => update({ pomodoroSound })}
+          />
+        </ListGroup>
+
+        <ListGroup
+          header="Tus datos"
+          footer={
+            notice ? (
+              <span
+                role="status"
+                className={cx(
+                  notice.tone === 'ok' && 'text-ok',
+                  notice.tone === 'warn' && 'text-warn',
+                  notice.tone === 'danger' && 'text-danger',
+                )}
+              >
+                {notice.text}
+              </span>
+            ) : synced ? (
+              'Se guardan en este dispositivo y en tu cuenta. La copia es un archivo JSON legible que puedes guardar donde quieras.'
+            ) : (
+              'Se guardan solo en este dispositivo. Exporta una copia de vez en cuando, o inicia sesión para tenerla en la nube.'
+            )
+          }
+        >
+          <ListRow icon={Database} tint="#8e8e93" label="Contenido" value={counts} />
+          <ListRow icon={Download} tint="#0a84ff" label="Exportar copia" onClick={exportData} />
+          <ListRow
+            icon={Upload}
+            tint="#0a84ff"
+            label="Importar copia"
+            onClick={() => fileInput.current?.click()}
+          />
+          <ListRow label="Empezar de cero" action="danger" onClick={() => setConfirmReset(true)} />
+        </ListGroup>
+        <input
+          ref={fileInput}
+          type="file"
+          accept="application/json,.json"
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) void importFile(file)
+            e.target.value = ''
+          }}
+        />
+
+        <p className="text-center text-[0.75rem] text-ink-3 pb-2">
+          Bachillerato OS · {settings.course} · {settings.academicYear}
+        </p>
       </div>
 
       <ConfirmDialog

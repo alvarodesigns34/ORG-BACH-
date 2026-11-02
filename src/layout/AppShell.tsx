@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { TriangleAlert, X } from 'lucide-react'
 
 import { useStore } from '@/state/StoreProvider'
 import { type RouteId } from '@/router'
 import { IconButton, cx } from '@/ui/primitives'
+import { TopBar, useScrolledPast, type BackLink } from './chrome'
 import { MobileNav } from './MobileNav'
 import { Sidebar } from './Sidebar'
 
@@ -57,13 +58,6 @@ export function AppShell({ current, onCreate, badges, children }: AppShellProps)
       <Sidebar current={current} onCreate={onCreate} badges={badges} />
 
       <div className="flex-1 min-w-0 flex flex-col">
-        {/* Material bajo la hora y el Dynamic Island: el contenido que pasa
-            por debajo al desplazarse no se mezcla con los iconos del sistema. */}
-        <div
-          aria-hidden
-          className="lg:hidden fixed top-0 inset-x-0 z-20 h-[env(safe-area-inset-top)] glass-bar"
-        />
-
         <StorageBanner />
 
         <main
@@ -71,8 +65,8 @@ export function AppShell({ current, onCreate, badges, children }: AppShellProps)
           className={cx(
             'flex-1 min-w-0',
             'pt-[env(safe-area-inset-top)] lg:pt-0',
-            // Hueco inferior en móvil para que la barra flotante no tape nada.
-            'pb-[calc(7rem+env(safe-area-inset-bottom))] lg:pb-16',
+            // Hueco inferior en móvil para que la barra de pestañas no tape nada.
+            'pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-16',
           )}
         >
           {/* La clave reinicia la animación de entrada en cada sección. */}
@@ -82,7 +76,7 @@ export function AppShell({ current, onCreate, badges, children }: AppShellProps)
         </main>
       </div>
 
-      <MobileNav current={current} onCreate={onCreate} badges={badges} />
+      <MobileNav current={current} badges={badges} />
     </div>
   )
 }
@@ -102,7 +96,8 @@ export function Page({ children, className }: PageProps) {
     <div
       className={cx(
         'mx-auto w-full max-w-[1180px]',
-        'px-[max(1.125rem,env(safe-area-inset-left))] sm:px-8 pt-5 sm:pt-10 pb-6',
+        // En móvil, el hueco de arriba es el de la barra superior fija.
+        'px-[max(1rem,env(safe-area-inset-left))] sm:px-8 pt-[3.25rem] lg:pt-10 pb-6',
         className,
       )}
     >
@@ -111,94 +106,57 @@ export function Page({ children, className }: PageProps) {
   )
 }
 
-/** Alto de la barra compacta, sin contar la zona segura. */
-const COMPACT_BAR = 44
-
-/**
- * ¿Ha pasado el elemento por debajo de la barra compacta?
- *
- * Se mide contra la posición real de la barra (zona segura + 44 px), que en
- * un iPhone con Dynamic Island no es la misma que en un Android o un iPad.
- */
-export function useScrolledPast(ref: RefObject<HTMLElement | null>): boolean {
-  const [past, setPast] = useState(false)
-  useEffect(() => {
-    let frame = 0
-    const check = () => {
-      frame = 0
-      const node = ref.current
-      if (!node) return
-      const safeTop =
-        parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-top')) || 0
-      const next = window.scrollY > 4 && node.getBoundingClientRect().bottom < safeTop + COMPACT_BAR
-      setPast((prev) => (prev === next ? prev : next))
-    }
-    const onScroll = () => {
-      if (!frame) frame = requestAnimationFrame(check)
-    }
-    check()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('resize', onScroll)
-    return () => {
-      cancelAnimationFrame(frame)
-      window.removeEventListener('scroll', onScroll)
-      window.removeEventListener('resize', onScroll)
-    }
-  }, [ref])
-  return past
-}
-
-/**
- * Barra superior compacta del móvil.
- *
- * Aparece cuando el título grande sale de la pantalla, como en las apps de
- * iOS: el alumno siempre sabe dónde está sin que el título ocupe sitio.
- * Es decorativa para lectores de pantalla: el `h1` real sigue en la página.
- */
-export function CompactTitleBar({ title, visible }: { title: string; visible: boolean }) {
-  return (
-    <div
-      aria-hidden
-      className={cx(
-        'lg:hidden fixed top-0 inset-x-0 z-20 pointer-events-none',
-        'pt-[env(safe-area-inset-top)] glass-bar border-b',
-        'transition-[opacity,border-color] duration-300',
-        visible ? 'opacity-100 border-hairline' : 'opacity-0 border-transparent',
-      )}
-    >
-      <p
-        className={cx(
-          'h-11 grid place-items-center px-16 text-[1.0625rem] font-semibold tracking-[-0.02em] truncate',
-          'transition-transform duration-500 ease-[var(--spring)]',
-          visible ? 'translate-y-0' : 'translate-y-2',
-        )}
-      >
-        {title}
-      </p>
-    </div>
-  )
-}
-
 interface PageHeaderProps {
   title: string
-  subtitle?: string
+  /** Línea pequeña sobre el título (fecha, contexto). */
+  eyebrow?: ReactNode
+  subtitle?: ReactNode
   actions?: ReactNode
   /** Fila de filtros o pestañas bajo el título. */
   toolbar?: ReactNode
+  /** Vuelta atrás en la barra superior («‹ Asignaturas»). */
+  back?: BackLink
+  /** Título de la barra compacta, si no es el mismo (p. ej. «Inicio»). */
+  compactTitle?: string
 }
 
-export function PageHeader({ title, subtitle, actions, toolbar }: PageHeaderProps) {
+/**
+ * Título grande al estilo de iOS. Al desplazarse, se resume en la barra
+ * superior (ver `TopBar`), que también lleva «+» y el acceso a Ajustes.
+ */
+export function PageHeader({
+  title,
+  eyebrow,
+  subtitle,
+  actions,
+  toolbar,
+  back,
+  compactTitle,
+}: PageHeaderProps) {
   const heading = useRef<HTMLHeadingElement>(null)
-  const collapsed = useScrolledPast(heading)
+  const { past, scrolled } = useScrolledPast(heading)
   return (
     <header className="mb-6 sm:mb-8">
-      <CompactTitleBar title={title} visible={collapsed} />
+      <TopBar title={compactTitle ?? title} collapsed={past} scrolled={scrolled} back={back} />
+      {back && (
+        <a
+          href={back.href}
+          className="max-lg:hidden inline-flex items-center gap-1 text-[0.875rem] font-medium text-accent hover:underline underline-offset-4 mb-4"
+        >
+          ‹ {back.label}
+        </a>
+      )}
+      {eyebrow && (
+        <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.04em] text-ink-3 mb-1">
+          {eyebrow}
+        </p>
+      )}
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
           <h1 ref={heading} className="display text-[2.125rem] sm:text-[2.5rem] leading-[1.08]">
             {title}
           </h1>
-          {subtitle && <p className="text-[0.9375rem] text-ink-3 mt-1">{subtitle}</p>}
+          {subtitle && <div className="text-[0.9375rem] text-ink-3 mt-1">{subtitle}</div>}
         </div>
         {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
       </div>

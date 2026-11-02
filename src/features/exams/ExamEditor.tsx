@@ -190,7 +190,11 @@ export function ExamEditor({ open, onClose, exam, defaults }: ExamEditorProps) {
 
             <Field label="Evaluación">
               {({ id }) => (
-                <Select id={id} value={form.term} onChange={(e) => set('term', e.target.value as TermId)}>
+                <Select
+                  id={id}
+                  value={form.term}
+                  onChange={(e) => set('term', e.target.value as TermId)}
+                >
                   {TERMS.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
@@ -229,7 +233,12 @@ export function ExamEditor({ open, onClose, exam, defaults }: ExamEditorProps) {
 
             <Field label="Hora">
               {({ id }) => (
-                <Input id={id} type="time" value={form.time} onChange={(e) => set('time', e.target.value)} />
+                <Input
+                  id={id}
+                  type="time"
+                  value={form.time}
+                  onChange={(e) => set('time', e.target.value)}
+                />
               )}
             </Field>
 

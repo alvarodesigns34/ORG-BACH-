@@ -132,7 +132,11 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
           {/* --- Color --- */}
           <div className="flex flex-col gap-2">
             <span className="text-[0.8125rem] font-medium text-ink-2">Color identificativo</span>
-            <div role="radiogroup" aria-label="Color de la asignatura" className="flex flex-wrap gap-2">
+            <div
+              role="radiogroup"
+              aria-label="Color de la asignatura"
+              className="flex flex-wrap gap-2"
+            >
               {SUBJECT_COLORS.map((option) => {
                 const active = option.id === color
                 return (

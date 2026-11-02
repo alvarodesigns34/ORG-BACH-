@@ -66,8 +66,7 @@ export function StatsView() {
       max: Math.min(scale.max, Math.max(Math.ceil(Math.max(...values)) + 1, scale.pass + 1)),
     }
   }, [timeline, scale])
-  const hasAnything =
-    data.grades.length > 0 || data.tasks.length > 0 || data.sessions.length > 0
+  const hasAnything = data.grades.length > 0 || data.tasks.length > 0 || data.sessions.length > 0
 
   if (!hasAnything) {
     return (
@@ -145,9 +144,13 @@ export function StatsView() {
       />
 
       {/* --- Cifras principales --- */}
-      <div className="bg-surface border border-hairline rounded-lg overflow-hidden">
+      <div className="card overflow-hidden">
         <dl className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-hairline">
-          <Stat label="Media global" value={formatGrade(average, scale)} tone={numeralTone(average, scale)} />
+          <Stat
+            label="Media global"
+            value={formatGrade(average, scale)}
+            tone={numeralTone(average, scale)}
+          />
           <Stat
             label="Mejor asignatura"
             value={ranking.length > 0 ? formatGrade(ranking[0].average, scale) : '—'}
@@ -191,7 +194,10 @@ export function StatsView() {
                 yMin={timelineRange.min}
                 yMax={timelineRange.max}
                 formatValue={(value) => formatGrade(value, { ...scale, decimals: 1 })}
-                reference={{ value: scale.pass, label: `Aprobado ${formatGrade(scale.pass, { ...scale, decimals: 0 })}` }}
+                reference={{
+                  value: scale.pass,
+                  label: `Aprobado ${formatGrade(scale.pass, { ...scale, decimals: 0 })}`,
+                }}
               />
             )}
           </Card>
@@ -249,9 +255,7 @@ export function StatsView() {
             <SectionHeader
               title="Media por asignatura"
               hint={
-                subjectBars.length > 0
-                  ? 'La marca vertical es tu objetivo en cada una.'
-                  : undefined
+                subjectBars.length > 0 ? 'La marca vertical es tu objetivo en cada una.' : undefined
               }
               className="mb-5"
             />
@@ -296,7 +300,10 @@ export function StatsView() {
           <>
             <div className="lg:col-span-6">
               <Card flush>
-                <SectionHeader title="Tus mejores notas" className="px-5 sm:px-6 pt-5 pb-4 border-b border-hairline" />
+                <SectionHeader
+                  title="Tus mejores notas"
+                  className="px-5 sm:px-6 pt-5 pb-4 border-b border-hairline"
+                />
                 <GradeList entries={ranked.slice(0, 4)} scale={scale} />
               </Card>
             </div>

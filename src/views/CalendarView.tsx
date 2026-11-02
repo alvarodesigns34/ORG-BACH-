@@ -23,7 +23,7 @@ import { Page, PageHeader } from '@/layout/AppShell'
 import { TaskEditor } from '@/features/tasks/TaskEditor'
 import { ExamEditor } from '@/features/exams/ExamEditor'
 import { EventEditor } from '@/features/events/EventEditor'
-import { Button, Card, EmptyState, IconButton, Segmented, cx } from '@/ui/primitives'
+import { Button, EmptyState, IconButton, Segmented, cx } from '@/ui/primitives'
 
 type CalendarMode = 'mes' | 'semana' | 'dia'
 
@@ -103,34 +103,36 @@ export function CalendarView() {
       <PageHeader
         title="Calendario"
         actions={
-          <>
+          // En el móvil se crea desde el día seleccionado (abajo) o con «+».
+          <div className="max-lg:hidden flex gap-2">
             <Button variant="secondary" onClick={() => setCreating('evento')}>
               <Plus className="size-4" />
-              <span className="hidden sm:inline">Evento</span>
+              Evento
             </Button>
             <Button variant="primary" onClick={() => setCreating('examen')}>
               <CalendarPlus className="size-4" />
-              <span className="hidden sm:inline">Examen</span>
+              Examen
             </Button>
-          </>
+          </div>
         }
         toolbar={
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <IconButton label="Anterior" onClick={() => step(-1)} variant="secondary" size="sm">
-                <ChevronLeft className="size-4" />
-              </IconButton>
-              <IconButton label="Siguiente" onClick={() => step(1)} variant="secondary" size="sm">
-                <ChevronRight className="size-4" />
-              </IconButton>
-              <h2 className="display text-[1.25rem] tracking-[-0.02em] ml-1 first-letter:uppercase">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-[1.375rem] font-bold tracking-[-0.022em] first-letter:uppercase truncate">
                 {heading}
               </h2>
-              <Button variant="ghost" size="sm" onClick={goToday} className="ml-1">
-                Hoy
-              </Button>
+              <div className="flex items-center gap-1 shrink-0">
+                <IconButton label="Anterior" onClick={() => step(-1)}>
+                  <ChevronLeft className="size-5 text-accent" strokeWidth={2.4} />
+                </IconButton>
+                <Button variant="ghost" size="sm" onClick={goToday} className="px-2.5">
+                  Hoy
+                </Button>
+                <IconButton label="Siguiente" onClick={() => step(1)}>
+                  <ChevronRight className="size-5 text-accent" strokeWidth={2.4} />
+                </IconButton>
+              </div>
             </div>
-
             <Segmented
               label="Vista del calendario"
               value={mode}
@@ -143,6 +145,7 @@ export function CalendarView() {
                 { value: 'semana', label: 'Semana' },
                 { value: 'dia', label: 'Día' },
               ]}
+              className="self-start"
             />
           </div>
         }
@@ -242,7 +245,15 @@ interface GridProps {
   onSelect: (day: string) => void
 }
 
-function MonthGrid({ cursor, selected, today, index, subjects, weekStartsOn, onSelect }: GridProps) {
+function MonthGrid({
+  cursor,
+  selected,
+  today,
+  index,
+  subjects,
+  weekStartsOn,
+  onSelect,
+}: GridProps) {
   const days = useMemo(() => monthGrid(cursor, weekStartsOn), [cursor, weekStartsOn])
   const headers = useMemo(
     () => Array.from({ length: 7 }, (_, i) => WEEKDAYS_SHORT[(i + weekStartsOn) % 7]),
@@ -254,18 +265,17 @@ function MonthGrid({ cursor, selected, today, index, subjects, weekStartsOn, onS
   )
 
   return (
-    <Card flush className="overflow-hidden">
-      <div className="grid grid-cols-7 border-b border-hairline">
+    <div className="card px-1.5 sm:px-3 pt-3 pb-2">
+      <div className="grid grid-cols-7 mb-1">
         {headers.map((label, i) => (
-          <div key={i} className="py-2.5 text-center">
-            <abbr
-              title={headerNames[i]}
-              className="eyebrow no-underline"
-              style={{ textDecoration: 'none' }}
-            >
-              {label}
-            </abbr>
-          </div>
+          <abbr
+            key={i}
+            title={headerNames[i]}
+            className="text-center text-[0.6875rem] font-semibold text-ink-3 no-underline"
+            style={{ textDecoration: 'none' }}
+          >
+            {label}
+          </abbr>
         ))}
       </div>
 
@@ -286,35 +296,57 @@ function MonthGrid({ cursor, selected, today, index, subjects, weekStartsOn, onS
               aria-current={isToday ? 'date' : undefined}
               aria-pressed={isSelected}
               className={cx(
-                'relative flex flex-col items-start gap-1 p-1.5 sm:p-2',
-                'min-h-[5.5rem] sm:min-h-[6.5rem] text-left',
-                'border-b border-r border-hairline',
-                '[&:nth-child(7n)]:border-r-0 [&:nth-last-child(-n+7)]:border-b-0',
-                'transition-colors duration-150',
-                !inMonth && 'bg-sunken/35',
-                isSelected ? 'bg-accent-quiet' : 'hover:bg-sunken/60',
+                'group relative flex flex-col items-center gap-1 pt-1.5 pb-1 rounded-[12px]',
+                'min-h-[3.375rem] lg:min-h-[6.5rem] lg:items-stretch lg:px-1.5',
+                'transition-colors duration-150 lg:hover:bg-fill/60',
+                isSelected && 'lg:bg-accent-quiet',
               )}
             >
               <span
                 className={cx(
-                  'inline-grid place-items-center size-6 rounded-full text-[0.8125rem] tabular-nums shrink-0',
+                  'grid place-items-center size-[2.125rem] rounded-full text-[1.0625rem] tabular-nums shrink-0 lg:self-start lg:size-7 lg:text-[0.875rem]',
+                  'transition-[background-color,color,transform] duration-300 ease-[var(--spring)] group-active:scale-90',
                   isToday
-                    ? 'bg-accent text-accent-ink font-bold'
-                    : inMonth
-                      ? 'text-ink font-medium'
-                      : 'text-ink-3',
+                    ? cx('font-semibold', isSelected ? 'bg-accent-fill text-white' : 'text-accent')
+                    : isSelected
+                      ? 'bg-ink text-canvas font-semibold'
+                      : inMonth
+                        ? 'text-ink'
+                        : 'text-ink-3/50',
                 )}
               >
                 {date.getDate()}
               </span>
 
-              <span className="flex flex-col gap-0.5 w-full min-w-0">
-                {items.slice(0, 2).map((item) => (
-                  <ItemChip key={`${item.kind}-${item.id}`} item={item} subject={subjects.get(item.subjectId ?? '')} />
+              {/* Móvil: puntos, como Calendario de iOS. La forma distingue el
+                  tipo (examen = rombo) además del color. */}
+              <span className="lg:hidden flex items-center justify-center gap-[3px] h-1.5">
+                {items.slice(0, 3).map((item) => (
+                  <span
+                    key={`${item.kind}-${item.id}`}
+                    aria-hidden
+                    className={cx(
+                      'size-[5px] shrink-0',
+                      KIND_STYLE[item.kind].shape,
+                      item.done && 'opacity-40',
+                    )}
+                    style={{ background: dotColor(item, subjects) }}
+                  />
                 ))}
-                {items.length > 2 && (
-                  <span className="text-[0.6875rem] text-ink-3 pl-0.5 tabular-nums">
-                    +{items.length - 2} más
+              </span>
+
+              {/* Escritorio: hay sitio para leer qué es. */}
+              <span className="max-lg:hidden flex flex-col gap-0.5 w-full min-w-0">
+                {items.slice(0, 3).map((item) => (
+                  <ItemChip
+                    key={`${item.kind}-${item.id}`}
+                    item={item}
+                    subject={subjects.get(item.subjectId ?? '')}
+                  />
+                ))}
+                {items.length > 3 && (
+                  <span className="text-[0.6875rem] text-ink-3 pl-1 tabular-nums">
+                    +{items.length - 3} más
                   </span>
                 )}
               </span>
@@ -322,8 +354,13 @@ function MonthGrid({ cursor, selected, today, index, subjects, weekStartsOn, onS
           )
         })}
       </div>
-    </Card>
+    </div>
   )
+}
+
+function dotColor(item: DayItem, subjects: Map<string, Subject>): string {
+  const subject = subjects.get(item.subjectId ?? '')
+  return subject ? colorVar(subject.color) : 'var(--c-ink-3)'
 }
 
 function ItemChip({ item, subject }: { item: DayItem; subject?: Subject }) {
@@ -333,12 +370,16 @@ function ItemChip({ item, subject }: { item: DayItem; subject?: Subject }) {
   return (
     <span
       className={cx(
-        'flex items-center gap-1 min-w-0 px-1 py-px rounded-[3px]',
+        'flex items-center gap-1 min-w-0 px-1.5 py-0.5 rounded-[6px]',
         'text-[0.6875rem] leading-tight',
         item.kind === 'examen' ? 'font-semibold' : 'font-normal',
         item.done && 'opacity-45 line-through',
       )}
-      style={item.kind === 'examen' ? { background: `color-mix(in oklab, ${color} 14%, transparent)` } : undefined}
+      style={
+        item.kind === 'examen'
+          ? { background: `color-mix(in oklab, ${color} 14%, transparent)` }
+          : undefined
+      }
     >
       <span
         aria-hidden
@@ -356,12 +397,20 @@ function ItemChip({ item, subject }: { item: DayItem; subject?: Subject }) {
 // Vista de semana
 // ---------------------------------------------------------------------------
 
-function WeekColumns({ cursor, selected, today, index, subjects, weekStartsOn, onSelect }: GridProps) {
+function WeekColumns({
+  cursor,
+  selected,
+  today,
+  index,
+  subjects,
+  weekStartsOn,
+  onSelect,
+}: GridProps) {
   const start = startOfWeek(cursor, weekStartsOn)
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i))
 
   return (
-    <Card flush className="overflow-hidden">
+    <div className="card overflow-hidden">
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7">
         {days.map((day) => {
           const items = index.get(day) ?? []
@@ -380,7 +429,7 @@ function WeekColumns({ cursor, selected, today, index, subjects, weekStartsOn, o
                 'flex flex-col text-left p-3 min-h-[9rem]',
                 'border-b border-r border-hairline last:border-r-0',
                 'transition-colors duration-150',
-                day === selected ? 'bg-accent-quiet' : 'hover:bg-sunken/60',
+                day === selected ? 'bg-accent-quiet' : 'hover:bg-fill/60',
               )}
             >
               <span className="flex items-baseline gap-1.5 mb-2">
@@ -400,7 +449,11 @@ function WeekColumns({ cursor, selected, today, index, subjects, weekStartsOn, o
                   <span className="text-[0.6875rem] text-ink-3">—</span>
                 ) : (
                   items.map((item) => (
-                    <ItemChip key={`${item.kind}-${item.id}`} item={item} subject={subjects.get(item.subjectId ?? '')} />
+                    <ItemChip
+                      key={`${item.kind}-${item.id}`}
+                      item={item}
+                      subject={subjects.get(item.subjectId ?? '')}
+                    />
                   ))
                 )}
               </span>
@@ -408,7 +461,7 @@ function WeekColumns({ cursor, selected, today, index, subjects, weekStartsOn, o
           )
         })}
       </div>
-    </Card>
+    </div>
   )
 }
 
@@ -436,96 +489,109 @@ function DayPanel({
   const { data } = useStore()
   const isToday = day === today
 
+  const date = parseDay(day)
+
   return (
-    <Card flush className={cx('lg:sticky lg:top-6', expanded && 'lg:static')}>
-      <header className="px-5 pt-5 pb-4 border-b border-hairline">
-        <p className="eyebrow">{isToday ? 'Hoy' : 'Día seleccionado'}</p>
-        <h2 className="display text-[1.25rem] tracking-[-0.02em] mt-1 first-letter:uppercase">
-          {formatDayMonth(day)}
-        </h2>
-      </header>
+    <section className={cx('lg:sticky lg:top-6', expanded && 'lg:static')}>
+      <div className="flex items-end justify-between gap-3 px-1 mb-2.5">
+        <div className="min-w-0">
+          <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.04em] text-ink-3">
+            {isToday ? 'Hoy' : WEEKDAYS_LONG[date.getDay()]}
+          </p>
+          <h2 className="text-[1.375rem] font-bold tracking-[-0.022em] leading-tight">
+            {date.getDate()} de {MONTHS_LONG[date.getMonth()]}
+          </h2>
+        </div>
+      </div>
 
-      {items.length === 0 ? (
-        <EmptyState
-          compact
-          icon={<ListPlus className="size-4" />}
-          title="Nada este día"
-          description="Puedes crear aquí una tarea, un examen o un evento con esta fecha ya puesta."
-        />
-      ) : (
-        <ul className="divide-y divide-hairline">
-          {items.map((item) => {
-            const subject = subjects.get(item.subjectId ?? '')
-            const color = subject ? colorVar(subject.color) : 'var(--c-ink-3)'
-            const exam = item.kind === 'examen' ? data.exams.find((e) => e.id === item.id) : null
-            // Las sesiones de estudio no se editan desde aquí: no hay editor
-            // para ellas, y una fila que parece pulsable y no hace nada es
-            // peor que una fila que ya se ve como texto.
-            const editable = item.kind !== 'estudio'
+      <div className="card overflow-hidden">
+        {items.length === 0 ? (
+          <EmptyState
+            compact
+            icon={<ListPlus className="size-5" />}
+            title="Nada este día"
+            description="Crea una tarea, un examen o un evento con esta fecha ya puesta."
+          />
+        ) : (
+          <ul>
+            {items.map((item, i) => {
+              const subject = subjects.get(item.subjectId ?? '')
+              const color = subject ? colorVar(subject.color) : 'var(--c-ink-3)'
+              const exam = item.kind === 'examen' ? data.exams.find((e) => e.id === item.id) : null
+              // Las sesiones de estudio no se editan desde aquí: no hay editor
+              // para ellas, y una fila que parece pulsable y no hace nada es
+              // peor que una fila que ya se ve como texto.
+              const editable = item.kind !== 'estudio'
 
-            const body = (
-              <>
-                <span
-                  aria-hidden
-                  className={cx('mt-1.5 size-2 shrink-0', KIND_STYLE[item.kind].shape)}
-                  style={{ background: color }}
-                />
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={cx(
-                      'text-[0.875rem] leading-snug',
-                      item.done ? 'text-ink-3 line-through' : 'text-ink',
-                      item.kind === 'examen' && 'font-semibold',
+              const body = (
+                <>
+                  {/* Barra de color con la hora, como la agenda de iOS. */}
+                  <span
+                    aria-hidden
+                    className="w-1 self-stretch rounded-full shrink-0"
+                    style={{ background: color }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={cx(
+                        'text-[0.9375rem] leading-snug',
+                        item.done ? 'text-ink-3 line-through' : 'text-ink',
+                        item.kind === 'examen' && 'font-semibold',
+                      )}
+                    >
+                      {item.title}
+                    </p>
+                    <p className="text-[0.75rem] text-ink-3 mt-0.5">
+                      {KIND_STYLE[item.kind].label}
+                      {subject && ` · ${subject.name}`}
+                    </p>
+                    {exam?.topics && (
+                      <p className="text-[0.75rem] text-ink-2 mt-1 leading-relaxed">
+                        {exam.topics}
+                      </p>
                     )}
-                  >
-                    {item.title}
-                  </p>
-                  <p className="text-[0.75rem] text-ink-3 mt-0.5">
-                    {KIND_STYLE[item.kind].label}
-                    {subject && ` · ${subject.name}`}
-                    {item.time && ` · ${item.time}`}
-                  </p>
-                  {exam?.topics && (
-                    <p className="text-[0.75rem] text-ink-2 mt-1.5 leading-relaxed">{exam.topics}</p>
+                  </div>
+                  <span className="text-[0.8125rem] text-ink-3 tabular-nums shrink-0">
+                    {item.time ?? 'Todo el día'}
+                  </span>
+                </>
+              )
+
+              return (
+                <li key={item.id} className={cx(i > 0 && 'inset-separator')}>
+                  {editable ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpen(item)}
+                      aria-label={`Editar ${KIND_STYLE[item.kind].label.toLowerCase()}: ${item.title}`}
+                      className="w-full text-left flex items-start gap-3 px-4 py-3 active:bg-fill hover:bg-fill/50 transition-colors duration-150"
+                    >
+                      {body}
+                    </button>
+                  ) : (
+                    <div className="flex items-start gap-3 px-4 py-3">{body}</div>
                   )}
-                </div>
-              </>
-            )
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
 
-            return (
-              <li key={item.id}>
-                {editable ? (
-                  <button
-                    type="button"
-                    onClick={() => onOpen(item)}
-                    aria-label={`Editar ${KIND_STYLE[item.kind].label.toLowerCase()}: ${item.title}`}
-                    className="w-full text-left flex items-start gap-3 px-5 py-3.5 hover:bg-sunken/50 transition-colors duration-150"
-                  >
-                    {body}
-                  </button>
-                ) : (
-                  <div className="flex items-start gap-3 px-5 py-3.5">{body}</div>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-      )}
-
-      <div className="px-5 py-4 border-t border-hairline flex flex-wrap gap-2">
-        <Button size="sm" variant="secondary" onClick={() => onCreate('tarea')}>
-          <Plus className="size-3.5" />
+      <div className="flex flex-wrap gap-2 mt-3 px-1">
+        <Button size="sm" onClick={() => onCreate('tarea')}>
+          <Plus className="size-3.5" strokeWidth={2.6} />
           Tarea
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => onCreate('examen')}>
-          <Plus className="size-3.5" />
+        <Button size="sm" onClick={() => onCreate('examen')}>
+          <Plus className="size-3.5" strokeWidth={2.6} />
           Examen
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => onCreate('evento')}>
-          <Plus className="size-3.5" />
+        <Button size="sm" onClick={() => onCreate('evento')}>
+          <Plus className="size-3.5" strokeWidth={2.6} />
           Evento
         </Button>
       </div>
-    </Card>
+    </section>
   )
 }

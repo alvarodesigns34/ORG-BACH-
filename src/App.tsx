@@ -21,6 +21,7 @@ import { Button } from '@/ui/primitives'
 import { LinkChoiceDialog, RecoveryDialog } from '@/features/account/Account'
 import { syncEngine } from '@/sync/engine'
 import { ToastProvider } from '@/ui/Toast'
+import { ChromeProvider } from '@/layout/chrome'
 
 export function App() {
   return (
@@ -49,6 +50,7 @@ function Shell() {
   )
 
   const openCreate = useCallback(() => setCreating(true), [])
+  const chrome = useMemo(() => ({ openCreate }), [openCreate])
 
   // La sincronización arranca dentro del proveedor: necesita el puente con el
   // almacén. Sin cuenta configurada no hace nada.
@@ -121,9 +123,11 @@ function Shell() {
 
   return (
     <>
-      <AppShell current={route.id} onCreate={openCreate} badges={badges}>
-        {renderRoute(route, data.subjects.length)}
-      </AppShell>
+      <ChromeProvider value={chrome}>
+        <AppShell current={route.id} onCreate={openCreate} badges={badges}>
+          {renderRoute(route, data.subjects.length)}
+        </AppShell>
+      </ChromeProvider>
 
       <TaskEditor open={creating} onClose={() => setCreating(false)} />
       <LinkChoiceDialog />

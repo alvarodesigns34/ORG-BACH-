@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 
-import {
-  KIND_LABEL,
-  SCOPES_BY_KIND,
-  SCOPE_LABEL,
-  suggestTitle,
-} from '@/domain/goals'
+import { KIND_LABEL, SCOPES_BY_KIND, SCOPE_LABEL, suggestTitle } from '@/domain/goals'
 import { parseDecimal, parseDecimalOr, toDecimalInput } from '@/domain/number'
-import { TERMS, termName, type Goal, type GoalKind, type GoalScope, type TermId } from '@/domain/types'
+import {
+  TERMS,
+  termName,
+  type Goal,
+  type GoalKind,
+  type GoalScope,
+  type TermId,
+} from '@/domain/types'
 import { useDispatch, useSettings } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
 import { Field, Input, NumberInput, Select } from '@/ui/fields'

@@ -6,7 +6,7 @@ import {
   useState,
   type CSSProperties,
 } from 'react'
-import { ChevronRight, MoreHorizontal, Plus } from 'lucide-react'
+import { ChevronRight, LayoutGrid } from 'lucide-react'
 
 import { hrefFor, type RouteId } from '@/router'
 import { cx } from '@/ui/primitives'
@@ -15,16 +15,17 @@ import { MOBILE_PRIMARY, NAV_ITEMS, NAV_TINTS, type NavItem } from './navigation
 
 interface MobileNavProps {
   current: RouteId
-  onCreate: () => void
   badges: Partial<Record<RouteId, number>>
 }
 
-const BAR_HEIGHT = 62
+/** Alto de la fila de pestañas, sin contar la zona segura inferior. */
+const ROW_HEIGHT = 54
 /** Margen del indicador en reposo dentro de su pestaña. */
-const REST_INSET = 4
+const REST_INSET_X = 6
+const REST_INSET_Y = 5
 /** Cuánto crece la lente al tocar, respecto a la pestaña. */
-const LENS_GROW_X = 1.32
-const LENS_HEIGHT = 80
+const LENS_GROW_X = 1.3
+const LENS_HEIGHT = 68
 /** Aumento del contenido visto a través de la lente. */
 const LENS_ZOOM = 1.16
 
@@ -34,23 +35,29 @@ interface Tab {
   icon: NavItem['icon']
 }
 
+/** Secciones de la hoja «Más». Ajustes no está: se abre desde el avatar. */
+const MORE_ITEMS = NAV_ITEMS.filter((i) => !MOBILE_PRIMARY.includes(i.id) && i.id !== 'ajustes')
+
 /**
- * Barra de pestañas flotante, con material de cristal (Liquid Glass).
+ * Barra de pestañas del móvil: de lado a lado, con material de cristal.
  *
- * Un único elemento hace de indicador y de lente:
+ * Un único elemento hace de indicador y de lente (Liquid Glass):
  * - En reposo es una cápsula tenue detrás de la pestaña activa.
- * - Al tocar, crece por encima de la barra, se vuelve una lente transparente
- *   con borde refractado y muestra AUMENTADO lo que tiene debajo (una copia de
- *   los iconos, en azul, escalada alrededor de su centro).
+ * - Al tocar, crece por encima de la barra, se vuelve una lente con borde
+ *   refractado y muestra AUMENTADO lo que tiene debajo (una copia de los
+ *   iconos, en azul, escalada alrededor de su centro).
  * - Mientras el dedo se arrastra, la lente lo sigue sin retraso y la pestaña
  *   bajo ella se ilumina; al soltar se asienta con un muelle en la elegida.
  *
- * Accesibilidad: son enlaces reales con `aria-current`; con teclado se
- * navega con Tab e Intro como siempre. La lente y su copia son decorativas
- * (`aria-hidden`). Con «reducir movimiento» no hay animaciones, y con
- * «reducir transparencia» el cristal pasa a ser opaco.
+ * Crear y Ajustes no están aquí: van arriba a la derecha (ver `TopBar`), como
+ * en las apps de iOS, y la barra queda solo para moverse entre secciones.
+ *
+ * Accesibilidad: son enlaces reales con `aria-current`; con teclado se navega
+ * con Tab e Intro. La lente y su copia son decorativas (`aria-hidden`). Con
+ * «reducir movimiento» no hay animaciones; con «reducir transparencia», el
+ * cristal es opaco.
  */
-export function MobileNav({ current, onCreate, badges }: MobileNavProps) {
+export function MobileNav({ current, badges }: MobileNavProps) {
   const [sheetOpen, setSheetOpen] = useState(false)
 
   const tabs: Tab[] = [
@@ -58,18 +65,21 @@ export function MobileNav({ current, onCreate, badges }: MobileNavProps) {
       const item = NAV_ITEMS.find((i) => i.id === id)!
       return { id: item.id, label: item.label, icon: item.icon }
     }),
-    { id: 'mas', label: 'Más', icon: MoreHorizontal },
+    { id: 'mas', label: 'Más', icon: LayoutGrid },
   ]
-  // Una sección que no está en la barra se marca en «Más».
+  // Una sección que no está en la barra se marca en «Más» (salvo Ajustes,
+  // que tiene su propio acceso y no marca ninguna pestaña).
   const restIndex = MOBILE_PRIMARY.includes(current)
     ? tabs.findIndex((t) => t.id === current)
-    : tabs.length - 1
+    : current === 'ajustes'
+      ? -1
+      : tabs.length - 1
 
   // --- Geometría ---------------------------------------------------------
-  const capsule = useRef<HTMLDivElement>(null)
+  const row = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
   useLayoutEffect(() => {
-    const node = capsule.current
+    const node = row.current
     if (!node) return
     const update = () => setWidth(node.clientWidth)
     update()
@@ -88,9 +98,8 @@ export function MobileNav({ current, onCreate, badges }: MobileNavProps) {
 
   const clampX = useCallback(
     (clientX: number) => {
-      const rect = capsule.current!.getBoundingClientRect()
-      const x = clientX - rect.left
-      return Math.min(Math.max(x, tabW / 2), rect.width - tabW / 2)
+      const rect = row.current!.getBoundingClientRect()
+      return Math.min(Math.max(clientX - rect.left, tabW / 2), rect.width - tabW / 2)
     },
     [tabW],
   )
@@ -99,19 +108,15 @@ export function MobileNav({ current, onCreate, badges }: MobileNavProps) {
     [tabW, tabs.length],
   )
 
-  const select = useCallback(
-    (index: number) => {
-      const tab = tabs[index]
-      if (!tab) return
-      if (tab.id === 'mas') {
-        setSheetOpen(true)
-        return
-      }
-      if (tab.id !== current) window.location.hash = hrefFor(tab.id).slice(1)
-    },
-    // `tabs` se reconstruye en cada render, pero solo depende de constantes.
-    [current], // eslint-disable-line react-hooks/exhaustive-deps
-  )
+  const select = (index: number) => {
+    const tab = tabs[index]
+    if (!tab) return
+    if (tab.id === 'mas') {
+      setSheetOpen(true)
+      return
+    }
+    if (tab.id !== current) window.location.hash = hrefFor(tab.id).slice(1)
+  }
 
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || !tabW) return
@@ -165,42 +170,41 @@ export function MobileNav({ current, onCreate, badges }: MobileNavProps) {
   }, [current, pressing])
 
   // --- Posición y forma de la lente ---------------------------------------
-  const restCenter = (restIndex + 0.5) * tabW
+  const resting = restIndex >= 0
+  const restCenter = ((resting ? restIndex : 0) + 0.5) * tabW
   const centerX = dragX ?? restCenter
   const visualIndex = pressing && dragX !== null ? indexAt(dragX) : restIndex
-  const lensW = pressing ? tabW * LENS_GROW_X : Math.max(0, tabW - REST_INSET * 2)
-  const lensH = pressing ? LENS_HEIGHT : BAR_HEIGHT - REST_INSET * 2
+  const lensW = pressing ? tabW * LENS_GROW_X : Math.max(0, tabW - REST_INSET_X * 2)
+  const lensH = pressing ? LENS_HEIGHT : ROW_HEIGHT - REST_INSET_Y * 2
 
   const lensStyle: CSSProperties = {
     width: lensW,
     height: lensH,
     transform: `translate3d(${centerX - lensW / 2}px, -50%, 0)`,
+    opacity: pressing || resting ? 1 : 0,
     // Mientras se arrastra, la lente va pegada al dedo: sin transición en la
     // posición, pero sí en el tamaño. Al soltar, todo vuelve con muelle.
     transitionProperty:
       dragX !== null && pressing
-        ? 'width, height, background-color, box-shadow'
-        : 'transform, width, height, background-color, box-shadow',
+        ? 'width, height, background-color, box-shadow, opacity'
+        : 'transform, width, height, background-color, box-shadow, opacity',
   }
 
   return (
     <>
-      <div
+      <nav
+        aria-label="Secciones"
         className={cx(
-          'lg:hidden fixed inset-x-0 z-30 flex items-center gap-2.5 pointer-events-none',
-          'px-[max(0.875rem,env(safe-area-inset-left))]',
-          'bottom-[max(0.75rem,calc(env(safe-area-inset-bottom)-0.5rem))]',
+          'lg:hidden fixed bottom-0 inset-x-0 z-30 glass-bar border-t border-hairline',
+          'pb-[env(safe-area-inset-bottom)]',
+          'pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]',
         )}
       >
-        <nav aria-label="Secciones" className="flex-1 min-w-0 pointer-events-auto">
+        <div className="mx-auto max-w-[560px] px-1.5">
           <div
-            ref={capsule}
-            className={cx(
-              'glass relative rounded-full touch-none select-none',
-              'transition-transform duration-500 ease-[var(--spring)]',
-              pressing && 'scale-[1.015]',
-            )}
-            style={{ height: BAR_HEIGHT }}
+            ref={row}
+            className="relative touch-none select-none"
+            style={{ height: ROW_HEIGHT }}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={() => finish(true)}
@@ -214,7 +218,7 @@ export function MobileNav({ current, onCreate, badges }: MobileNavProps) {
             >
               {tabs.map((tab, index) => {
                 const lit = index === visualIndex
-                const isCurrent = tab.id === current || (tab.id === 'mas' && restIndex === index)
+                const isCurrent = index === restIndex
                 const count = tab.id !== 'mas' ? badges[tab.id] : undefined
                 const body = <TabFace tab={tab} lit={lit} count={count} />
                 return (
@@ -232,7 +236,7 @@ export function MobileNav({ current, onCreate, badges }: MobileNavProps) {
                           }
                           setSheetOpen(true)
                         }}
-                        className="w-full h-full rounded-full"
+                        className="w-full h-full rounded-[14px]"
                       >
                         {body}
                       </button>
@@ -244,7 +248,7 @@ export function MobileNav({ current, onCreate, badges }: MobileNavProps) {
                         onClick={(e) => {
                           if (handledClick.current) e.preventDefault()
                         }}
-                        className="block h-full rounded-full"
+                        className="block h-full rounded-[14px]"
                       >
                         {body}
                       </a>
@@ -277,9 +281,9 @@ export function MobileNav({ current, onCreate, badges }: MobileNavProps) {
                     className="absolute grid text-accent"
                     style={{
                       width,
-                      height: BAR_HEIGHT,
+                      height: ROW_HEIGHT,
                       left: -centerX,
-                      top: -BAR_HEIGHT / 2,
+                      top: -ROW_HEIGHT / 2,
                       gridTemplateColumns: `repeat(${tabs.length}, 1fr)`,
                     }}
                   >
@@ -291,23 +295,8 @@ export function MobileNav({ current, onCreate, badges }: MobileNavProps) {
               </div>
             )}
           </div>
-        </nav>
-
-        <button
-          type="button"
-          onClick={onCreate}
-          aria-label="Crear tarea"
-          className={cx(
-            'pointer-events-auto shrink-0 grid place-items-center rounded-full',
-            'bg-accent-fill text-white',
-            'shadow-[0_10px_24px_color-mix(in_srgb,var(--c-accent-fill)_38%,transparent),inset_0_1px_0_rgb(255_255_255/0.35)]',
-            'pressable active:scale-90',
-          )}
-          style={{ width: BAR_HEIGHT, height: BAR_HEIGHT }}
-        >
-          <Plus className="size-7" strokeWidth={2.4} />
-        </button>
-      </div>
+        </div>
+      </nav>
 
       <MoreSheet open={sheetOpen} onClose={() => setSheetOpen(false)} current={current} />
     </>
@@ -333,11 +322,11 @@ function TabFace({
         'flex flex-col items-center justify-center gap-[3px] h-full px-0.5',
         'text-[0.625rem] font-semibold leading-none tracking-[-0.005em]',
         'transition-colors duration-200',
-        forceColor ? '' : lit ? 'text-accent' : 'text-ink',
+        forceColor ? '' : lit ? 'text-accent' : 'text-ink-2',
       )}
     >
       <span className="relative">
-        <Icon className="size-[23px]" strokeWidth={lit ? 2.3 : 1.9} />
+        <Icon className="size-[23px]" strokeWidth={lit ? 2.3 : 1.85} />
         {count !== undefined && count > 0 && (
           <span
             className={cx(
@@ -355,7 +344,7 @@ function TabFace({
   )
 }
 
-/** Hoja «Más»: el resto de secciones, como una lista agrupada de Ajustes de iOS. */
+/** Hoja «Más»: el resto de secciones, como una lista agrupada de iOS. */
 function MoreSheet({
   open,
   onClose,
@@ -365,11 +354,10 @@ function MoreSheet({
   onClose: () => void
   current: RouteId
 }) {
-  const rest = NAV_ITEMS.filter((item) => !MOBILE_PRIMARY.includes(item.id))
   return (
-    <Modal open={open} onClose={onClose} title="Más secciones">
+    <Modal open={open} onClose={onClose} title="Más">
       <ul className="rounded-[18px] bg-canvas dark:bg-raised/60 overflow-hidden">
-        {rest.map((item, index) => {
+        {MORE_ITEMS.map((item, index) => {
           const active = item.id === current
           return (
             <li key={item.id}>
@@ -380,7 +368,6 @@ function MoreSheet({
                 className={cx(
                   'flex items-center gap-3.5 pl-3.5 pr-3 h-[3.25rem] transition-colors duration-150',
                   'active:bg-fill',
-                  active && 'bg-accent-quiet',
                 )}
               >
                 <span
@@ -391,14 +378,14 @@ function MoreSheet({
                 </span>
                 <span
                   className={cx(
-                    'flex-1 min-w-0 h-full flex items-center text-[1rem]',
+                    'flex-1 min-w-0 h-full flex items-center gap-3 text-[1.0625rem]',
                     index > 0 && 'border-t border-hairline',
                     active ? 'font-semibold text-accent' : 'text-ink',
                   )}
                 >
-                  {item.label}
+                  <span className="flex-1 truncate">{item.label}</span>
+                  <ChevronRight className="size-4 text-ink-3 shrink-0" strokeWidth={2.4} />
                 </span>
-                <ChevronRight className="size-4 text-ink-3 shrink-0" strokeWidth={2.4} />
               </a>
             </li>
           )

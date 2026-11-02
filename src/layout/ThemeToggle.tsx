@@ -22,10 +22,7 @@ export function ThemeToggle({ className }: { className?: string }) {
     <div
       role="radiogroup"
       aria-label="Tema de la aplicación"
-      className={cx(
-        'inline-flex items-center gap-0.5 p-[3px] rounded-full bg-fill',
-        className,
-      )}
+      className={cx('inline-flex items-center gap-0.5 p-[3px] rounded-full bg-fill', className)}
     >
       {OPTIONS.map(({ value, label, Icon }) => {
         const active = settings.theme === value

@@ -60,9 +60,9 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className }: TaskR
   return (
     <li
       className={cx(
-        'group relative flex items-start gap-3 pl-3 pr-2 py-3',
-        'border-b border-hairline last:border-b-0',
-        'transition-colors duration-150 hover:bg-sunken/45',
+        // Separador interior entre filas (ver .task-row en index.css).
+        'task-row group flex items-start gap-3 pl-4 pr-2 py-3',
+        'transition-colors duration-150 hover:bg-fill/50',
         className,
       )}
     >

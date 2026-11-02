@@ -263,13 +263,18 @@ export function TasksView() {
             <section key={group.key}>
               <h2
                 className={cx(
-                  'eyebrow mb-2 px-1',
-                  group.tone === 'danger' && 'text-danger',
-                  group.tone === 'warn' && 'text-warn',
+                  'flex items-baseline gap-2 mb-2 px-1 text-[1.125rem] font-bold tracking-[-0.02em]',
+                  group.tone === 'danger'
+                    ? 'text-danger'
+                    : group.tone === 'warn'
+                      ? 'text-warn'
+                      : 'text-ink',
                 )}
               >
                 {group.label}
-                <span className="ml-2 text-ink-3 font-semibold">{group.tasks.length}</span>
+                <span className="text-[0.875rem] text-ink-3 font-semibold tabular-nums">
+                  {group.tasks.length}
+                </span>
               </h2>
               <Card flush className="overflow-hidden">
                 <ul>

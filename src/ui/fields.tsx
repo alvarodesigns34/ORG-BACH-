@@ -424,29 +424,52 @@ export function Switch({
         </label>
         {description && <p className="text-[0.8125rem] text-ink-3 mt-0.5">{description}</p>}
       </div>
-      <button
-        id={id}
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={cx(
-          'group relative shrink-0 w-[51px] h-[31px] rounded-full transition-colors duration-300',
-          checked ? 'bg-[var(--c-switch-on)]' : 'bg-fill',
-        )}
-      >
-        <span
-          aria-hidden
-          className={cx(
-            'absolute top-[2px] left-[2px] h-[27px] w-[27px] rounded-full bg-white',
-            'shadow-[0_3px_8px_rgb(0_0_0/0.15),0_1px_1px_rgb(0_0_0/0.16)]',
-            'transition-[transform,width] duration-500 ease-[var(--spring)]',
-            // Al pulsar, la bola se estira como en iOS.
-            'group-active:w-[33px]',
-            checked ? 'translate-x-[20px] group-active:translate-x-[14px]' : 'translate-x-0',
-          )}
-        />
-      </button>
+      <SwitchControl id={id} checked={checked} onChange={onChange} />
     </div>
+  )
+}
+
+/** Solo el interruptor de iOS, para filas de lista que ponen su propia etiqueta. */
+export function SwitchControl({
+  checked,
+  onChange,
+  id,
+  label,
+  disabled,
+}: {
+  checked: boolean
+  onChange: (checked: boolean) => void
+  id?: string
+  /** Nombre accesible si no hay un <label for> que lo dé. */
+  label?: string
+  disabled?: boolean
+}) {
+  return (
+    <button
+      id={id}
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={cx(
+        'group relative shrink-0 w-[51px] h-[31px] rounded-full transition-colors duration-300',
+        'disabled:opacity-45',
+        checked ? 'bg-[var(--c-switch-on)]' : 'bg-fill',
+      )}
+    >
+      <span
+        aria-hidden
+        className={cx(
+          'absolute top-[2px] left-[2px] h-[27px] w-[27px] rounded-full bg-white',
+          'shadow-[0_3px_8px_rgb(0_0_0/0.15),0_1px_1px_rgb(0_0_0/0.16)]',
+          'transition-[transform,width] duration-500 ease-[var(--spring)]',
+          // Al pulsar, la bola se estira como en iOS.
+          'group-active:w-[33px]',
+          checked ? 'translate-x-[20px] group-active:translate-x-[14px]' : 'translate-x-0',
+        )}
+      />
+    </button>
   )
 }

@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, CalendarPlus, ListChecks, Pencil, Plus } from 'lucide-react'
+import { CalendarPlus, ListChecks, Pencil, Plus } from 'lucide-react'
 
 import { formatGrade, formatPercent, numeralTone } from '@/domain/grades'
-import { colorVar, quietVar } from '@/domain/palette'
+import { colorVar } from '@/domain/palette'
 import { isDone, sortTasks } from '@/domain/tasks'
 import { termName, type Exam, type GradeEntry, type Task } from '@/domain/types'
 import { hrefFor } from '@/router'
 import { useSettings, useStore, useToday } from '@/state/StoreProvider'
 import { useSubjectResults } from '@/state/selectors'
-import { Page } from '@/layout/AppShell'
+import { Page, PageHeader } from '@/layout/AppShell'
 import { ExamCard } from '@/features/exams/ExamCard'
 import { ExamEditor } from '@/features/exams/ExamEditor'
 import { GradeCalculator } from '@/features/grades/GradeCalculator'
@@ -92,43 +92,33 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
 
   return (
     <Page>
-      <a
-        href={hrefFor('asignaturas')}
-        className="inline-flex items-center gap-1.5 text-[0.8125rem] text-ink-3 hover:text-ink transition-colors duration-150 mb-5"
-      >
-        <ArrowLeft className="size-3.5" />
-        Asignaturas
-      </a>
-
-      {/* --- Cabecera --- */}
-      <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4 mb-7">
-        <div className="min-w-0">
-          <span
-            className="inline-flex items-center rounded-xs px-1.5 py-0.5 text-[0.6875rem] font-bold tracking-[0.04em]"
-            style={{ background: quietVar(subject.color), color: accent }}
-          >
+      <PageHeader
+        title={subject.name}
+        back={{ href: hrefFor('asignaturas'), label: 'Asignaturas' }}
+        eyebrow={
+          <span className="inline-flex items-center gap-2">
+            <span aria-hidden className="size-2.5 rounded-full" style={{ background: accent }} />
             {subject.shortName}
           </span>
-          <h1 className="display text-[1.75rem] sm:text-[2.125rem] leading-[1.1] tracking-[-0.025em] mt-2">
-            {subject.name}
-          </h1>
-          <p className="text-[0.875rem] text-ink-3 mt-1.5">
-            {[subject.teacher, subject.room && `Aula ${subject.room}`, `${subject.weight} h/semana`]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
-        </div>
-
-        <Button variant="secondary" onClick={() => setEditingSubject(true)}>
-          <Pencil className="size-4" />
-          Editar
-        </Button>
-      </header>
+        }
+        subtitle={[
+          subject.teacher,
+          subject.room && `Aula ${subject.room}`,
+          `${subject.weight} h/semana`,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
+        actions={
+          <Button onClick={() => setEditingSubject(true)}>
+            <Pencil className="size-4" />
+            Editar
+          </Button>
+        }
+      />
 
       {/* --- Cifras --- */}
-      <div className="relative bg-surface border border-hairline rounded-lg overflow-hidden">
-        <span aria-hidden className="absolute inset-x-0 top-0 h-1" style={{ background: accent }} />
-        <dl className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-hairline pt-1">
+      <div className="card overflow-hidden">
+        <dl className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-hairline">
           {metrics.map((metric) => (
             <div key={metric.label} className="px-4 sm:px-5 py-4">
               <dt className="eyebrow whitespace-nowrap">{metric.label}</dt>
@@ -185,18 +175,19 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
                 description="Apunta el próximo y verás aquí la cuenta atrás."
               />
             ) : (
-              <div className="px-2 pb-3">
-                {exams.map((exam) => (
-                  <ExamCard
-                    key={exam.id}
-                    exam={exam}
-                    subject={subject}
-                    today={today}
-                    onOpen={setEditingExam}
-                    hideSubject
-                  />
+              <ul className="pb-1">
+                {exams.map((exam, i) => (
+                  <li key={exam.id} className={i > 0 ? 'inset-separator-wide' : undefined}>
+                    <ExamCard
+                      exam={exam}
+                      subject={subject}
+                      today={today}
+                      onOpen={setEditingExam}
+                      hideSubject
+                    />
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
           </Card>
 
@@ -250,7 +241,11 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
           term: settings.activeTerm,
         }}
       />
-      <GradeEditor open={!!editingGrade} grade={editingGrade} onClose={() => setEditingGrade(null)} />
+      <GradeEditor
+        open={!!editingGrade}
+        grade={editingGrade}
+        onClose={() => setEditingGrade(null)}
+      />
       <TaskEditor
         open={creatingTask}
         onClose={() => setCreatingTask(false)}
@@ -262,11 +257,7 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
         onClose={() => setCreatingExam(false)}
         defaults={{ subjectId: subject.id }}
       />
-      <ExamEditor
-        open={!!editingExam}
-        exam={editingExam}
-        onClose={() => setEditingExam(null)}
-      />
+      <ExamEditor open={!!editingExam} exam={editingExam} onClose={() => setEditingExam(null)} />
       <GradeCalculator
         open={calculatorOpen}
         subjectId={subject.id}

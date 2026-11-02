@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, CircleCheck, Ellipsis, Pause, Play, X, Timer as TimerIcon, Trash2 } from 'lucide-react'
+import {
+  Check,
+  CircleCheck,
+  Ellipsis,
+  Pause,
+  Play,
+  X,
+  Timer as TimerIcon,
+  Trash2,
+} from 'lucide-react'
 
 import { formatDuration } from '@/domain/dates'
 import { colorVar } from '@/domain/palette'
@@ -28,7 +37,7 @@ import { ColumnChart, type Column } from '@/ui/charts'
 import { Input, Select } from '@/ui/fields'
 import { Menu } from '@/ui/Menu'
 import { ConfirmDialog } from '@/ui/Modal'
-import { Button, Card, EmptyState, Numeral, SectionHeader, cx } from '@/ui/primitives'
+import { Button, Card, EmptyState, Numeral, SectionHeader, Segmented, cx } from '@/ui/primitives'
 
 /** Cada cuánto se repinta. El tiempo sale del reloj, no de este intervalo. */
 const TICK_MS = 500
@@ -189,7 +198,10 @@ export function StudyView() {
         <div className="lg:col-span-5">
           <Card className="lg:sticky lg:top-6">
             {timerNotice && (
-              <p role="status" className="text-[0.8125rem] text-danger bg-danger-quiet rounded-sm px-3 py-2 mb-4">
+              <p
+                role="status"
+                className="text-[0.8125rem] text-danger bg-danger-quiet rounded-sm px-3 py-2 mb-4"
+              >
                 {timerNotice}
               </p>
             )}
@@ -200,9 +212,7 @@ export function StudyView() {
                 now={now}
                 complete={complete}
                 subjectName={timer.subjectId ? subjectMap.get(timer.subjectId)?.name : undefined}
-                subjectColor={
-                  timer.subjectId ? subjectMap.get(timer.subjectId)?.color : undefined
-                }
+                subjectColor={timer.subjectId ? subjectMap.get(timer.subjectId)?.color : undefined}
                 onPause={() => setTimer(pause(timer))}
                 onResume={() => {
                   setTimer(resume(timer))
@@ -232,7 +242,7 @@ export function StudyView() {
 
         {/* --- Cifras y gráfico --- */}
         <div className="lg:col-span-7 flex flex-col gap-5 lg:gap-6">
-          <div className="bg-surface border border-hairline rounded-lg overflow-hidden">
+          <div className="card overflow-hidden">
             <dl className="grid grid-cols-3 divide-x divide-hairline">
               {[
                 { label: 'Hoy', value: stats.todayMinutes },
@@ -298,9 +308,7 @@ export function StudyView() {
                       <div className="min-w-0 flex-1">
                         <p className="text-[0.875rem] text-ink truncate">
                           {subject?.name ?? 'Sin asignatura'}
-                          {session.topic && (
-                            <span className="text-ink-3"> · {session.topic}</span>
-                          )}
+                          {session.topic && <span className="text-ink-3"> · {session.topic}</span>}
                         </p>
                         <p className="text-[0.6875rem] text-ink-3 mt-0.5 tabular-nums">
                           {started.toLocaleDateString('es-ES', {
@@ -409,25 +417,19 @@ function IdleTimer({
 }) {
   return (
     <div className="flex flex-col items-center text-center">
-      <div className="flex gap-1 p-0.5 rounded-sm bg-sunken border border-hairline mb-7">
-        {(['pomodoro', 'libre'] as TimerMode[]).map((option) => (
-          <button
-            key={option}
-            type="button"
-            aria-pressed={mode === option}
-            onClick={() => onMode(option)}
-            className={cx(
-              'h-8 px-4 rounded-[5px] text-[0.8125rem] font-medium transition-colors duration-150',
-              mode === option ? 'bg-surface text-ink shadow-xs' : 'text-ink-3 hover:text-ink-2',
-            )}
-          >
-            {option === 'pomodoro' ? 'Pomodoro' : 'Libre'}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        label="Modo del temporizador"
+        value={mode}
+        onChange={onMode}
+        options={[
+          { value: 'pomodoro' as TimerMode, label: 'Pomodoro' },
+          { value: 'libre' as TimerMode, label: 'Libre' },
+        ]}
+        className="mb-7"
+      />
 
       <Ring progress={0} phase="trabajo">
-        <span className="numeral text-[3rem] leading-none">
+        <span className="numeral text-[3.5rem] leading-none font-[600]">
           {mode === 'pomodoro' ? formatClock(config.workMinutes * 60_000) : '00:00'}
         </span>
       </Ring>
@@ -533,7 +535,8 @@ function RunningTimer({
 
       {timer.mode === 'pomodoro' && timer.completed > 0 && (
         <p className="text-[0.75rem] text-ink-3 mt-5 tabular-nums">
-          {timer.completed} {timer.completed === 1 ? 'pomodoro completado' : 'pomodoros completados'}
+          {timer.completed}{' '}
+          {timer.completed === 1 ? 'pomodoro completado' : 'pomodoros completados'}
           {logged > 0 && ` · ${formatDuration(logged)} de estudio`}
         </p>
       )}
@@ -590,13 +593,11 @@ function Ring({
   const color = phase === 'trabajo' ? 'var(--c-accent)' : 'var(--c-ok)'
 
   return (
-    <div className="relative grid place-items-center" style={{ width: RING_SIZE, height: RING_SIZE }}>
-      <svg
-        width={RING_SIZE}
-        height={RING_SIZE}
-        className="absolute inset-0 -rotate-90"
-        aria-hidden
-      >
+    <div
+      className="relative grid place-items-center"
+      style={{ width: RING_SIZE, height: RING_SIZE }}
+    >
+      <svg width={RING_SIZE} height={RING_SIZE} className="absolute inset-0 -rotate-90" aria-hidden>
         <circle
           cx={RING_SIZE / 2}
           cy={RING_SIZE / 2}

@@ -69,71 +69,77 @@ export function SubjectGrades({
     <div>
       {/* --- Cabecera con la media --- */}
       {!hideHeader && (
-      <HeaderTag
-        {...(collapsible
-          ? {
-              type: 'button' as const,
-              onClick: () => setOpen((v) => !v),
-              'aria-expanded': open,
-              className:
-                'w-full text-left flex items-start justify-between gap-4 px-5 sm:px-6 py-5 hover:bg-sunken/35 transition-colors duration-150',
-            }
-          : {
-              className:
-                'flex items-start justify-between gap-4 px-5 sm:px-6 py-5',
-            })}
-      >
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            {collapsible && (
-              <ChevronRight
+        <HeaderTag
+          {...(collapsible
+            ? {
+                type: 'button' as const,
+                onClick: () => setOpen((v) => !v),
+                'aria-expanded': open,
+                className:
+                  'w-full text-left flex items-start justify-between gap-4 px-5 sm:px-6 py-5 hover:bg-sunken/35 transition-colors duration-150',
+              }
+            : {
+                className: 'flex items-start justify-between gap-4 px-5 sm:px-6 py-5',
+              })}
+        >
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              {collapsible && (
+                <ChevronRight
+                  aria-hidden
+                  className={cx(
+                    'size-4 text-ink-3 shrink-0 transition-transform duration-200',
+                    open && 'rotate-90',
+                  )}
+                />
+              )}
+              <span
                 aria-hidden
-                className={cx(
-                  'size-4 text-ink-3 shrink-0 transition-transform duration-200',
-                  open && 'rotate-90',
-                )}
+                className="size-2.5 rounded-full shrink-0"
+                style={{ background: accent }}
               />
-            )}
-            <span aria-hidden className="size-2.5 rounded-full shrink-0" style={{ background: accent }} />
-            <h3 className="text-[1rem] font-semibold tracking-[-0.01em] truncate">{subject.name}</h3>
+              <h3 className="text-[1rem] font-semibold tracking-[-0.01em] truncate">
+                {subject.name}
+              </h3>
+            </div>
+
+            <p className="text-[0.75rem] text-ink-3 mt-1.5 tabular-nums">
+              {hasGrades ? (
+                <>
+                  {result.entryCount} {result.entryCount === 1 ? 'nota' : 'notas'}
+                  {result.weightsDeclared &&
+                    ` · ${formatPercent(result.evaluatedPercent)} evaluado`}
+                  {subject.targetGrade !== undefined &&
+                    ` · objetivo ${formatGrade(subject.targetGrade, scale)}`}
+                </>
+              ) : (
+                'Sin notas todavía'
+              )}
+            </p>
           </div>
 
-          <p className="text-[0.75rem] text-ink-3 mt-1.5 tabular-nums">
-            {hasGrades ? (
-              <>
-                {result.entryCount} {result.entryCount === 1 ? 'nota' : 'notas'}
-                {result.weightsDeclared && ` · ${formatPercent(result.evaluatedPercent)} evaluado`}
-                {subject.targetGrade !== undefined &&
-                  ` · objetivo ${formatGrade(subject.targetGrade, scale)}`}
-              </>
-            ) : (
-              'Sin notas todavía'
-            )}
-          </p>
-        </div>
-
-        <div className="shrink-0">
-          <div className="text-right">
-            <Numeral
-              value={formatGrade(result.average, scale)}
-              size="md"
-              tone={numeralTone(result.average, scale)}
-            />
-            {subject.targetGrade !== undefined && result.average !== null && (
-              <p
-                className={cx(
-                  'text-[0.6875rem] mt-1 tabular-nums',
-                  result.average >= subject.targetGrade ? 'text-ok' : 'text-warn',
-                )}
-              >
-                {result.average >= subject.targetGrade
-                  ? 'objetivo cumplido'
-                  : `${formatGrade(subject.targetGrade - result.average, scale)} por debajo`}
-              </p>
-            )}
+          <div className="shrink-0">
+            <div className="text-right">
+              <Numeral
+                value={formatGrade(result.average, scale)}
+                size="md"
+                tone={numeralTone(result.average, scale)}
+              />
+              {subject.targetGrade !== undefined && result.average !== null && (
+                <p
+                  className={cx(
+                    'text-[0.6875rem] mt-1 tabular-nums',
+                    result.average >= subject.targetGrade ? 'text-ok' : 'text-warn',
+                  )}
+                >
+                  {result.average >= subject.targetGrade
+                    ? 'objetivo cumplido'
+                    : `${formatGrade(subject.targetGrade - result.average, scale)} por debajo`}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-      </HeaderTag>
+        </HeaderTag>
       )}
 
       {/* --- Cuánto se ha evaluado --- */}
@@ -259,7 +265,8 @@ export function SubjectGrades({
                               {entry.score.toLocaleString('es-ES', { maximumFractionDigits: 2 })}
                             </span>
                             <span className="text-[0.75rem] text-ink-3">
-                              /{entry.maxScore.toLocaleString('es-ES', { maximumFractionDigits: 2 })}
+                              /
+                              {entry.maxScore.toLocaleString('es-ES', { maximumFractionDigits: 2 })}
                             </span>
                           </span>
 
@@ -315,16 +322,16 @@ export function SubjectGrades({
 
       {/* --- Acciones --- */}
       {expanded && (
-      <footer className="flex flex-wrap gap-2 px-5 sm:px-6 py-4 border-t border-hairline">
-        <Button size="sm" onClick={() => onAddGrade(null)}>
-          <Plus className="size-3.5" />
-          Añadir nota
-        </Button>
-        <Button size="sm" variant="ghost" onClick={onCalculate}>
-          <Calculator className="size-3.5" />
-          ¿Qué nota necesito?
-        </Button>
-      </footer>
+        <footer className="flex flex-wrap gap-2 px-5 sm:px-6 py-4 border-t border-hairline">
+          <Button size="sm" onClick={() => onAddGrade(null)}>
+            <Plus className="size-3.5" />
+            Añadir nota
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onCalculate}>
+            <Calculator className="size-3.5" />
+            ¿Qué nota necesito?
+          </Button>
+        </footer>
       )}
 
       <ConfirmDialog

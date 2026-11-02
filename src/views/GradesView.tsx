@@ -4,7 +4,12 @@ import { Calculator, GraduationCap, Plus } from 'lucide-react'
 import { formatGrade, numeralTone } from '@/domain/grades'
 import { TERMS, termName, type GradeEntry, type TermId } from '@/domain/types'
 import { useSettings, useStore } from '@/state/StoreProvider'
-import { useGlobalAverage, useSubjectResults, useSubjects, useTermAverages } from '@/state/selectors'
+import {
+  useGlobalAverage,
+  useSubjectResults,
+  useSubjects,
+  useTermAverages,
+} from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
 import { GradeCalculator } from '@/features/grades/GradeCalculator'
 import { GradeEditor } from '@/features/grades/GradeEditor'
@@ -24,9 +29,10 @@ export function GradesView() {
   const termAverages = useTermAverages()
 
   const [editing, setEditing] = useState<GradeEntry | null>(null)
-  const [creating, setCreating] = useState<{ subjectId?: string; categoryId?: string | null } | null>(
-    null,
-  )
+  const [creating, setCreating] = useState<{
+    subjectId?: string
+    categoryId?: string | null
+  } | null>(null)
   const [calculatorFor, setCalculatorFor] = useState<string | undefined>(undefined)
   const [calculatorOpen, setCalculatorOpen] = useState(false)
 
@@ -72,7 +78,7 @@ export function GradesView() {
               <Calculator className="size-4" />
               <span className="hidden sm:inline">Calculadora</span>
             </Button>
-            <Button variant="primary" onClick={() => setCreating({})}>
+            <Button onClick={() => setCreating({})}>
               <Plus className="size-4" strokeWidth={2.5} />
               <span className="hidden sm:inline">Añadir nota</span>
               <span className="sm:hidden">Nota</span>
@@ -139,9 +145,7 @@ export function GradesView() {
           <p className="text-[0.75rem] text-ink-3 px-1 text-balance">
             Las medias que ves corresponden a {scopeLabel}. Una categoría sin notas no cuenta
             todavía: no baja la media, simplemente no participa hasta que la evalúen.
-            {average !== null && (
-              <> Media global: {formatGrade(average, settings.gradeScale)}.</>
-            )}
+            {average !== null && <> Media global: {formatGrade(average, settings.gradeScale)}.</>}
           </p>
         </div>
       )}
@@ -189,51 +193,55 @@ function TermSummary({ averages, scale, active, onSelect, mode }: TermSummaryPro
   if (!withGrades) return null
 
   return (
-    <div className="bg-surface border border-hairline rounded-lg overflow-hidden">
-      <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-hairline">
-        {averages.map((entry) => {
-          const isFinal = entry.term === 'final'
-          const label = entry.term === 'final' ? 'Nota final' : termName(entry.term)
-          const selected = !isFinal && active === entry.term
+    // Cuatro tarjetas pequeñas, como widgets: la evaluación elegida se marca
+    // con un anillo, no con un fondo que se confunde con el estado «pulsado».
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {averages.map((entry) => {
+        const isFinal = entry.term === 'final'
+        const label = entry.term === 'final' ? 'Nota final' : termName(entry.term)
+        const selected = !isFinal && active === entry.term
 
-          const content = (
-            <>
-              <span className={cx('eyebrow', selected && 'text-accent')}>{label}</span>
-              <span className="block mt-2">
-                <Numeral
-                  value={formatGrade(entry.average, scale)}
-                  size={isFinal ? 'md' : 'sm'}
-                  tone={numeralTone(entry.average, scale)}
-                />
-              </span>
-            </>
-          )
-
-          // La final no es seleccionable: para verla hay que ir a «Curso», que
-          // es lo que representa realmente.
-          return isFinal ? (
-            <div key="final" className="px-4 sm:px-5 py-4 bg-sunken/40">
-              {content}
-              <span className="block text-[0.6875rem] text-ink-3 mt-1">
-                media {mode === 'ponderada' ? 'ponderada por horas' : 'de las asignaturas'}
-              </span>
-            </div>
-          ) : (
-            <button
-              key={entry.term}
-              type="button"
-              onClick={() => onSelect(entry.term as Scope)}
-              aria-pressed={selected}
+        const content = (
+          <>
+            <span
               className={cx(
-                'px-4 sm:px-5 py-4 text-left transition-colors duration-150',
-                selected ? 'bg-accent-quiet' : 'hover:bg-sunken/50',
+                'block text-[0.8125rem] font-semibold',
+                selected ? 'text-accent' : 'text-ink-2',
               )}
             >
-              {content}
-            </button>
-          )
-        })}
-      </div>
+              {label}
+            </span>
+            <span className="block mt-2">
+              <Numeral
+                value={formatGrade(entry.average, scale)}
+                size="md"
+                tone={numeralTone(entry.average, scale)}
+              />
+            </span>
+          </>
+        )
+
+        // La final no es seleccionable: para verla hay que ir a «Curso», que
+        // es lo que representa realmente.
+        return isFinal ? (
+          <div key="final" className="card px-4 py-3.5">
+            {content}
+            <span className="block text-[0.6875rem] text-ink-3 mt-1">
+              media {mode === 'ponderada' ? 'ponderada por horas' : 'de las asignaturas'}
+            </span>
+          </div>
+        ) : (
+          <button
+            key={entry.term}
+            type="button"
+            onClick={() => onSelect(entry.term as Scope)}
+            aria-pressed={selected}
+            className={cx('card pressable px-4 py-3.5 text-left', selected && 'ring-2 ring-accent')}
+          >
+            {content}
+          </button>
+        )
+      })}
     </div>
   )
 }

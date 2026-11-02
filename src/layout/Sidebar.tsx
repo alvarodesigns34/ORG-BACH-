@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import { useSettings } from '@/state/StoreProvider'
 import { hrefFor, type RouteId } from '@/router'
 import { SyncBadge } from '@/features/account/SyncBadge'
+import { AccountAvatar } from './chrome'
 import { Button, cx } from '@/ui/primitives'
 import { BrandMark, BrandWordmark } from './Brand'
 import { NAV_GROUPS, NAV_ITEMS, NAV_TINTS } from './navigation'
@@ -58,48 +59,63 @@ export function Sidebar({ current, onCreate, badges }: SidebarProps) {
           <div key={group.id} className="mb-5 last:mb-0">
             <p className="eyebrow px-2.5 mb-1.5">{group.label}</p>
             <ul className="flex flex-col gap-px">
-              {NAV_ITEMS.filter((item) => item.group === group.id).map((item) => {
-                const active = item.id === current
-                const count = badges[item.id]
-                return (
-                  <li key={item.id}>
-                    <a
-                      href={hrefFor(item.id)}
-                      aria-current={active ? 'page' : undefined}
-                      className={cx(
-                        'flex items-center gap-2.5 h-9 pl-2 pr-2.5 rounded-[10px]',
-                        'text-[0.875rem] transition-colors duration-150',
-                        active
-                          ? 'bg-accent-quiet text-ink font-semibold'
-                          : 'text-ink-2 hover:bg-fill hover:text-ink',
-                      )}
-                    >
-                      <span
-                        className="grid place-items-center size-6 rounded-[7px] text-white shrink-0"
-                        style={{ background: NAV_TINTS[item.id] }}
+              {NAV_ITEMS.filter((item) => item.group === group.id && item.id !== 'ajustes').map(
+                (item) => {
+                  const active = item.id === current
+                  const count = badges[item.id]
+                  return (
+                    <li key={item.id}>
+                      <a
+                        href={hrefFor(item.id)}
+                        aria-current={active ? 'page' : undefined}
+                        className={cx(
+                          'flex items-center gap-2.5 h-9 pl-2 pr-2.5 rounded-[10px]',
+                          'text-[0.875rem] transition-colors duration-150',
+                          active
+                            ? 'bg-accent-quiet text-ink font-semibold'
+                            : 'text-ink-2 hover:bg-fill hover:text-ink',
+                        )}
                       >
-                        <item.icon className="size-[14px]" strokeWidth={2.3} />
-                      </span>
-                      <span className="truncate">{item.label}</span>
-                      {count !== undefined && count > 0 && (
-                        <span className="ml-auto text-[0.75rem] font-semibold tabular-nums text-ink-3">
-                          {count}
+                        <span
+                          className="grid place-items-center size-6 rounded-[7px] text-white shrink-0"
+                          style={{ background: NAV_TINTS[item.id] }}
+                        >
+                          <item.icon className="size-[14px]" strokeWidth={2.3} />
                         </span>
-                      )}
-                    </a>
-                  </li>
-                )
-              })}
+                        <span className="truncate">{item.label}</span>
+                        {count !== undefined && count > 0 && (
+                          <span className="ml-auto text-[0.75rem] font-semibold tabular-nums text-ink-3">
+                            {count}
+                          </span>
+                        )}
+                      </a>
+                    </li>
+                  )
+                },
+              )}
             </ul>
           </div>
         ))}
       </nav>
 
-      {/* --- Pie --- */}
-      <div className="px-4 py-3 border-t border-hairline flex flex-col gap-1">
-        <p className="text-[0.8125rem] font-semibold text-ink truncate">
-          {settings.userName || 'Sin nombre'}
-        </p>
+      {/* --- Pie: la cuenta y los ajustes, como en las apps de macOS --- */}
+      <a
+        href={hrefFor('ajustes')}
+        aria-current={current === 'ajustes' ? 'page' : undefined}
+        className={cx(
+          'mx-3 mb-3 mt-1 flex items-center gap-3 rounded-[12px] px-2.5 py-2.5 transition-colors duration-150',
+          current === 'ajustes' ? 'bg-accent-quiet' : 'hover:bg-fill',
+        )}
+      >
+        <AccountAvatar size={34} decorative />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[0.875rem] font-semibold text-ink truncate">
+            {settings.userName || 'Sin nombre'}
+          </span>
+          <span className="block text-[0.75rem] text-ink-3 truncate">Ajustes y cuenta</span>
+        </span>
+      </a>
+      <div className="px-5 pb-4">
         <SyncBadge />
       </div>
     </aside>

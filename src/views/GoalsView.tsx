@@ -88,7 +88,7 @@ export function GoalsView() {
               : `${goals.length} en marcha`
         }
         actions={
-          <Button variant="primary" onClick={() => setCreating(true)}>
+          <Button onClick={() => setCreating(true)}>
             <Plus className="size-4" strokeWidth={2.5} />
             <span className="hidden sm:inline">Nuevo objetivo</span>
             <span className="sm:hidden">Nuevo</span>

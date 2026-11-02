@@ -165,7 +165,9 @@ export function LineChart({
   )
 
   const ticks = [yMin, (yMin + yMax) / 2, yMax]
-  const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${scaleX(i)} ${scaleY(p.value)}`).join(' ')
+  const path = points
+    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${scaleX(i)} ${scaleY(p.value)}`)
+    .join(' ')
   const area =
     points.length > 0
       ? `${path} L ${scaleX(points.length - 1)} ${padding.top + plotHeight} L ${scaleX(0)} ${padding.top + plotHeight} Z`
@@ -212,7 +214,12 @@ export function LineChart({
                   stroke="var(--c-hairline)"
                   strokeWidth={1}
                 />
-                <text x={padding.left - 8} y={scaleY(tick) + 4} textAnchor="end" className={AXIS_TEXT}>
+                <text
+                  x={padding.left - 8}
+                  y={scaleY(tick) + 4}
+                  textAnchor="end"
+                  className={AXIS_TEXT}
+                >
                   {formatValue(tick)}
                 </text>
               </g>
@@ -294,7 +301,12 @@ export function LineChart({
                   {points[0].label}
                 </text>
                 {points.length > 1 && (
-                  <text x={width - padding.right} y={height - 6} textAnchor="end" className={AXIS_TEXT}>
+                  <text
+                    x={width - padding.right}
+                    y={height - 6}
+                    textAnchor="end"
+                    className={AXIS_TEXT}
+                  >
                     {points[points.length - 1].label}
                   </text>
                 )}
@@ -379,16 +391,13 @@ export function ColumnChart({
             />
 
             {columns.map((column, i) => {
-              const barHeight = column.value === 0 ? 0 : Math.max(3, (column.value / max) * plotHeight)
+              const barHeight =
+                column.value === 0 ? 0 : Math.max(3, (column.value / max) * plotHeight)
               const x = padding.left + i * slot + (slot - barWidth) / 2
               const y = padding.top + plotHeight - barHeight
 
               return (
-                <g
-                  key={i}
-                  onPointerEnter={() => setHover(i)}
-                  onPointerLeave={() => setHover(null)}
-                >
+                <g key={i} onPointerEnter={() => setHover(i)} onPointerLeave={() => setHover(null)}>
                   {/* Zona sensible mayor que la barra: acertar con el dedo en
                       una columna de 4 px es imposible. */}
                   <rect
@@ -428,10 +437,7 @@ export function ColumnChart({
                 x={padding.left + i * slot + slot / 2}
                 y={height - 6}
                 textAnchor="middle"
-                className={cx(
-                  AXIS_TEXT,
-                  column.highlight && 'fill-[var(--c-ink)] font-semibold',
-                )}
+                className={cx(AXIS_TEXT, column.highlight && 'fill-[var(--c-ink)] font-semibold')}
               >
                 {column.shortLabel ?? column.label}
               </text>
