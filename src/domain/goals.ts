@@ -1,13 +1,13 @@
 /**
  * Progreso de los objetivos.
  *
- * Se calcula a partir de los datos reales: notas registradas, sesiones de
- * estudio y tareas completadas. No hay progreso que el alumno tenga que
+ * Se calcula a partir de los datos reales: notas registradas y
+ * tareas completadas. No hay progreso que el alumno tenga que
  * actualizar a mano, salvo en los objetivos de tipo «manual», que existen
  * precisamente para lo que la aplicación no puede medir.
  */
 
-import { formatDuration, startOfWeek, toDay } from './dates.ts'
+import { startOfWeek, toDay } from './dates.ts'
 import { formatGrade, round } from './grades.ts'
 import type { SubjectResult } from './grades.ts'
 import { isDone } from './tasks.ts'
@@ -18,7 +18,6 @@ import type {
   GoalScope,
   GradeScale,
   ID,
-  StudySession,
   Subject,
   Task,
   TermId,
@@ -26,7 +25,6 @@ import type {
 
 export interface GoalContext {
   tasks: Task[]
-  sessions: StudySession[]
   subjects: Subject[]
   /** Resultados de la evaluación activa. Los usa el alcance «trimestral». */
   results: Map<ID, SubjectResult>
@@ -73,7 +71,6 @@ export interface GoalProgress {
 export const SCOPES_BY_KIND: Record<GoalKind, GoalScope[]> = {
   // Una media no se mide por días: se mide por evaluación o por curso.
   media: ['trimestral', 'anual'],
-  horas_estudio: ['diario', 'semanal', 'anual'],
   tareas: ['diario', 'semanal'],
   manual: ['diario', 'semanal', 'trimestral', 'anual'],
 }
@@ -87,7 +84,6 @@ export const SCOPE_LABEL: Record<GoalScope, string> = {
 
 export const KIND_LABEL: Record<GoalKind, string> = {
   media: 'Nota media',
-  horas_estudio: 'Horas de estudio',
   tareas: 'Tareas completadas',
   manual: 'Seguimiento manual',
 }
@@ -152,27 +148,6 @@ export function goalProgress(goal: Goal, ctx: GoalContext): GoalProgress {
       }
     }
 
-    case 'horas_estudio': {
-      const minutes = ctx.sessions
-        .filter((s) => {
-          if (goal.subjectId && s.subjectId !== goal.subjectId) return false
-          return !from || toDay(new Date(s.startedAt)) >= from
-        })
-        .reduce((sum, s) => sum + s.minutes, 0)
-
-      const targetMinutes = target * 60
-      const percent = clampPercent((minutes / targetMinutes) * 100)
-      return {
-        current: minutes / 60,
-        target,
-        percent,
-        label: `${formatDuration(minutes)} de ${formatDuration(targetMinutes)}`,
-        headline: `${Math.round(percent)} %`,
-        done: minutes >= targetMinutes,
-        measurable: true,
-      }
-    }
-
     case 'tareas': {
       const completed = ctx.tasks.filter((t) => {
         if (!isDone(t) || !t.completedAt) return false
@@ -226,8 +201,6 @@ export function suggestTitle(kind: GoalKind, scope: GoalScope, target: number, s
   switch (kind) {
     case 'media':
       return `Conseguir una media de ${target.toLocaleString('es-ES')}${where}`
-    case 'horas_estudio':
-      return `Estudiar ${target} h${where} · ${SCOPE_LABEL[scope].toLowerCase()}`
     case 'tareas':
       return `Completar ${target} tareas${where} · ${SCOPE_LABEL[scope].toLowerCase()}`
     default:

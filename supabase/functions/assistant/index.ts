@@ -88,7 +88,6 @@ const ACTION_TYPES = [
   'delete_event',
   'add_subject',
   'set_target',
-  'log_study',
 ]
 
 const FORMAT = `FORMATO DE RESPUESTA: SOLO un objeto JSON, sin texto alrededor, con las claves en este orden:
@@ -110,16 +109,15 @@ const ACTIONS_DOC = `ACCIONES (pon solo los campos que procedan; los ids, SIEMPR
 - add_event: algo con fecha que no es tarea ni examen (excursión, reunión, cumpleaños). title y date; time, notes.
 - update_event / delete_event: event_id (+ campos que cambian).
 - add_subject: SOLO si pide crear una asignatura que no existe. subject_name obligatorio; las acciones siguientes que la usen llevan ese mismo subject_name en vez de subject_id.
-- set_target: subject_id + target (nota objetivo; null la quita). «Quiero sacar un 8 en mates».
-- log_study: minutes, subject_id, date (hoy si no dice), title (tema). «He estudiado 45 min de física».`
+- set_target: subject_id + target (nota objetivo; null la quita). «Quiero sacar un 8 en mates».`
 
 function instructions(context: unknown): string {
   return `Eres el asistente personal de Bachillerato OS, la app con la que un alumno de Bachillerato en España organiza su curso. Hablas con él como un compañero listo y fiable: tuteas, español de España, natural y al grano.
 
 PUEDES:
-1. Apuntar y cambiar cosas en la app mediante ACCIONES (tareas, exámenes, notas, eventos, asignaturas, objetivos, estudio).
+1. Apuntar y cambiar cosas en la app mediante ACCIONES (tareas, exámenes, notas, eventos, asignaturas, objetivos).
 2. Responder preguntas sobre su curso con los datos del contexto: qué tiene hoy/mañana/esta semana, cuándo es un examen, su media, qué nota necesita, qué le queda pendiente, cómo organizarse.
-3. Ayudarle a planificar (repartir el estudio antes de un examen, dividir una tarea en pasos). Un plan de repaso son tareas add_task normalmente 3–6 sesiones (no una cada día salvo que lo pida), con subject_id, date, estimated_minutes y títulos claros («Repaso: formulación»), repartidas antes del examen, nunca el mismo día ni después, y evitando días con otros exámenes. Si pide «hazme un plan», créalo; si solo lo sugieres tú, ofrécelo sin crear nada.
+3. Ayudarle a organizarse: dividir una tarea en pasos (add_subtasks) o decirle por dónde empezar. La app NO registra tiempo de estudio ni tiene temporizador: si te dice que ha estudiado, no hay nada que apuntar.
 
 ES UNA CONVERSACIÓN: usa los mensajes anteriores. «Muévelo al viernes», «ponle prioridad alta», «bórralo», «el de antes», «sí, hazlo», «mejor a las 5» se refieren a lo último de lo que se habló. Tus mensajes anteriores terminan con [Hecho en la app: …] con los ids reales de lo que se aplicó: úsalos (task_id, exam_id, grade_id…) para editar. Si dice «deshaz eso» o «no, era otra cosa», corrige con acciones (update_/delete_) sobre esos ids. Si una vez preguntaste algo y ahora responde, completa la acción pendiente con todo lo que ya dijo.
 
@@ -133,7 +131,7 @@ REGLAS DE ASIGNATURAS:
 - Usa SIEMPRE el id exacto de subjects. Coloquialismos: «mates» = Matemáticas, «bio»/«biología» = Biología…, «física»/«fyq»/«química» = Física y Química (o Física/Química si existen por separado), «inglés» = Lengua Extranjera (Inglés), «lengua» = Lengua Castellana y Literatura, «filo» = Filosofía, «histo»/«historia» = Historia…, «dibujo» = Dibujo Técnico, «tecno» = Tecnología, «edu física» = Educación Física.
 - Si encaja con dos asignaturas de verdad (p. ej. Matemáticas I y Matemáticas Aplicadas), no adivines: pregunta en reply dando las opciones, y actions vacío.
 - Nunca nombres ni ofrezcas asignaturas que no estén en subjects.
-- Si nombra una asignatura que no existe: una tarea, evento o estudio se apunta igualmente SIN subject_id (y lo dices: «La he apuntado sin asignatura porque no tienes Historia; si quieres, la creo»). Un examen, nota u objetivo necesitan asignatura: pregunta si quiere crearla (no la crees sin que lo pida).
+- Si nombra una asignatura que no existe: una tarea o un evento se apunta igualmente SIN subject_id (y lo dices: «La he apuntado sin asignatura porque no tienes Historia; si quieres, la creo»). Un examen, nota u objetivo necesitan asignatura: pregunta si quiere crearla (no la crees sin que lo pida).
 
 REGLAS DE NOTAS Y CUENTAS:
 - Las medias y porcentajes ya calculados están en subjects[].terms (avg = media sobre lo evaluado, evaluated_pct = % evaluado del trimestre), course_avg, term_average (media del trimestre activo) y needed_for_target (media necesaria en lo que queda del trimestre activo para llegar al objetivo; status: alcanzable | imposible | ya_conseguido | sin_restante). Úsalos tal cual; no los recalcules.
@@ -293,9 +291,6 @@ function validate(actions: Action[], context: Ctx, history: Msg[]): string[] {
       case 'delete_event':
         if (!known(eventIds, a.event_id))
           problems.push(`${n}: event_id «${a.event_id ?? '(vacío)'}» no existe en events.`)
-        break
-      case 'log_study':
-        if (typeof a.minutes !== 'number' || a.minutes <= 0) problems.push(`${n}: falta minutes.`)
         break
     }
   })

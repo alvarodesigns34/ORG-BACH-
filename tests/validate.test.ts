@@ -17,7 +17,6 @@ import {
   parseCollection,
   parseEvent,
   parseGrade,
-  parseSession,
   parseSubject,
   parseTask,
   sanitizeSettings,
@@ -143,29 +142,6 @@ describe('parseGrade', () => {
   })
 })
 
-describe('parseSession', () => {
-  const valid = {
-    id: 's1',
-    startedAt: '2026-10-01T17:00:00.000Z',
-    minutes: 45,
-    mode: 'libre',
-  }
-
-  it('rechaza duraciones imposibles', () => {
-    assert.equal(parseSession({ ...valid, minutes: 0 }), null)
-    assert.equal(parseSession({ ...valid, minutes: -30 }), null)
-  })
-
-  it('recorta una duración absurda en vez de dispararlo todo', () => {
-    // 500 horas de estudio en una sesión falsearían cada estadística.
-    assert.equal(parseSession({ ...valid, minutes: 30_000 })?.minutes, 24 * 60)
-  })
-
-  it('rechaza marcas de tiempo ilegibles', () => {
-    assert.equal(parseSession({ ...valid, startedAt: 'ayer' }), null)
-  })
-})
-
 describe('parseEvent', () => {
   it('descarta una hora de fin anterior al inicio', () => {
     const parsed = parseEvent({
@@ -278,15 +254,43 @@ describe('sanitizeSettings', () => {
   it('recorta valores fuera de rango al límite exacto', () => {
     // Con `assert.ok(x <= 365)` pasaba cualquier recorte, incluido uno que
     // dejara el aviso en un día. Se fija el valor.
+    const high = sanitizeSettings({ examAlertDays: 5000 }, DEFAULT_SETTINGS)
+    assert.equal(high.examAlertDays, 365)
+    // Al MÍNIMO del rango (1), no al valor por defecto (7): el recorte
+    // acerca al límite, no repone el ajuste.
+    const low = sanitizeSettings({ examAlertDays: 0 }, DEFAULT_SETTINGS)
+    assert.equal(low.examAlertDays, 1)
+  })
+
+  it('las tarjetas de Inicio: sin repetidos ni desconocidas, y con las que falten al final', () => {
     const settings = sanitizeSettings(
-      { examAlertDays: 5000, pomodoroMinutes: 0 },
+      { home: { order: ['media', 'media', 'inventada', 'hoy'], hidden: ['hoy', 'otra'] } },
       DEFAULT_SETTINGS,
     )
-    assert.equal(settings.examAlertDays, 365)
-    // Al MÍNIMO del rango (1), no al valor por defecto (25): el recorte
-    // acerca al límite, no repone el ajuste. El `assert.ok(x >= 1)` anterior
-    // daba por buenas las dos lecturas.
-    assert.equal(settings.pomodoroMinutes, 1)
+    assert.deepEqual(settings.home.order.slice(0, 2), ['media', 'hoy'])
+    assert.equal(settings.home.order.length, DEFAULT_SETTINGS.home.order.length)
+    assert.equal(new Set(settings.home.order).size, settings.home.order.length)
+    assert.deepEqual(settings.home.hidden, ['hoy'])
+  })
+
+  it('lo que guardaba el temporizador de estudio se aparta sin contarlo como roto', () => {
+    const report = migrateWithReport({
+      version: 1,
+      settings: { ...DEFAULT_SETTINGS, onboarded: true, pomodoroMinutes: 25 },
+      sessions: [{ id: 's1', startedAt: '2026-10-01T17:00:00.000Z', minutes: 45, mode: 'libre' }],
+      goals: [
+        { id: 'g1', title: 'Estudiar', kind: 'horas_estudio', scope: 'semanal', target: 8 },
+        { id: 'g2', title: 'Media', kind: 'media', scope: 'anual', target: 8 },
+      ],
+      activity: [
+        { id: 'a1', kind: 'estudio_registrado', at: '2026-10-01T17:00:00.000Z', text: 'x' },
+      ],
+    })
+    assert.equal(report.totalDropped, 0)
+    assert.deepEqual(report.data.goals.map((g) => g.id), ['g2'])
+    assert.equal(report.data.activity.length, 0)
+    assert.equal('sessions' in report.data, false)
+    assert.equal('pomodoroMinutes' in report.data.settings, false)
   })
 
   it('con ajustes ilegibles devuelve los de por defecto', () => {
@@ -373,7 +377,6 @@ describe('importJSON', () => {
       grades: [],
       exams: [],
       events: [],
-      sessions: [],
       goals: [],
       activity: [],
     })

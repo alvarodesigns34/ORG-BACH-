@@ -216,22 +216,10 @@ export interface CalendarEvent {
 }
 
 // ---------------------------------------------------------------------------
-// Estudio y objetivos
+// Objetivos
 // ---------------------------------------------------------------------------
 
-export interface StudySession {
-  id: ID
-  subjectId?: ID
-  topic?: string
-  startedAt: TimestampISO
-  /** Duracion real registrada, en minutos. */
-  minutes: number
-  mode: 'pomodoro' | 'libre'
-  notes?: string
-  demo?: boolean
-}
-
-export type GoalKind = 'media' | 'horas_estudio' | 'tareas' | 'manual'
+export type GoalKind = 'media' | 'tareas' | 'manual'
 export type GoalScope = 'diario' | 'semanal' | 'trimestral' | 'anual'
 
 export interface Goal {
@@ -258,7 +246,6 @@ export type ActivityKind =
   | 'tarea_completada'
   | 'nota_anadida'
   | 'examen_creado'
-  | 'estudio_registrado'
   | 'asignatura_creada'
   | 'objetivo_creado'
 
@@ -281,6 +268,26 @@ export interface GradeScale {
   decimals: number
 }
 
+/** Tarjetas que se pueden colocar en Inicio. */
+export const HOME_WIDGETS = [
+  'ahora',
+  'hoy',
+  'examenes',
+  'media',
+  'semana',
+  'objetivos',
+  'avisos',
+  'actividad',
+] as const
+export type HomeWidgetId = (typeof HOME_WIDGETS)[number]
+
+export interface HomeLayout {
+  /** Todas las tarjetas, en el orden en que se pintan. */
+  order: HomeWidgetId[]
+  /** Las que el alumno ha quitado de Inicio. */
+  hidden: HomeWidgetId[]
+}
+
 export type ThemePreference = 'light' | 'dark' | 'system'
 
 /** Como se combina la nota de cada asignatura en la media global. */
@@ -299,12 +306,8 @@ export interface Settings {
   alertsEnabled: boolean
   /** Dias de antelacion con los que avisar de un examen. */
   examAlertDays: number
-  /** Duración de un tramo de trabajo del pomodoro, en minutos. */
-  pomodoroMinutes: number
-  /** Duración del descanso entre pomodoros, en minutos. */
-  pomodoroBreakMinutes: number
-  /** Aviso sonoro al terminar un tramo del pomodoro. */
-  pomodoroSound: boolean
+  /** Tarjetas de Inicio: en qué orden van y cuáles están ocultas. */
+  home: HomeLayout
   onboarded: boolean
 }
 
@@ -317,7 +320,6 @@ export interface AppData {
   grades: GradeEntry[]
   exams: Exam[]
   events: CalendarEvent[]
-  sessions: StudySession[]
   goals: Goal[]
   activity: ActivityEntry[]
 }

@@ -26,7 +26,6 @@ interface GoalEditorProps {
 /** Unidad y ayuda de cada tipo, para que el campo «meta» no sea ambiguo. */
 const TARGET_HINT: Record<GoalKind, { suffix: string; hint: string; step: number }> = {
   media: { suffix: '', hint: 'La nota media que quieres alcanzar.', step: 0.5 },
-  horas_estudio: { suffix: 'h', hint: 'Horas de estudio en el periodo elegido.', step: 1 },
   tareas: { suffix: '', hint: 'Número de tareas completadas en el periodo.', step: 1 },
   manual: { suffix: '', hint: 'La cifra a la que quieres llegar.', step: 1 },
 }

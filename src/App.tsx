@@ -14,7 +14,6 @@ import { SubjectsView } from '@/views/SubjectsView'
 import { SubjectDetailView } from '@/views/SubjectDetailView'
 import { GradesView } from '@/views/GradesView'
 import { StatsView } from '@/views/StatsView'
-import { StudyView } from '@/views/StudyView'
 import { GoalsView } from '@/views/GoalsView'
 import { SettingsView } from '@/views/SettingsView'
 import { Button } from '@/ui/primitives'
@@ -154,8 +153,6 @@ function renderRoute(route: Route, subjectCount: number) {
       return <GradesView />
     case 'estadisticas':
       return <StatsView />
-    case 'estudio':
-      return <StudyView />
     case 'objetivos':
       return <GoalsView />
     case 'ajustes':

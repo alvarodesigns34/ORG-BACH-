@@ -13,7 +13,6 @@
 
 import { createEmptyData, SCHEMA_VERSION, STORAGE_KEY } from '../data/defaults.ts'
 import { DEFAULT_SETTINGS } from '../data/defaults.ts'
-import { parseTimerState, type TimerState } from '../domain/study.ts'
 import type { AppData } from '../domain/types.ts'
 import {
   parseActivity,
@@ -22,7 +21,6 @@ import {
   parseExam,
   parseGoal,
   parseGrade,
-  parseSession,
   parseSubject,
   parseTask,
   sanitizeSettings,
@@ -40,7 +38,6 @@ const COLLECTIONS = [
   'grades',
   'exams',
   'events',
-  'sessions',
   'goals',
   'activity',
 ] as const
@@ -52,7 +49,6 @@ const PARSERS = {
   grades: parseGrade,
   exams: parseExam,
   events: parseEvent,
-  sessions: parseSession,
   goals: parseGoal,
   activity: parseActivity,
 } as const
@@ -65,13 +61,34 @@ export interface MigrateReport {
 }
 
 /**
+ * Quita lo que guardaban las versiones con temporizador de estudio: los
+ * objetivos de horas y las entradas de actividad de sesiones. Se apartan
+ * ANTES de validar para que no cuenten como registros rotos: no lo están,
+ * simplemente pertenecen a una función que ya no existe. Las sesiones y los
+ * ajustes del pomodoro se ignoran solos al no tener colección ni campo.
+ */
+function withoutStudy(input: Record<string, unknown>): Record<string, unknown> {
+  const keep = (list: unknown, legacyKind: string) =>
+    Array.isArray(list)
+      ? list.filter(
+          (item) => !(item && typeof item === 'object' && (item as { kind?: unknown }).kind === legacyKind),
+        )
+      : list
+  return {
+    ...input,
+    goals: keep(input.goals, 'horas_estudio'),
+    activity: keep(input.activity, 'estudio_registrado'),
+  }
+}
+
+/**
  * Normaliza unos datos guardados y descarta lo que no se pueda usar.
  *
  * Hace dos trabajos a la vez. El primero es migrar: los campos añadidos en
  * versiones nuevas aparecen con su valor por defecto en lugar de llegar como
  * `undefined` y romper la interfaz a mitad de render. El segundo es validar
  * cada registro campo a campo, porque un archivo importado puede ser JSON
- * correcto y aun así traer notas sin escala o sesiones de duración imposible.
+ * correcto y aun así traer notas sin escala o tareas sin título.
  *
  * Un registro roto se descarta solo él, no el archivo entero: perder dos
  * notas de ciento veinte es mejor que perder el curso completo.
@@ -80,7 +97,7 @@ export function migrateWithReport(raw: unknown): MigrateReport {
   const base = createEmptyData()
   if (!raw || typeof raw !== 'object') return { data: base, dropped: {}, totalDropped: 0 }
 
-  const input = raw as Record<string, unknown>
+  const input = withoutStudy(raw as Record<string, unknown>)
   const data: AppData = {
     ...base,
     settings: sanitizeSettings(input.settings, DEFAULT_SETTINGS),
@@ -152,9 +169,6 @@ export function migrateWithReport(raw: unknown): MigrateReport {
   data.events = data.events.map((e) =>
     e.subjectId && !subjectIds.has(e.subjectId) ? { ...e, subjectId: undefined } : e,
   )
-  data.sessions = data.sessions.map((s) =>
-    s.subjectId && !subjectIds.has(s.subjectId) ? { ...s, subjectId: undefined } : s,
-  )
   // Sin asignatura el objetivo deja de ser el mismo: se archiva, igual que
   // al borrar la asignatura desde la interfaz. Desvincularlo y dejarlo activo
   // lo convertía en un objetivo global falso.
@@ -182,7 +196,6 @@ const COLLECTION_NAMES: Record<string, string> = {
   grades: 'notas',
   exams: 'exámenes',
   events: 'eventos',
-  sessions: 'sesiones de estudio',
   goals: 'objetivos',
   activity: 'entradas de actividad',
 }
@@ -307,7 +320,7 @@ export function clearBackup(): void {
 }
 
 /**
- * Borra los datos académicos Y el temporizador en marcha.
+ * Borra los datos académicos.
  *
  * Se escribe un curso vacío en vez de `removeItem`: un `storage` con
  * `newValue === null` lo ignoraba la otra pestaña, y el siguiente tecleo
@@ -315,53 +328,11 @@ export function clearBackup(): void {
  */
 export function resetAll(): void {
   saveEmpty()
-  clearTimer()
-}
-
-// ---------------------------------------------------------------------------
-// Temporizador en marcha
-// ---------------------------------------------------------------------------
-
-/**
- * El temporizador vive aparte de los datos académicos.
- *
- * Es estado efímero de una sesión concreta, no algo que tenga sentido exportar
- * ni migrar. Guardarlo, en cambio, sí importa: recargar la página sin querer a
- * los cuarenta minutos no debería perder la sesión.
- */
-const TIMER_KEY = 'bachillerato-os:timer'
-
-/** La pestaña actual también tiene que enterarse de un reset del temporizador. */
-export const TIMER_CLEARED_EVENT = 'bachillerato-os:timer-cleared'
-
-export function loadTimer(): TimerState | null {
+  // Resto de versiones anteriores: el temporizador de estudio en marcha.
   try {
-    const raw = localStorage.getItem(TIMER_KEY)
-    if (!raw) return null
-    // La validación vive en el dominio, donde se puede probar sin navegador.
-    return parseTimerState(JSON.parse(raw))
+    localStorage.removeItem('bachillerato-os:timer')
   } catch {
-    return null
-  }
-}
-
-export function saveTimer(state: TimerState | null): { ok: true } | { ok: false; error: string } {
-  try {
-    if (state) localStorage.setItem(TIMER_KEY, JSON.stringify(state))
-    else localStorage.removeItem(TIMER_KEY)
-    return { ok: true }
-  } catch (error) {
-    return {
-      ok: false,
-      error: `No se pudo guardar el temporizador (${describe(error)}). Si recargas ahora, se pierde la sesión.`,
-    }
-  }
-}
-
-export function clearTimer(): void {
-  saveTimer(null)
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event(TIMER_CLEARED_EVENT))
+    // Sin almacenamiento no hay nada que limpiar.
   }
 }
 

@@ -6,7 +6,6 @@ import {
   ListChecks,
   Settings,
   Target,
-  Timer,
   TrendingUp,
   type LucideIcon,
 } from 'lucide-react'
@@ -28,7 +27,6 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'asignaturas', label: 'Asignaturas', icon: BookOpen, group: 'academico' },
   { id: 'notas', label: 'Notas', icon: GraduationCap, group: 'academico' },
   { id: 'estadisticas', label: 'Estadísticas', icon: TrendingUp, group: 'academico' },
-  { id: 'estudio', label: 'Estudio', icon: Timer, group: 'sistema' },
   { id: 'objetivos', label: 'Objetivos', icon: Target, group: 'sistema' },
   { id: 'ajustes', label: 'Ajustes', icon: Settings, group: 'sistema' },
 ]
@@ -53,7 +51,6 @@ export const NAV_TINTS: Record<RouteId, string> = {
   asignaturas: '#ff9f0a',
   notas: '#bf5af2',
   estadisticas: '#30b158',
-  estudio: '#ff6b2c',
   objetivos: '#ff375f',
   ajustes: '#8e8e93',
 }

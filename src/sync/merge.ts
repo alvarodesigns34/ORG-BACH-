@@ -32,7 +32,6 @@ import {
   parseExam,
   parseGoal,
   parseGrade,
-  parseSession,
   parseSubject,
   parseTask,
   sanitizeSettings,
@@ -45,7 +44,6 @@ export const ENTITY_COLLECTIONS = [
   'grades',
   'exams',
   'events',
-  'sessions',
   'goals',
   'activity',
 ] as const
@@ -263,7 +261,6 @@ const PARSERS: Record<EntityCollection, (raw: unknown) => { id: string } | null>
   grades: parseGrade,
   exams: parseExam,
   events: parseEvent,
-  sessions: parseSession,
   goals: parseGoal,
   activity: parseActivity,
 }

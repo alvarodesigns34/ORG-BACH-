@@ -7,12 +7,11 @@ import {
   ListChecks,
   Mic,
   Sparkles,
-  Timer,
   TriangleAlert,
   type LucideIcon,
 } from 'lucide-react'
 
-import { daysUntil, formatDuration, formatLongDate, greeting } from '@/domain/dates'
+import { daysUntil, formatLongDate, greeting } from '@/domain/dates'
 import { formatGrade, numeralTone } from '@/domain/grades'
 import { TERMS, type Exam, type Subject, type Task } from '@/domain/types'
 import { hrefFor } from '@/router'
@@ -20,7 +19,6 @@ import { useSettings, useStore, useToday } from '@/state/StoreProvider'
 import {
   useAlerts,
   useGlobalAverage,
-  useStudyStats,
   useSubjectMap,
   useSubjectResults,
   useTaskSummary,
@@ -52,7 +50,6 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
   const summary = useTaskSummary()
   const exams = useUpcomingExams(4)
   const subjects = useSubjectMap()
-  const study = useStudyStats()
   const average = useGlobalAverage(settings.activeTerm)
   // Lo atrasado y los exámenes ya tienen su widget y su lista: repetirlos
   // como aviso duplicaba la misma información en la primera pantalla.
@@ -151,14 +148,6 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
             caption="en total"
           />
         )}
-        <Widget
-          href={hrefFor('estudio')}
-          icon={Timer}
-          tint={NAV_TINTS.estudio}
-          label="Estudio"
-          value={formatDuration(study.weekMinutes)}
-          caption="esta semana"
-        />
       </div>
 
       {/* --- Avisos: una lista, como mucho tres filas, por gravedad --- */}

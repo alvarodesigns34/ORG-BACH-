@@ -7,7 +7,6 @@
  * plano que finge tener información.
  */
 
-import { addDays, toDay } from './dates.ts'
 import { globalAverage, subjectResult, type SubjectResult } from './grades.ts'
 import { isDone, isOverdue, wasOnTime } from './tasks.ts'
 import type {
@@ -16,7 +15,6 @@ import type {
   GradeEntry,
   GradeScale,
   ID,
-  StudySession,
   Subject,
   Task,
   TermId,
@@ -161,57 +159,4 @@ export function taskStats(
       judgements.length === 0 ? null : Math.round((onTime.length / judgements.length) * 100),
     withDueDate: tasks.filter((t) => t.dueDate).length,
   }
-}
-
-// ---------------------------------------------------------------------------
-// Estudio
-// ---------------------------------------------------------------------------
-
-export interface DayStudy {
-  day: DateISO
-  minutes: number
-}
-
-/** Minutos estudiados cada uno de los últimos `days` días, del más antiguo al más reciente. */
-export function studyByDay(sessions: StudySession[], today: DateISO, days: number): DayStudy[] {
-  const perDay = new Map<DateISO, number>()
-  for (const session of sessions) {
-    const day = toDay(new Date(session.startedAt))
-    perDay.set(day, (perDay.get(day) ?? 0) + session.minutes)
-  }
-  return Array.from({ length: days }, (_, i) => {
-    const day = addDays(today, i - (days - 1))
-    return { day, minutes: perDay.get(day) ?? 0 }
-  })
-}
-
-export interface SubjectStudy {
-  subject: Subject | undefined
-  minutes: number
-  /** Porcentaje sobre el total estudiado (0-100). */
-  share: number
-}
-
-export function studyBySubject(
-  sessions: StudySession[],
-  subjects: Subject[],
-  from?: DateISO,
-): SubjectStudy[] {
-  const byId = new Map(subjects.map((s) => [s.id, s]))
-  const perSubject = new Map<ID | undefined, number>()
-
-  let total = 0
-  for (const session of sessions) {
-    if (from && toDay(new Date(session.startedAt)) < from) continue
-    perSubject.set(session.subjectId, (perSubject.get(session.subjectId) ?? 0) + session.minutes)
-    total += session.minutes
-  }
-
-  return [...perSubject.entries()]
-    .map(([id, minutes]) => ({
-      subject: id ? byId.get(id) : undefined,
-      minutes,
-      share: total === 0 ? 0 : (minutes / total) * 100,
-    }))
-    .sort((a, b) => b.minutes - a.minutes)
 }

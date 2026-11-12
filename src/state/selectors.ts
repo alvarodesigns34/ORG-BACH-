@@ -9,7 +9,7 @@
 import { useMemo } from 'react'
 
 import { detectAlerts, type Alert } from '../domain/alerts.ts'
-import { addDays, daysUntil, startOfWeek, startOfMonth, toDay } from '../domain/dates.ts'
+import { daysUntil, startOfWeek, toDay } from '../domain/dates.ts'
 import { globalAverage, subjectResult, type SubjectResult } from '../domain/grades.ts'
 import { bucketOf, isOverdue, sortTasks } from '../domain/tasks.ts'
 import type { DateISO, Exam, ID, Subject, Task, TermId } from '../domain/types.ts'
@@ -146,64 +146,6 @@ export function useUpcomingExams(limit?: number): Exam[] {
 }
 
 // ---------------------------------------------------------------------------
-// Estudio
-// ---------------------------------------------------------------------------
-
-export interface StudyStats {
-  todayMinutes: number
-  weekMinutes: number
-  monthMinutes: number
-  totalMinutes: number
-  /** Minutos por día de los últimos 7 días, del más antiguo al más reciente. */
-  lastWeek: { day: DateISO; minutes: number }[]
-  bySubject: { subjectId: ID | undefined; minutes: number }[]
-}
-
-export function useStudyStats(): StudyStats {
-  const { data, today } = useStore()
-  return useMemo(() => {
-    const weekStart = startOfWeek(today, data.settings.weekStartsOn)
-    const monthStart = startOfMonth(today)
-
-    // Las sesiones guardan marca de tiempo completa; el día natural es su
-    // prefijo. Comparar cadenas evita crear un Date por sesión.
-    const dayOf = (iso: string) => toDay(new Date(iso))
-
-    let todayMinutes = 0
-    let weekMinutes = 0
-    let monthMinutes = 0
-    let totalMinutes = 0
-
-    const perDay = new Map<DateISO, number>()
-    const perSubject = new Map<ID | undefined, number>()
-
-    for (const session of data.sessions) {
-      const day = dayOf(session.startedAt)
-      totalMinutes += session.minutes
-      if (day === today) todayMinutes += session.minutes
-      // "Esta semana"/"este mes" son lo estudiado hasta ahora: una sesión con
-      // fecha futura (solo posible con datos importados o manipulados) no
-      // debe engordar un total que todavía no ha llegado.
-      if (day >= weekStart && day <= today) weekMinutes += session.minutes
-      if (day >= monthStart && day <= today) monthMinutes += session.minutes
-      perDay.set(day, (perDay.get(day) ?? 0) + session.minutes)
-      perSubject.set(session.subjectId, (perSubject.get(session.subjectId) ?? 0) + session.minutes)
-    }
-
-    const lastWeek = Array.from({ length: 7 }, (_, i) => {
-      const day = addDays(today, i - 6)
-      return { day, minutes: perDay.get(day) ?? 0 }
-    })
-
-    const bySubject = [...perSubject.entries()]
-      .map(([subjectId, minutes]) => ({ subjectId, minutes }))
-      .sort((a, b) => b.minutes - a.minutes)
-
-    return { todayMinutes, weekMinutes, monthMinutes, totalMinutes, lastWeek, bySubject }
-  }, [data.sessions, data.settings.weekStartsOn, today])
-}
-
-// ---------------------------------------------------------------------------
 // Alertas
 // ---------------------------------------------------------------------------
 
@@ -238,7 +180,7 @@ export function useAlerts(): Alert[] {
 // Calendario
 // ---------------------------------------------------------------------------
 
-export type DayItemKind = 'tarea' | 'examen' | 'evento' | 'estudio'
+export type DayItemKind = 'tarea' | 'examen' | 'evento'
 
 export interface DayItem {
   id: ID
@@ -289,20 +231,10 @@ export function useCalendarIndex(): Map<DateISO, DayItem[]> {
         time: event.startTime,
       })
     }
-    for (const session of data.sessions) {
-      const day = toDay(new Date(session.startedAt))
-      push(day, {
-        id: session.id,
-        kind: 'estudio',
-        title: session.topic ? `Estudio: ${session.topic}` : 'Sesión de estudio',
-        subjectId: session.subjectId,
-      })
-    }
-
     // Dentro de un día manda la hora; lo que no la tiene queda al final.
     for (const list of index.values()) {
       list.sort((a, b) => (a.time ?? '99:99').localeCompare(b.time ?? '99:99'))
     }
     return index
-  }, [data.tasks, data.exams, data.events, data.sessions])
+  }, [data.tasks, data.exams, data.events])
 }

@@ -5,7 +5,6 @@ import {
   CalendarDays,
   CalendarRange,
   Check,
-  Coffee,
   Database,
   Download,
   GraduationCap,
@@ -13,11 +12,9 @@ import {
   Layers,
   Sigma,
   SunMoon,
-  Timer,
   TriangleAlert,
   Upload,
   UserRound,
-  Volume2,
 } from 'lucide-react'
 
 import { createEmptyData } from '@/data/defaults'
@@ -102,7 +99,6 @@ export function SettingsView({ section }: { section?: string | null }) {
 
   const applyImport = () => {
     if (!pendingImport) return
-    storage.clearTimer()
     replaceAndSave(pendingImport.data)
     setNotice(
       pendingImport.warning
@@ -282,40 +278,6 @@ export function SettingsView({ section }: { section?: string | null }) {
           )}
         </ListGroup>
 
-        <ListGroup header="Temporizador de estudio">
-          <RowNumber
-            icon={Timer}
-            tint="#ff6b2c"
-            label="Tramo de trabajo"
-            suffix="min"
-            min={5}
-            max={120}
-            integer
-            value={settings.pomodoroMinutes}
-            fallback={25}
-            onCommit={(pomodoroMinutes) => update({ pomodoroMinutes })}
-          />
-          <RowNumber
-            icon={Coffee}
-            tint="#a2845e"
-            label="Descanso"
-            suffix="min"
-            min={1}
-            max={60}
-            integer
-            value={settings.pomodoroBreakMinutes}
-            fallback={5}
-            onCommit={(pomodoroBreakMinutes) => update({ pomodoroBreakMinutes })}
-          />
-          <RowSwitch
-            icon={Volume2}
-            tint="#ff375f"
-            label="Sonido al terminar"
-            checked={settings.pomodoroSound}
-            onChange={(pomodoroSound) => update({ pomodoroSound })}
-          />
-        </ListGroup>
-
         <ListGroup
           header="Tus datos"
           footer={
@@ -397,8 +359,8 @@ export function SettingsView({ section }: { section?: string | null }) {
         title="Borrar todos los datos"
         message={
           synced
-            ? 'Se eliminarán asignaturas, tareas, exámenes, notas y sesiones de estudio en este dispositivo y en tu cuenta, así que desaparecerán también de tus otros dispositivos. Si quieres conservarlos, exporta antes una copia. Esta acción no se puede deshacer.'
-            : 'Se eliminarán asignaturas, tareas, exámenes, notas y sesiones de estudio, y volverás a la pantalla de bienvenida. Si quieres conservarlos, exporta antes una copia. Esta acción no se puede deshacer.'
+            ? 'Se eliminarán asignaturas, tareas, exámenes y notas en este dispositivo y en tu cuenta, así que desaparecerán también de tus otros dispositivos. Si quieres conservarlos, exporta antes una copia. Esta acción no se puede deshacer.'
+            : 'Se eliminarán asignaturas, tareas, exámenes y notas, y volverás a la pantalla de bienvenida. Si quieres conservarlos, exporta antes una copia. Esta acción no se puede deshacer.'
         }
         confirmLabel="Borrar todo"
         destructive

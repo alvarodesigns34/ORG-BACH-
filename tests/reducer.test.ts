@@ -289,32 +289,6 @@ describe('editar una asignatura', () => {
   })
 })
 
-describe('session/add', () => {
-  it('recorta a 24 horas', () => {
-    const next = reducer(baseState(), {
-      type: 'session/add',
-      session: {
-        startedAt: '2026-10-01T08:00:00.000Z',
-        minutes: 10_000,
-        mode: 'libre',
-      },
-    })
-    assert.equal(next.sessions.at(-1)?.minutes, 24 * 60)
-  })
-
-  it('ignora una sesión de cero minutos', () => {
-    const next = reducer(baseState(), {
-      type: 'session/add',
-      session: {
-        startedAt: '2026-10-01T08:00:00.000Z',
-        minutes: 0,
-        mode: 'libre',
-      },
-    })
-    assert.equal(next.sessions.length, baseState().sessions.length)
-  })
-})
-
 describe('el enlace examen-nota es de la misma asignatura', () => {
   it('no enlaza un examen de otra asignatura', () => {
     const next = reducer(baseState(), {

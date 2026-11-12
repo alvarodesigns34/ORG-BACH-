@@ -7,11 +7,11 @@
  */
 
 import { DEFAULT_SCALE } from '../domain/grades.ts'
-import { DEFAULT_POMODORO } from '../domain/study.ts'
-import type { AppData, Settings, SubjectColor } from '../domain/types.ts'
+import { HOME_WIDGETS } from '../domain/types.ts'
+import type { AppData, HomeLayout, Settings, SubjectColor } from '../domain/types.ts'
 
 /** Versión del esquema guardado. Súbela al cambiar la forma de los datos. */
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 export const STORAGE_KEY = 'bachillerato-os:v1'
 
@@ -35,22 +35,23 @@ export const DEFAULT_SETTINGS: Settings = {
   activeTerm: 'T1',
   alertsEnabled: true,
   examAlertDays: 7,
-  pomodoroMinutes: DEFAULT_POMODORO.workMinutes,
-  pomodoroBreakMinutes: DEFAULT_POMODORO.breakMinutes,
-  pomodoroSound: true,
+  home: { order: [...HOME_WIDGETS], hidden: ['actividad'] },
   onboarded: false,
+}
+
+export function cloneHome(home: HomeLayout): HomeLayout {
+  return { order: [...home.order], hidden: [...home.hidden] }
 }
 
 export function createEmptyData(): AppData {
   return {
     version: SCHEMA_VERSION,
-    settings: { ...DEFAULT_SETTINGS, gradeScale: { ...DEFAULT_SCALE } },
+    settings: { ...DEFAULT_SETTINGS, gradeScale: { ...DEFAULT_SCALE }, home: cloneHome(DEFAULT_SETTINGS.home) },
     subjects: [],
     tasks: [],
     grades: [],
     exams: [],
     events: [],
-    sessions: [],
     goals: [],
     activity: [],
   }

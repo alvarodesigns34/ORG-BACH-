@@ -1,14 +1,12 @@
 import { useMemo, useState } from 'react'
 import { CircleCheck, CircleSlash, TrendingUp } from 'lucide-react'
 
-import { formatDuration, formatShort } from '@/domain/dates'
+import { formatShort } from '@/domain/dates'
 import { formatGrade, numeralTone } from '@/domain/grades'
 import { colorVar } from '@/domain/palette'
 import {
   gradeTimeline,
   rankGrades,
-  studyByDay,
-  studyBySubject,
   subjectRanking,
   taskStats,
 } from '@/domain/stats'
@@ -16,7 +14,7 @@ import { TERMS, type TermId } from '@/domain/types'
 import { useSettings, useStore, useToday } from '@/state/StoreProvider'
 import { useGlobalAverage, useSubjectResults, useSubjects } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
-import { ColumnChart, LineChart, RankedBars, type Column, type RankedBar } from '@/ui/charts'
+import { LineChart, RankedBars, type RankedBar } from '@/ui/charts'
 import { Button, Card, EmptyState, Numeral, SectionHeader, Segmented, cx } from '@/ui/primitives'
 
 type Scope = TermId | 'todas'
@@ -42,14 +40,6 @@ export function StatsView() {
     () => rankGrades(data.grades, subjects, scale, scope),
     [data.grades, subjects, scale, scope],
   )
-  const byDay = useMemo(() => studyByDay(data.sessions, today, 30), [data.sessions, today])
-  const bySubject = useMemo(
-    () => studyBySubject(data.sessions, subjects),
-    [data.sessions, subjects],
-  )
-
-  const totalStudy = data.sessions.reduce((sum, s) => sum + s.minutes, 0)
-
   /**
    * Ventana vertical del gráfico de evolución.
    *
@@ -66,7 +56,7 @@ export function StatsView() {
       max: Math.min(scale.max, Math.max(Math.ceil(Math.max(...values)) + 1, scale.pass + 1)),
     }
   }, [timeline, scale])
-  const hasAnything = data.grades.length > 0 || data.tasks.length > 0 || data.sessions.length > 0
+  const hasAnything = data.grades.length > 0 || data.tasks.length > 0
 
   if (!hasAnything) {
     return (
@@ -76,7 +66,7 @@ export function StatsView() {
           <EmptyState
             icon={<TrendingUp className="size-5" />}
             title="Todavía no hay nada que analizar"
-            description="En cuanto registres notas, completes tareas o apuntes sesiones de estudio, esta sección mostrará cómo evoluciona el curso."
+            description="En cuanto registres notas o completes tareas, esta sección mostrará cómo evoluciona el curso."
             action={
               <Button variant="primary" onClick={() => (window.location.hash = '/notas')}>
                 Empezar por las notas
@@ -103,25 +93,6 @@ export function StatsView() {
           }
         : undefined,
   }))
-
-  const studyBars: RankedBar[] = bySubject.map((entry, i) => ({
-    id: entry.subject?.id ?? `sin-asignatura-${i}`,
-    label: entry.subject?.name ?? 'Sin asignatura',
-    value: entry.minutes,
-    formatted: `${formatDuration(entry.minutes)} · ${Math.round(entry.share)} %`,
-    dotColor: entry.subject ? colorVar(entry.subject.color) : 'var(--c-ink-3)',
-  }))
-
-  const studyColumns: Column[] = byDay.map((day) => {
-    const date = new Date(`${day.day}T00:00:00`)
-    return {
-      label: date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' }),
-      shortLabel: date.getDate() === 1 || date.getDate() === 15 ? String(date.getDate()) : '',
-      value: day.minutes,
-      formatted: day.minutes === 0 ? 'Sin estudiar' : formatDuration(day.minutes),
-      highlight: day.day === today,
-    }
-  })
 
   return (
     <Page>
@@ -158,8 +129,8 @@ export function StatsView() {
           />
           <Stat label="Tareas completadas" value={String(tasks.completed)} />
           <Stat
-            label="Horas de estudio"
-            value={totalStudy === 0 ? '—' : formatDuration(totalStudy)}
+            label="A tiempo"
+            value={tasks.onTimeRate === null ? '—' : `${tasks.onTimeRate} %`}
           />
         </dl>
       </div>
@@ -267,33 +238,6 @@ export function StatsView() {
             />
           </Card>
         </div>
-
-        {/* --- Reparto del estudio --- */}
-        <div className="lg:col-span-5">
-          <Card>
-            <SectionHeader
-              title="En qué se va el tiempo"
-              hint={totalStudy > 0 ? formatDuration(totalStudy) : undefined}
-              className="mb-5"
-            />
-            <RankedBars
-              bars={studyBars}
-              max={Math.max(...bySubject.map((s) => s.minutes), 1)}
-              title="Minutos de estudio por asignatura"
-              emptyLabel="Aún no has registrado sesiones de estudio."
-            />
-          </Card>
-        </div>
-
-        {/* --- Estudio en el tiempo --- */}
-        {totalStudy > 0 && (
-          <div className="lg:col-span-12">
-            <Card>
-              <SectionHeader title="Estudio de los últimos 30 días" className="mb-5" />
-              <ColumnChart columns={studyColumns} title="Minutos estudiados por día" height={150} />
-            </Card>
-          </div>
-        )}
 
         {/* --- Mejores y peores --- */}
         {ranked.length >= 2 && (

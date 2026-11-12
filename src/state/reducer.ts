@@ -19,7 +19,6 @@ import type {
   Goal,
   ID,
   Settings,
-  StudySession,
   Subject,
   Task,
 } from '../domain/types.ts'
@@ -56,8 +55,6 @@ export type Action =
   | { type: 'event/add'; event: New<CalendarEvent> }
   | { type: 'event/update'; id: ID; patch: Partial<CalendarEvent> }
   | { type: 'event/remove'; id: ID }
-  | { type: 'session/add'; session: Omit<StudySession, 'id'> }
-  | { type: 'session/remove'; id: ID }
   | { type: 'goal/add'; goal: New<Goal> }
   | { type: 'goal/update'; id: ID; patch: Partial<Goal> }
   | { type: 'goal/remove'; id: ID }
@@ -182,9 +179,6 @@ export function reducer(state: AppData, action: Action): AppData {
         ),
         events: state.events.map((e) =>
           e.subjectId === action.id ? { ...e, subjectId: undefined } : e,
-        ),
-        sessions: state.sessions.map((s) =>
-          s.subjectId === action.id ? { ...s, subjectId: undefined } : s,
         ),
         // Un objetivo sobre la media de una asignatura que ya no existe no se
         // puede volver a medir. Se archiva en lugar de borrarlo (no se pierde
@@ -371,27 +365,6 @@ export function reducer(state: AppData, action: Action): AppData {
 
     case 'event/remove':
       return { ...state, events: state.events.filter((e) => e.id !== action.id) }
-
-    // --- Sesiones de estudio ---
-
-    case 'session/add': {
-      const minutes = Math.min(Math.max(0, Math.round(action.session.minutes)), 24 * 60)
-      if (minutes <= 0) return state
-      const session: StudySession = { ...action.session, id: newId('ses'), minutes }
-      return {
-        ...state,
-        sessions: [...state.sessions, session],
-        activity: logActivity(
-          state,
-          'estudio_registrado',
-          withSubject(state, session.subjectId, `Sesión de estudio: ${session.minutes} min`),
-          session.subjectId,
-        ),
-      }
-    }
-
-    case 'session/remove':
-      return { ...state, sessions: state.sessions.filter((s) => s.id !== action.id) }
 
     // --- Objetivos ---
 

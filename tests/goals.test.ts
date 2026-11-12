@@ -10,7 +10,7 @@ import { describe, it } from 'node:test'
 
 import { DEFAULT_SCALE } from '../src/domain/grades.ts'
 import { goalProgress, type GoalContext } from '../src/domain/goals.ts'
-import type { Goal, StudySession, Task } from '../src/domain/types.ts'
+import type { Goal, Task } from '../src/domain/types.ts'
 
 // Miércoles, para que la semana (lunes a domingo) tenga días antes y después.
 const TODAY = '2026-10-14'
@@ -19,21 +19,11 @@ function makeGoal(overrides: Partial<Goal>): Goal {
   return {
     id: 'g1',
     title: 'Objetivo',
-    kind: 'horas_estudio',
+    kind: 'tareas',
     scope: 'semanal',
     target: 8,
     createdAt: '2026-09-01T00:00:00.000Z',
     ...overrides,
-  }
-}
-
-function session(day: string, minutes: number, subjectId?: string): StudySession {
-  return {
-    id: `s-${day}-${minutes}`,
-    startedAt: `${day}T17:00:00.000Z`,
-    minutes,
-    mode: 'libre',
-    subjectId,
   }
 }
 
@@ -54,7 +44,6 @@ function task(completedDay: string | null, subjectId?: string): Task {
 function makeContext(overrides: Partial<GoalContext> = {}): GoalContext {
   return {
     tasks: [],
-    sessions: [],
     subjects: [],
     results: new Map(),
     globalAverage: null,
@@ -66,62 +55,6 @@ function makeContext(overrides: Partial<GoalContext> = {}): GoalContext {
     ...overrides,
   }
 }
-
-describe('objetivos de horas de estudio', () => {
-  it('cuenta solo lo de esta semana', () => {
-    const ctx = makeContext({
-      sessions: [
-        session('2026-10-12', 120), // lunes, dentro
-        session('2026-10-14', 180), // hoy, dentro
-        session('2026-10-11', 300), // domingo anterior, fuera
-      ],
-    })
-    const progress = goalProgress(makeGoal({ target: 8 }), ctx)
-    // 5 h de 8 h
-    assert.equal(progress.current, 5)
-    assert.equal(Math.round(progress.percent), 63)
-    assert.equal(progress.label, '5 h de 8 h')
-    assert.equal(progress.done, false)
-  })
-
-  it('un objetivo diario solo mira hoy', () => {
-    const ctx = makeContext({
-      sessions: [session('2026-10-14', 90), session('2026-10-13', 240)],
-    })
-    const progress = goalProgress(makeGoal({ scope: 'diario', target: 2 }), ctx)
-    assert.equal(progress.current, 1.5)
-    assert.equal(progress.done, false)
-  })
-
-  it('marca conseguido al llegar', () => {
-    const ctx = makeContext({ sessions: [session('2026-10-13', 480)] })
-    const progress = goalProgress(makeGoal({ target: 8 }), ctx)
-    assert.equal(progress.done, true)
-    assert.equal(progress.percent, 100)
-  })
-
-  it('pasarse del objetivo no supera el 100 %', () => {
-    const ctx = makeContext({ sessions: [session('2026-10-13', 900)] })
-    assert.equal(goalProgress(makeGoal({ target: 8 }), ctx).percent, 100)
-  })
-
-  it('filtra por asignatura cuando la lleva', () => {
-    const ctx = makeContext({
-      sessions: [session('2026-10-13', 120, 'mat'), session('2026-10-13', 300, 'fis')],
-    })
-    const progress = goalProgress(makeGoal({ target: 4, subjectId: 'mat' }), ctx)
-    assert.equal(progress.current, 2)
-  })
-
-  it('el objetivo de curso cuenta todo lo acumulado', () => {
-    const ctx = makeContext({
-      sessions: [session('2026-09-05', 600), session('2026-10-13', 600)],
-    })
-    const progress = goalProgress(makeGoal({ scope: 'anual', target: 20 }), ctx)
-    assert.equal(progress.current, 20)
-    assert.equal(progress.done, true)
-  })
-})
 
 describe('objetivos de tareas', () => {
   it('cuenta las completadas dentro del periodo', () => {
@@ -207,12 +140,7 @@ describe('objetivos de media', () => {
 })
 
 describe('titulares del resto de tipos', () => {
-  it('las horas sí se miden en porcentaje', () => {
-    const ctx = makeContext({ sessions: [session('2026-10-13', 240)] })
-    assert.equal(goalProgress(makeGoal({ target: 8 }), ctx).headline, '50 %')
-  })
-
-  it('las tareas también', () => {
+  it('las tareas sí se miden en porcentaje', () => {
     const ctx = makeContext({ tasks: [task('2026-10-13'), task('2026-10-14')] })
     assert.equal(goalProgress(makeGoal({ kind: 'tareas', target: 4 }), ctx).headline, '50 %')
   })

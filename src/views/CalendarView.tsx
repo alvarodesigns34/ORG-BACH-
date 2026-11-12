@@ -32,7 +32,6 @@ const KIND_STYLE: Record<DayItem['kind'], { label: string; shape: string }> = {
   tarea: { label: 'Tarea', shape: 'rounded-full' },
   examen: { label: 'Examen', shape: 'rounded-[1px] rotate-45' },
   evento: { label: 'Evento', shape: 'rounded-[2px]' },
-  estudio: { label: 'Estudio', shape: 'rounded-full opacity-55' },
 }
 
 export function CalendarView() {
@@ -54,8 +53,7 @@ export function CalendarView() {
    * Abre lo que se ha pulsado en el panel del día.
    *
    * El índice del calendario guarda solo lo justo para pintar (`DayItem`), así
-   * que hay que recuperar la entidad real antes de editarla. Las sesiones de
-   * estudio se quedan fuera a propósito: se gestionan desde Estudio, no aquí.
+   * que hay que recuperar la entidad real antes de editarla.
    */
   const openItem = (item: DayItem) => {
     if (item.kind === 'tarea') {
@@ -518,10 +516,7 @@ function DayPanel({
               const subject = subjects.get(item.subjectId ?? '')
               const color = subject ? colorVar(subject.color) : 'var(--c-ink-3)'
               const exam = item.kind === 'examen' ? data.exams.find((e) => e.id === item.id) : null
-              // Las sesiones de estudio no se editan desde aquí: no hay editor
-              // para ellas, y una fila que parece pulsable y no hace nada es
-              // peor que una fila que ya se ve como texto.
-              const editable = item.kind !== 'estudio'
+              const editable = true
 
               const body = (
                 <>

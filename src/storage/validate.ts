@@ -13,7 +13,7 @@
 
 import { today as todayISO } from '../domain/dates.ts'
 import { deriveShortName } from '../domain/palette.ts'
-import { DEFAULT_POMODORO } from '../domain/study.ts'
+import { HOME_WIDGETS } from '../domain/types.ts'
 import type {
   ActivityEntry,
   CalendarEvent,
@@ -21,9 +21,10 @@ import type {
   Goal,
   GradeCategory,
   GradeEntry,
+  HomeLayout,
+  HomeWidgetId,
   ScheduleSlot,
   Settings,
-  StudySession,
   Subject,
   Subtask,
   Task,
@@ -251,30 +252,15 @@ export function parseEvent(raw: unknown): CalendarEvent | null {
   }
 }
 
-export function parseSession(raw: unknown): StudySession | null {
-  if (!isRow(raw) || !isId(raw.id) || !isStamp(raw.startedAt)) return null
-  if (!isNum(raw.minutes) || raw.minutes <= 0) return null
-  return {
-    id: raw.id,
-    subjectId: optId(raw.subjectId),
-    topic: optText(raw.topic),
-    startedAt: raw.startedAt,
-    // Tope de 24 h: una sesión más larga es un dato corrupto, y colarla
-    // dispararía todas las estadísticas de estudio.
-    minutes: Math.min(raw.minutes, 24 * 60),
-    mode: raw.mode === 'pomodoro' ? 'pomodoro' : 'libre',
-    notes: optText(raw.notes),
-    demo: raw.demo === true,
-  }
-}
-
 export function parseGoal(raw: unknown): Goal | null {
   if (!isRow(raw) || !isId(raw.id)) return null
   if (!isNum(raw.target) || raw.target <= 0) return null
+  // Los objetivos de horas de estudio desaparecieron con el temporizador.
+  if (raw.kind === 'horas_estudio') return null
   return {
     id: raw.id,
     title: isText(raw.title) && raw.title.trim() ? raw.title : 'Objetivo',
-    kind: oneOf('media', 'horas_estudio', 'tareas', 'manual')(raw.kind) ? raw.kind : 'manual',
+    kind: oneOf('media', 'tareas', 'manual')(raw.kind) ? raw.kind : 'manual',
     scope: oneOf('diario', 'semanal', 'trimestral', 'anual')(raw.scope) ? raw.scope : 'semanal',
     target: raw.target,
     manualProgress: optNum(raw.manualProgress),
@@ -288,6 +274,7 @@ export function parseGoal(raw: unknown): Goal | null {
 
 export function parseActivity(raw: unknown): ActivityEntry | null {
   if (!isRow(raw) || !isId(raw.id) || !isText(raw.text) || !isStamp(raw.at)) return null
+  if (raw.kind === 'estudio_registrado') return null
   return {
     id: raw.id,
     kind: oneOf(
@@ -295,7 +282,6 @@ export function parseActivity(raw: unknown): ActivityEntry | null {
       'tarea_completada',
       'nota_anadida',
       'examen_creado',
-      'estudio_registrado',
       'asignatura_creada',
       'objetivo_creado',
     )(raw.kind)
@@ -310,6 +296,27 @@ export function parseActivity(raw: unknown): ActivityEntry | null {
 // ---------------------------------------------------------------------------
 // Ajustes
 // ---------------------------------------------------------------------------
+
+/**
+ * Tarjetas de Inicio: solo identificadores conocidos, sin repetir, y con las
+ * que falten (una tarjeta nueva en una versión posterior) añadidas al final.
+ */
+export function sanitizeHome(raw: unknown, defaults: HomeLayout): HomeLayout {
+  if (!isRow(raw)) return { order: [...defaults.order], hidden: [...defaults.hidden] }
+  const known = (list: unknown): HomeWidgetId[] => {
+    if (!Array.isArray(list)) return []
+    const out: HomeWidgetId[] = []
+    for (const id of list) {
+      if ((HOME_WIDGETS as readonly unknown[]).includes(id) && !out.includes(id as HomeWidgetId)) {
+        out.push(id as HomeWidgetId)
+      }
+    }
+    return out
+  }
+  const order = known(raw.order)
+  for (const id of defaults.order) if (!order.includes(id)) order.push(id)
+  return { order, hidden: known(raw.hidden) }
+}
 
 /** Recorta los ajustes a valores utilizables sin descartar los válidos. */
 export function sanitizeSettings(raw: unknown, defaults: Settings): Settings {
@@ -334,13 +341,7 @@ export function sanitizeSettings(raw: unknown, defaults: Settings): Settings {
     activeTerm: isTerm(raw.activeTerm) ? raw.activeTerm : defaults.activeTerm,
     alertsEnabled: raw.alertsEnabled !== false,
     examAlertDays: Math.round(clampNum(raw.examAlertDays, 1, 365, defaults.examAlertDays)),
-    pomodoroMinutes: Math.round(
-      clampNum(raw.pomodoroMinutes, 1, 240, DEFAULT_POMODORO.workMinutes),
-    ),
-    pomodoroBreakMinutes: Math.round(
-      clampNum(raw.pomodoroBreakMinutes, 1, 120, DEFAULT_POMODORO.breakMinutes),
-    ),
-    pomodoroSound: raw.pomodoroSound !== false,
+    home: sanitizeHome(raw.home, defaults.home),
     onboarded: raw.onboarded === true,
   }
 }

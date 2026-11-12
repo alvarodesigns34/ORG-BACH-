@@ -112,7 +112,7 @@ export function Onboarding() {
               en un sitio.
             </h1>
             <p className="text-[0.9375rem] text-ink-2 mt-6 leading-relaxed">
-              Tareas, exámenes, notas y horas de estudio. Funciona sin cuenta y sin conexión; si
+              Tareas, exámenes, horario y notas. Funciona sin cuenta y sin conexión; si
               quieres, crea una para tenerlo en el móvil y en el ordenador.
             </p>
           </div>

@@ -37,7 +37,6 @@ export function GoalsView() {
   const context: GoalContext = useMemo(
     () => ({
       tasks: data.tasks,
-      sessions: data.sessions,
       subjects: data.subjects,
       results,
       globalAverage,
@@ -55,7 +54,6 @@ export function GoalsView() {
     }),
     [
       data.tasks,
-      data.sessions,
       data.subjects,
       results,
       globalAverage,
@@ -101,7 +99,7 @@ export function GoalsView() {
           <EmptyState
             icon={<Target className="size-5" />}
             title="Ningún objetivo todavía"
-            description="Un objetivo convierte una intención vaga en una cifra que puedes mirar: subir la media a 9, estudiar 8 horas esta semana, no dejar tareas sin hacer."
+            description="Un objetivo convierte una intención vaga en una cifra que puedes mirar: subir la media a 9, sacar un 8 en Física, no dejar tareas sin hacer esta semana."
             action={
               <Button variant="primary" onClick={() => setCreating(true)}>
                 <Plus className="size-4" />

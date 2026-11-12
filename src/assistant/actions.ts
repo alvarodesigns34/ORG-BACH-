@@ -48,7 +48,6 @@ export const ACTION_TYPES = [
   'delete_event',
   'add_subject',
   'set_target',
-  'log_study',
 ] as const
 
 export type AssistantActionType = (typeof ACTION_TYPES)[number]
@@ -92,7 +91,6 @@ export type AppliedKind =
   | 'asignatura'
   | 'completada'
   | 'reabierta'
-  | 'estudio'
   | 'editada'
   | 'borrada'
   | 'subtareas'
@@ -766,34 +764,6 @@ export function applyAssistantActions(
         break
       }
 
-      // --------------------------------------------------------------- estudio
-      case 'log_study': {
-        const minutes = num(action.minutes)
-        if (!minutes || minutes <= 0) {
-          skipped.push('Sesión de estudio sin duración.')
-          break
-        }
-        const s = mentionsSubject ? subject() : undefined
-        const day = isDay(action.date) ? action.date : today
-        const start = new Date(`${day}T12:00:00`)
-        data = reducer(data, {
-          type: 'session/add',
-          session: {
-            subjectId: s?.id,
-            topic: text(action.title),
-            startedAt: start.toISOString(),
-            minutes: Math.min(Math.round(minutes), 24 * 60),
-            mode: 'libre',
-          },
-        })
-        applied.push({
-          kind: 'estudio',
-          text: `${Math.round(minutes)} min${s ? ` · ${s.name}` : ''}`,
-          memo: `estudio registrado: ${Math.round(minutes)} min${s ? ` de ${s.name}` : ''} el ${day}`,
-        })
-        break
-      }
-
       default:
         skipped.push('Una acción que no sé hacer.')
     }
@@ -832,7 +802,7 @@ function nextFreeColor(data: AppData): Subject['color'] {
 // Deshacer
 // ---------------------------------------------------------------------------
 
-const ENTITIES = ['subjects', 'tasks', 'exams', 'grades', 'events', 'sessions'] as const
+const ENTITIES = ['subjects', 'tasks', 'exams', 'grades', 'events'] as const
 type EntityKey = (typeof ENTITIES)[number]
 type Entity = { id: string } & Record<string, unknown>
 
@@ -906,7 +876,7 @@ export function applyUndo(data: AppData, plan: UndoPlan): AppData {
 
   // 1. Quitar lo creado (las notas antes que los exámenes, por el enlace).
   for (const id of plan.created.grades ?? []) next = reducer(next, { type: 'grade/remove', id })
-  for (const key of ['exams', 'tasks', 'events', 'sessions'] as const) {
+  for (const key of ['exams', 'tasks', 'events'] as const) {
     const ids = new Set(plan.created[key] ?? [])
     if (ids.size)
       set(
@@ -1016,9 +986,6 @@ export function buildContext(data: AppData, today: string, now: Date = new Date(
               status: need.status,
             }
           : null,
-        study_min_7d: data.sessions
-          .filter((x) => x.subjectId === s.id && x.startedAt.slice(0, 10) >= weekAgo)
-          .reduce((sum, x) => sum + x.minutes, 0),
       }
     })
 
@@ -1120,9 +1087,6 @@ export function buildContext(data: AppData, today: string, now: Date = new Date(
         date: e.date,
         time: e.startTime,
       })),
-    study_min_today: data.sessions
-      .filter((x) => x.startedAt.slice(0, 10) === today)
-      .reduce((sum, x) => sum + x.minutes, 0),
   }
 }
 
