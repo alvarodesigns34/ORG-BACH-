@@ -6,6 +6,9 @@ import { useTaskSummary } from '@/state/selectors'
 import { useRoute, type Route, type RouteId } from '@/router'
 import { AppShell, StorageBanner } from '@/layout/AppShell'
 import { TaskEditor } from '@/features/tasks/TaskEditor'
+import { ExamEditor } from '@/features/exams/ExamEditor'
+import { GradeEditor } from '@/features/grades/GradeEditor'
+import { EventEditor } from '@/features/events/EventEditor'
 import { Onboarding } from '@/features/onboarding/Onboarding'
 import { DashboardView } from '@/views/DashboardView'
 import { TasksView } from '@/views/TasksView'
@@ -20,7 +23,7 @@ import { Button } from '@/ui/primitives'
 import { LinkChoiceDialog, RecoveryDialog } from '@/features/account/Account'
 import { syncEngine } from '@/sync/engine'
 import { ToastProvider } from '@/ui/Toast'
-import { ChromeProvider } from '@/layout/chrome'
+import { ChromeProvider, type CreateKind } from '@/layout/chrome'
 import { AssistantSheet } from '@/features/assistant/AssistantSheet'
 
 export function App() {
@@ -39,7 +42,7 @@ function Shell() {
   const { data, hasIllegibleBackup, downloadIllegibleBackup, acknowledgeCorruptStorage } =
     useStore()
   const summary = useTaskSummary()
-  const [creating, setCreating] = useState(false)
+  const [creating, setCreating] = useState<CreateKind | null>(null)
 
   // `summary.today` ya incluye lo atrasado (es la lista real del día), así que
   // sumarle `overdue` contaba dos veces cada tarea pasada de fecha: una sola
@@ -49,10 +52,15 @@ function Shell() {
     [summary.today.length],
   )
 
-  const openCreate = useCallback(() => setCreating(true), [])
+  const openCreate = useCallback((kind: CreateKind = 'tarea') => setCreating(kind), [])
   const [assistantOpen, setAssistantOpen] = useState(false)
   const openAssistant = useCallback(() => setAssistantOpen(true), [])
-  const chrome = useMemo(() => ({ openCreate, openAssistant }), [openCreate, openAssistant])
+  const hasSubjects = data.subjects.length > 0
+  const chrome = useMemo(
+    () => ({ openCreate, openAssistant, hasSubjects }),
+    [openCreate, openAssistant, hasSubjects],
+  )
+  const closeCreate = useCallback(() => setCreating(null), [])
 
   // La sincronización arranca dentro del proveedor: necesita el puente con el
   // almacén. Sin cuenta configurada no hace nada.
@@ -77,7 +85,7 @@ function Shell() {
       if (document.querySelector('[aria-modal="true"]')) return
       if (event.key === 'c' || event.key === 'C') {
         event.preventDefault()
-        setCreating(true)
+        setCreating('tarea')
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -126,12 +134,19 @@ function Shell() {
   return (
     <>
       <ChromeProvider value={chrome}>
-        <AppShell current={route.id} onCreate={openCreate} badges={badges}>
+        <AppShell
+          current={route.id}
+          screenKey={`${route.id}:${route.params.get('id') ?? ''}`}
+          badges={badges}
+        >
           {renderRoute(route, data.subjects.length)}
         </AppShell>
       </ChromeProvider>
 
-      <TaskEditor open={creating} onClose={() => setCreating(false)} />
+      <TaskEditor open={creating === 'tarea'} onClose={closeCreate} />
+      <ExamEditor open={creating === 'examen'} onClose={closeCreate} />
+      <GradeEditor open={creating === 'nota'} onClose={closeCreate} />
+      <EventEditor open={creating === 'evento'} onClose={closeCreate} />
       <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} />
       <LinkChoiceDialog />
       <RecoveryDialog />

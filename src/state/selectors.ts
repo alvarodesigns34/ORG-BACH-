@@ -9,10 +9,11 @@
 import { useMemo } from 'react'
 
 import { detectAlerts, type Alert } from '../domain/alerts.ts'
+import { goalProgress, type GoalContext, type GoalProgress } from '../domain/goals.ts'
 import { daysUntil, startOfWeek, toDay } from '../domain/dates.ts'
 import { globalAverage, subjectResult, type SubjectResult } from '../domain/grades.ts'
 import { bucketOf, isOverdue, sortTasks } from '../domain/tasks.ts'
-import type { DateISO, Exam, ID, Subject, Task, TermId } from '../domain/types.ts'
+import type { DateISO, Exam, Goal, ID, Subject, Task, TermId } from '../domain/types.ts'
 import { useStore } from './StoreProvider'
 
 // ---------------------------------------------------------------------------
@@ -237,4 +238,70 @@ export function useCalendarIndex(): Map<DateISO, DayItem[]> {
     }
     return index
   }, [data.tasks, data.exams, data.events])
+}
+
+// ---------------------------------------------------------------------------
+// Objetivos
+// ---------------------------------------------------------------------------
+
+/**
+ * Objetivos activos con su progreso ya calculado.
+ *
+ * Las tres evaluaciones se calculan siempre —los hooks no pueden ir tras un
+ * `if`— y salen de la misma función que el resto de medias, así que no pueden
+ * discrepar de lo que enseña Notas.
+ */
+export function useGoalsProgress(): { goal: Goal; progress: GoalProgress }[] {
+  const { data, today } = useStore()
+  const settings = data.settings
+  const results = useSubjectResults(settings.activeTerm)
+  const average = useGlobalAverage(settings.activeTerm)
+  const courseResults = useSubjectResults('todas')
+  const courseAverage = useGlobalAverage('todas')
+  const t1 = useSubjectResults('T1')
+  const t2 = useSubjectResults('T2')
+  const t3 = useSubjectResults('T3')
+  const avg1 = useGlobalAverage('T1')
+  const avg2 = useGlobalAverage('T2')
+  const avg3 = useGlobalAverage('T3')
+
+  return useMemo(() => {
+    const context: GoalContext = {
+      tasks: data.tasks,
+      subjects: data.subjects,
+      results,
+      globalAverage: average,
+      courseResults,
+      courseAverage,
+      termResults: (term: TermId) =>
+        term === 'T1'
+          ? { results: t1, average: avg1 }
+          : term === 'T2'
+            ? { results: t2, average: avg2 }
+            : { results: t3, average: avg3 },
+      scale: settings.gradeScale,
+      today,
+      weekStartsOn: settings.weekStartsOn,
+    }
+    return data.goals
+      .filter((goal) => !goal.archived)
+      .map((goal) => ({ goal, progress: goalProgress(goal, context) }))
+  }, [
+    data.tasks,
+    data.subjects,
+    data.goals,
+    results,
+    average,
+    courseResults,
+    courseAverage,
+    t1,
+    t2,
+    t3,
+    avg1,
+    avg2,
+    avg3,
+    settings.gradeScale,
+    settings.weekStartsOn,
+    today,
+  ])
 }

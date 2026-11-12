@@ -8,7 +8,9 @@ import {
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
+import { AnimatePresence, motion } from 'motion/react'
 
+import { exitFast, spring } from './motion'
 import { cx } from './primitives'
 
 interface ToastOptions {
@@ -35,24 +37,18 @@ const ToastContext = createContext<((options: ToastOptions) => void) | null>(nul
  */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<ToastState | null>(null)
-  const [leaving, setLeaving] = useState(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const counter = useRef(0)
 
   const dismiss = useCallback(() => {
-    setLeaving(true)
     if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(() => {
-      setToast(null)
-      setLeaving(false)
-    }, 220)
+    setToast(null)
   }, [])
 
   const show = useCallback(
     (options: ToastOptions) => {
       if (timer.current) clearTimeout(timer.current)
       counter.current += 1
-      setLeaving(false)
       setToast({ ...options, id: counter.current })
       timer.current = setTimeout(dismiss, options.duration ?? (options.action ? 5500 : 3000))
     },
@@ -71,35 +67,45 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           className={cx(
             'fixed z-40 inset-x-0 flex justify-center pointer-events-none px-4',
             // Encima de la barra flotante en móvil; abajo a la izquierda en escritorio.
-            'bottom-[calc(5.75rem+env(safe-area-inset-bottom))] lg:bottom-6 lg:justify-start lg:left-[288px]',
+            'bottom-[calc(5.75rem+env(safe-area-inset-bottom))] lg:bottom-6 lg:justify-start lg:left-[304px]',
           )}
         >
-          {toast && (
-            <div
-              key={toast.id}
-              className={cx(
-                'glass pointer-events-auto flex items-center gap-1 rounded-full pl-5 pr-1.5 h-12 max-w-full',
-                'text-[0.9375rem] font-medium text-ink',
-                leaving
-                  ? 'opacity-0 translate-y-2 transition-[opacity,transform] duration-200'
-                  : 'animate-toast',
-              )}
-            >
-              <span className="truncate pr-2">{toast.text}</span>
-              {toast.action && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    toast.action!.run()
-                    dismiss()
-                  }}
-                  className="pressable shrink-0 h-9 px-4 rounded-full font-semibold text-accent hover:bg-fill"
-                >
-                  {toast.action.label}
-                </button>
-              )}
-            </div>
-          )}
+          <AnimatePresence mode="popLayout">
+            {toast && (
+              <motion.div
+                key={toast.id}
+                initial={{ opacity: 0, y: 28, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 12, scale: 0.94, transition: exitFast }}
+                transition={spring.bouncy}
+                // Se puede apartar con el dedo hacia abajo.
+                drag="y"
+                dragConstraints={{ top: 0, bottom: 0 }}
+                dragElastic={{ top: 0.05, bottom: 0.7 }}
+                onDragEnd={(_, info) => {
+                  if (info.offset.y > 28) dismiss()
+                }}
+                className={cx(
+                  'liquid pointer-events-auto flex items-center gap-1 rounded-full pl-5 pr-1.5 h-12 max-w-full',
+                  'text-[0.9375rem] font-medium text-ink touch-none',
+                )}
+              >
+                <span className="relative z-[2] truncate pr-2">{toast.text}</span>
+                {toast.action && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toast.action!.run()
+                      dismiss()
+                    }}
+                    className="pressable relative z-[2] shrink-0 h-9 px-4 rounded-full font-semibold text-accent hover:bg-fill"
+                  >
+                    {toast.action.label}
+                  </button>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>,
         document.body,
       )}

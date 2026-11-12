@@ -9,6 +9,7 @@ import { hrefFor } from '@/router'
 import { useSettings, useStore, useToday } from '@/state/StoreProvider'
 import { useSubjectResults } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
+import { useAmbient } from '@/layout/chrome'
 import { ExamCard } from '@/features/exams/ExamCard'
 import { ExamEditor } from '@/features/exams/ExamEditor'
 import { GradeCalculator } from '@/features/grades/GradeCalculator'
@@ -16,7 +17,7 @@ import { GradeEditor } from '@/features/grades/GradeEditor'
 import { SubjectGrades } from '@/features/grades/SubjectGrades'
 import { SubjectEditor } from '@/features/subjects/SubjectEditor'
 import { TaskEditor } from '@/features/tasks/TaskEditor'
-import { TaskRow } from '@/features/tasks/TaskRow'
+import { TaskList } from '@/features/tasks/TaskRow'
 import { Button, Card, EmptyState, Numeral, SectionHeader } from '@/ui/primitives'
 
 export function SubjectDetailView({ subjectId }: { subjectId: string }) {
@@ -27,6 +28,8 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
 
   const subject = data.subjects.find((s) => s.id === subjectId)
   const result = results.get(subjectId)
+  // La pantalla se tiñe del color de la asignatura.
+  useAmbient(subject ? colorVar(subject.color) : null)
 
   const [editingSubject, setEditingSubject] = useState(false)
   const [editingGrade, setEditingGrade] = useState<GradeEntry | null>(null)
@@ -211,17 +214,12 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
                 description={`No tienes tareas sin hacer de ${subject.name}.`}
               />
             ) : (
-              <ul>
-                {tasks.map((task) => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    subject={subject}
-                    onOpen={setEditingTask}
-                    hideSubject
-                  />
-                ))}
-              </ul>
+              <TaskList
+                tasks={tasks}
+                subjects={new Map([[subject.id, subject]])}
+                onOpen={setEditingTask}
+                hideSubject
+              />
             )}
           </Card>
         </div>

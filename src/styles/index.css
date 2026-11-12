@@ -82,16 +82,17 @@
   --shadow-lg: 0 6px 16px rgb(0 0 0 / 0.06), 0 28px 64px rgb(0 0 0 / 0.16);
 
   /* --- Material de cristal (barra inferior, cabeceras, menús) --- */
-  --glass-bg: rgb(255 255 255 / 0.58);
+  --glass-bg: rgb(255 255 255 / 0.52);
   --glass-bg-strong: rgb(249 249 252 / 0.8);
   /* Brillo especular del borde del cristal (Liquid Glass). */
   --glass-spec: rgb(255 255 255 / 0.95);
   --glass-spec-soft: rgb(255 255 255 / 0.28);
+  --glass-sheen: rgb(255 255 255 / 0.42);
+  --glass-floor: rgb(0 0 0 / 0.1);
 
-  /* Luz ambiente de la parte de arriba: lo que el cristal refracta. */
-  --ambient-a: rgb(0 122 255 / 0.13);
-  --ambient-b: rgb(175 82 222 / 0.1);
-  --ambient-c: rgb(255 45 85 / 0.06);
+  /* Intensidad de la luz ambiente (ver .ambient). */
+  --amb-a: 20%;
+  --amb-b: 11%;
   --glass-rim: rgb(255 255 255 / 0.85);
   --glass-edge: rgb(0 0 0 / 0.07);
   --glass-shadow: 0 10px 30px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.05);
@@ -163,10 +164,11 @@
   --glass-bg-strong: rgb(22 22 25 / 0.8);
   --glass-spec: rgb(255 255 255 / 0.32);
   --glass-spec-soft: rgb(255 255 255 / 0.06);
+  --glass-sheen: rgb(255 255 255 / 0.07);
+  --glass-floor: rgb(0 0 0 / 0.5);
 
-  --ambient-a: rgb(10 132 255 / 0.22);
-  --ambient-b: rgb(191 90 242 / 0.16);
-  --ambient-c: rgb(255 55 95 / 0.09);
+  --amb-a: 30%;
+  --amb-b: 16%;
   --glass-rim: rgb(255 255 255 / 0.14);
   --glass-edge: rgb(255 255 255 / 0.06);
   --glass-shadow: 0 10px 30px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
@@ -216,8 +218,8 @@
   --radius-xs: 6px;
   --radius-sm: 10px;
   --radius-md: 14px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
 
   --shadow-xs: var(--shadow-xs);
   --shadow-sm: var(--shadow-sm);
@@ -400,13 +402,17 @@ html {
 @utility liquid {
   position: relative;
   isolation: isolate;
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(24px) saturate(190%) brightness(1.04);
-  backdrop-filter: blur(24px) saturate(190%) brightness(1.04);
+  background:
+    linear-gradient(180deg, var(--glass-sheen), transparent 46%),
+    var(--glass-bg);
+  -webkit-backdrop-filter: blur(22px) saturate(185%) brightness(1.05);
+  backdrop-filter: blur(22px) saturate(185%) brightness(1.05);
   box-shadow:
     inset 0 0 0 0.5px var(--glass-edge),
+    inset 0 1px 1px -0.5px var(--glass-rim),
+    inset 0 -6px 12px -8px var(--glass-floor),
     0 1px 2px rgb(0 0 0 / 0.06),
-    0 8px 24px rgb(0 0 0 / 0.08);
+    0 10px 30px rgb(0 0 0 / 0.1);
   &::after {
     content: '';
     position: absolute;
@@ -414,11 +420,11 @@ html {
     border-radius: inherit;
     padding: 1px;
     background: linear-gradient(
-      145deg,
+      150deg,
       var(--glass-spec) 0%,
-      var(--glass-spec-soft) 32%,
-      transparent 55%,
-      var(--glass-spec-soft) 80%,
+      var(--glass-spec-soft) 30%,
+      transparent 52%,
+      var(--glass-spec-soft) 82%,
       var(--glass-spec) 100%
     );
     -webkit-mask:
@@ -440,21 +446,65 @@ html {
     0 8px 24px rgb(0 0 0 / 0.45);
 }
 
-/* Luz ambiente: un resplandor de color arriba que se desvanece. Va fija y
-   detrás de todo; las tarjetas son opacas, así que solo se ve en los huecos
-   y a través del cristal de las barras. */
+/* Luz ambiente. Un solo tono, el del CONTEXTO: la asignatura que toca ahora
+   en Inicio, la de la ficha que se está viendo, el acento en el resto. Es lo
+   que refractan las barras de cristal; por eso no es un adorno fijo.
+   `--amb` está registrada como color para poder hacer la transición. */
+@property --amb {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #0a84ff;
+}
+:root {
+  --amb: var(--c-accent-fill);
+  transition: --amb 900ms var(--ease-std);
+}
 .ambient {
   position: fixed;
   inset: 0 0 auto 0;
-  height: min(78vh, 640px);
+  height: min(70vh, 620px);
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(60% 55% at 12% 0%, var(--ambient-a), transparent 70%),
-    radial-gradient(55% 50% at 88% 6%, var(--ambient-b), transparent 70%),
-    radial-gradient(45% 40% at 55% 32%, var(--ambient-c), transparent 70%);
-  -webkit-mask-image: linear-gradient(#000 40%, transparent);
-  mask-image: linear-gradient(#000 40%, transparent);
+    radial-gradient(90% 70% at 8% -10%, color-mix(in srgb, var(--amb) var(--amb-a), transparent), transparent 68%),
+    radial-gradient(70% 55% at 100% 0%, color-mix(in srgb, var(--amb) var(--amb-b), transparent), transparent 70%);
+  -webkit-mask-image: linear-gradient(#000 30%, transparent);
+  mask-image: linear-gradient(#000 30%, transparent);
+}
+
+/* Borde de desplazamiento (iOS 26): en vez de una barra con línea, el
+   contenido se desenfoca y se disuelve al acercarse al borde de la pantalla.
+   Un desenfoque recortado con una máscara en degradado. */
+.edge-top,
+.edge-bottom {
+  position: fixed;
+  inset-inline: 0;
+  z-index: 29;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+  transition: opacity 260ms var(--ease-std);
+}
+.edge-top {
+  top: 0;
+  height: calc(env(safe-area-inset-top, 0px) + 76px);
+  background: linear-gradient(color-mix(in srgb, var(--c-canvas) 82%, transparent), transparent);
+  -webkit-mask-image: linear-gradient(#000 45%, transparent);
+  mask-image: linear-gradient(#000 45%, transparent);
+}
+.edge-bottom {
+  bottom: 0;
+  height: calc(env(safe-area-inset-bottom, 0px) + 104px);
+  background: linear-gradient(transparent, color-mix(in srgb, var(--c-canvas) 88%, transparent) 70%);
+  -webkit-mask-image: linear-gradient(transparent, #000 55%);
+  mask-image: linear-gradient(transparent, #000 55%);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .edge-top,
+  .edge-bottom {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -497,10 +547,7 @@ html {
 }
 
 /* Filas de tarea: la línea empieza en el texto, tras la casilla. */
-.task-row {
-  position: relative;
-}
-.task-row + .task-row::before {
+.task-row + .task-row > .task-body::before {
   content: '';
   position: absolute;
   top: 0;
@@ -582,7 +629,7 @@ html {
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(14px) scale(0.985);
   }
   to {
     opacity: 1;
@@ -662,6 +709,75 @@ html {
     opacity: 1;
     transform: translateY(-3px);
   }
+}
+
+/* Onda al completar: un anillo que sale de la casilla y se desvanece. */
+@keyframes check-burst {
+  from {
+    opacity: 0.55;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.3);
+  }
+}
+
+/* Modo edición de Inicio: las tarjetas tiemblan, como los iconos de iOS. */
+@keyframes jiggle {
+  0%,
+  100% {
+    rotate: -0.55deg;
+  }
+  50% {
+    rotate: 0.55deg;
+  }
+}
+@utility animate-jiggle {
+  animation: jiggle 260ms ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * -70ms);
+}
+
+/* Entrada de una sección: sus bloques suben en cascada, con muelle. */
+/* `backwards`, no `both`: al terminar, el bloque no conserva `transform` y
+   deja de ser un contexto de apilamiento (una tarjeta arrastrada puede
+   pasar por encima de la barra lateral). */
+.page-enter > * {
+  animation: rise 520ms var(--spring) backwards;
+}
+.page-enter > *:nth-child(2) {
+  animation-delay: 40ms;
+}
+.page-enter > *:nth-child(3) {
+  animation-delay: 80ms;
+}
+.page-enter > *:nth-child(4) {
+  animation-delay: 120ms;
+}
+.page-enter > *:nth-child(n + 5) {
+  animation-delay: 160ms;
+}
+
+/* Trazo que se dibuja (gráficos, anillos). Requiere pathLength="1". */
+@keyframes draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+@utility animate-draw {
+  stroke-dasharray: 1;
+  animation: draw 900ms var(--ease-out) both;
+}
+
+/* Barra que crece desde su base. */
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+@utility animate-grow-x {
+  transform-origin: left center;
+  animation: grow-x 700ms var(--ease-out) both;
 }
 
 /* Los tres puntos de «escribiendo…» del asistente. */

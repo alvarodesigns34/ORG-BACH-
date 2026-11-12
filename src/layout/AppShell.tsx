@@ -1,4 +1,5 @@
 import { useRef, type ReactNode } from 'react'
+import { motion, useScroll, useTransform } from 'motion/react'
 import { TriangleAlert, X } from 'lucide-react'
 
 import { useStore } from '@/state/StoreProvider'
@@ -10,7 +11,8 @@ import { Sidebar } from './Sidebar'
 
 interface AppShellProps {
   current: RouteId
-  onCreate: () => void
+  /** Cambia al entrar en otra pantalla (también en una ficha dentro de la sección). */
+  screenKey: string
   badges: Partial<Record<RouteId, number>>
   children: ReactNode
 }
@@ -52,14 +54,14 @@ export function StorageBanner() {
   )
 }
 
-export function AppShell({ current, onCreate, badges, children }: AppShellProps) {
+export function AppShell({ current, screenKey, badges, children }: AppShellProps) {
   return (
-    <div className="relative isolate flex min-h-dvh">
-      {/* Luz ambiente de color arriba: lo que refractan las barras de cristal. */}
+    <div className="relative isolate min-h-dvh">
+      {/* Luz ambiente con el color del contexto: lo que refracta el cristal. */}
       <div aria-hidden className="ambient" />
-      <Sidebar current={current} onCreate={onCreate} badges={badges} />
+      <Sidebar current={current} badges={badges} />
 
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="min-w-0 flex flex-col min-h-dvh lg:pl-[calc(272px+0.75rem+max(0.75rem,env(safe-area-inset-left)))]">
         <StorageBanner />
 
         <main
@@ -67,14 +69,13 @@ export function AppShell({ current, onCreate, badges, children }: AppShellProps)
           className={cx(
             'flex-1 min-w-0',
             'pt-[env(safe-area-inset-top)] lg:pt-0',
-            // Hueco inferior en móvil para que la barra de pestañas no tape nada.
-            'pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-16',
+            // Hueco inferior para que la barra flotante no tape nada.
+            'pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-16',
           )}
         >
-          {/* La clave reinicia la animación de entrada en cada sección. */}
-          <div key={current} className="animate-[rise_380ms_var(--ease-out)_both]">
-            {children}
-          </div>
+          {/* La clave remonta la pantalla y con ello su entrada en cascada
+              (ver `.page-enter`). */}
+          <div key={screenKey}>{children}</div>
         </main>
       </div>
 
@@ -97,9 +98,9 @@ export function Page({ children, className }: PageProps) {
   return (
     <div
       className={cx(
-        'mx-auto w-full max-w-[1180px]',
-        // En móvil, el hueco de arriba es el de la barra superior fija.
-        'px-[max(1rem,env(safe-area-inset-left))] sm:px-8 pt-[3.25rem] lg:pt-10 pb-6',
+        'page-enter mx-auto w-full max-w-[1180px]',
+        // En móvil, el hueco de arriba es el de la barra superior flotante.
+        'px-[max(1.25rem,env(safe-area-inset-left))] sm:px-8 pt-[3.75rem] lg:pt-10 pb-6',
         className,
       )}
     >
@@ -137,6 +138,10 @@ export function PageHeader({
 }: PageHeaderProps) {
   const heading = useRef<HTMLHeadingElement>(null)
   const { past, scrolled } = useScrolledPast(heading)
+  // Al tirar hacia abajo en lo alto (el rebote elástico de iOS), el título
+  // grande crece un poco, como en las apps del sistema.
+  const { scrollY } = useScroll()
+  const stretch = useTransform(scrollY, [-140, 0], [1.14, 1], { clamp: true })
   return (
     <header className="mb-6 sm:mb-8">
       <TopBar title={compactTitle ?? title} collapsed={past} scrolled={scrolled} back={back} />
@@ -155,9 +160,13 @@ export function PageHeader({
       )}
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
-          <h1 ref={heading} className="display text-[2.125rem] sm:text-[2.5rem] leading-[1.08]">
+          <motion.h1
+            ref={heading}
+            style={{ scale: stretch, transformOrigin: 'left bottom' }}
+            className="display text-[2.125rem] sm:text-[2.5rem] leading-[1.08]"
+          >
             {title}
-          </h1>
+          </motion.h1>
           {subtitle && <div className="text-[0.9375rem] text-ink-3 mt-1">{subtitle}</div>}
         </div>
         {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}

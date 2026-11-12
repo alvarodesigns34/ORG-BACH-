@@ -1,13 +1,14 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { AnimatePresence, motion, useDragControls, useReducedMotion } from 'motion/react'
 import { X } from 'lucide-react'
 
+import { exitFast, spring, useMediaQuery } from './motion'
 import { Button, IconButton, cx } from './primitives'
 import { lockScroll } from './scrollLock'
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-
 
 interface ModalProps {
   open: boolean
@@ -25,9 +26,15 @@ interface ModalProps {
 /**
  * Diálogo modal.
  *
- * En escritorio aparece centrado; en móvil sube desde abajo como hoja, que es
- * donde llega el pulgar. Retiene el foco mientras está abierto y lo devuelve
- * al elemento que lo abrió al cerrarse.
+ * En el iPhone es una hoja que sube desde abajo, agarrada al dedo: se puede
+ * arrastrar desde la cabecera y, al soltarla, un muelle decide con la
+ * velocidad que lleva si se cierra o vuelve a su sitio. En pantallas anchas
+ * (iPad, escritorio) aparece centrada.
+ *
+ * Retiene el foco mientras está abierta y lo devuelve al elemento que la
+ * abrió. La salida la gestiona `AnimatePresence`, que conserva el último
+ * contenido pintado mientras baja: si el formulario se rehiciera con las
+ * props nuevas (p. ej. `task = null`), parpadearía vacío a media animación.
  */
 export function Modal({
   open,
@@ -45,44 +52,41 @@ export function Modal({
   const restoreFocus = useRef<HTMLElement | null>(null)
   const titleId = useId()
   const descId = useId()
-
-  // Montado del panel: sigue montado durante la animación de salida (abajo).
-  const [rendered, setRendered] = useState(open)
+  const sheet = !useMediaQuery('(min-width: 640px)')
+  const reduce = useReducedMotion()
+  const dragControls = useDragControls()
 
   // Al abrir: recordar quién tenía el foco y llevarlo dentro del diálogo.
-  // Depende también de `rendered`: un diálogo que vive montado y cerrado (el
-  // del asistente) no tiene panel en el primer render tras abrirse, y sin
-  // esperar a que exista el foco se quedaba en la página de detrás.
   useEffect(() => {
-    if (!open || !rendered) return
+    if (!open) return
     restoreFocus.current = document.activeElement as HTMLElement | null
 
     const node = panel.current
     if (node) {
       // El orden importa. El botón de cerrar vive en la cabecera, así que es
       // el primer elemento enfocable del panel y se llevaba el foco siempre:
-      // abrir «Nueva tarea» y empezar a escribir no escribía en ningún sitio,
-      // y el `autoFocus` del primer campo no servía de nada porque este efecto
-      // corre después. Se busca primero en el cuerpo (el primer campo del
-      // formulario) y luego en las acciones (en una confirmación, «Cancelar»,
-      // que es la salida segura). Cerrar queda como último recurso.
+      // abrir «Nueva tarea» y empezar a escribir no escribía en ningún sitio.
+      // Se busca primero en el cuerpo (el primer campo del formulario) y
+      // luego en las acciones (en una confirmación, «Cancelar», que es la
+      // salida segura). Cerrar queda como último recurso.
       // Un campo marcado con data-autofocus manda, pero solo con ratón: en
       // el móvil abriría el teclado cada vez que se abre la hoja.
-      const preferred = window.matchMedia('(pointer: fine)').matches
-        ? node.querySelector<HTMLElement>('[data-autofocus]')
-        : null
+      const fine = window.matchMedia('(pointer: fine)').matches
+      const preferred = fine ? node.querySelector<HTMLElement>('[data-autofocus]') : null
       const first =
         preferred ??
-        content.current?.querySelector<HTMLElement>(FOCUSABLE) ??
-        actions.current?.querySelector<HTMLElement>(FOCUSABLE) ??
-        node.querySelector<HTMLElement>(FOCUSABLE)
+        // En táctil el foco va al panel: enfocar un campo sube el teclado y
+        // tapa media hoja antes de que el alumno haya decidido qué tocar.
+        (fine ? content.current?.querySelector<HTMLElement>(FOCUSABLE) : null) ??
+        (fine ? actions.current?.querySelector<HTMLElement>(FOCUSABLE) : null) ??
+        (fine ? node.querySelector<HTMLElement>(FOCUSABLE) : null)
       // Sin nada enfocable, el propio panel recibe el foco para que las
       // teclas de navegación no se queden actuando sobre la página de detrás.
       ;(first ?? node).focus({ preventScroll: true })
     }
 
     return () => restoreFocus.current?.focus({ preventScroll: true })
-  }, [open, rendered])
+  }, [open])
 
   // Bloquear el fondo (y dejarlo inerte) mientras esté abierto. El bloqueo
   // es compartido entre diálogos: ver scrollLock.ts.
@@ -124,166 +128,137 @@ export function Modal({
     return () => document.removeEventListener('keydown', onKeyDown, true)
   }, [open, onClose])
 
-  // --- Salida animada ----------------------------------------------------
-  // Al cerrar, el panel sigue montado lo que dura su animación de salida, con
-  // el último contenido que tuvo abierto: si se pintara con las props nuevas
-  // (p. ej. `task = null`), el formulario parpadearía vacío mientras baja.
-  const [closing, setClosing] = useState(false)
-  const snapshot = useRef({ title, description, children, footer })
-  if (open) snapshot.current = { title, description, children, footer }
-
-  useEffect(() => {
-    if (open) {
-      setRendered(true)
-      setClosing(false)
-      return
-    }
-    if (!rendered) return
-    setClosing(true)
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const id = setTimeout(
-      () => {
-        setRendered(false)
-        setClosing(false)
-      },
-      reduce ? 0 : 260,
-    )
-    return () => clearTimeout(id)
-  }, [open, rendered])
-
-  // --- Arrastrar para cerrar (hoja de móvil) ------------------------------
-  const drag = useRef<{ startY: number; startT: number; dy: number } | null>(null)
-  const [dragY, setDragY] = useState(0)
-
-  const onGrabStart = (event: React.PointerEvent) => {
-    if (window.matchMedia('(min-width: 640px)').matches) return
-    if ((event.target as HTMLElement).closest('button')) return
-    drag.current = { startY: event.clientY, startT: performance.now(), dy: 0 }
-    ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
-  }
-  const onGrabMove = (event: React.PointerEvent) => {
-    if (!drag.current) return
-    const dy = Math.max(0, event.clientY - drag.current.startY)
-    drag.current.dy = dy
-    setDragY(dy)
-  }
-  const onGrabEnd = () => {
-    const state = drag.current
-    drag.current = null
-    if (!state) return
-    const velocity = state.dy / Math.max(1, performance.now() - state.startT)
-    if (state.dy > 110 || (state.dy > 30 && velocity > 0.6)) onClose()
-    else setDragY(0)
-  }
-  useEffect(() => {
-    if (!open) setDragY(0)
-  }, [open])
-
-  if (!rendered) return null
-
-  const view = open ? { title, description, children, footer } : snapshot.current
   const widths = { sm: 'sm:max-w-md', md: 'sm:max-w-xl', lg: 'sm:max-w-3xl' }
 
+  const hidden = reduce
+    ? { opacity: 0 }
+    : sheet
+      ? { y: '100%' }
+      : { opacity: 0, scale: 0.94, y: 12 }
+  const shown = { opacity: 1, scale: 1, y: 0 }
+
   return createPortal(
-    <div
-      className={cx(
-        'fixed inset-0 z-50 flex sm:items-center justify-center items-end',
-        closing && 'pointer-events-none',
-      )}
-    >
-      <div
-        className={cx(
-          'absolute inset-0 transition-opacity duration-300',
-          closing ? 'opacity-0' : 'animate-fade',
-        )}
-        style={{ background: 'var(--scrim)' }}
-        onClick={onClose}
-        aria-hidden
-      />
-
-      <div
-        ref={panel}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={view.description ? descId : undefined}
-        tabIndex={-1}
-        className={cx(
-          'relative w-full flex flex-col outline-none',
-          'bg-surface shadow-lg',
-          'rounded-t-[28px] sm:rounded-[28px] sm:mx-4',
-          'max-h-[94dvh] sm:max-h-[86dvh]',
-          closing
-            ? 'translate-y-full sm:translate-y-0 sm:scale-95 sm:opacity-0 transition-[transform,opacity] duration-[260ms] ease-[var(--ease-std)]'
-            : dragY > 0
-              ? ''
-              : 'animate-sheet sm:animate-pop transition-transform duration-500 ease-[var(--spring)]',
-          widths[size],
-        )}
-        style={dragY > 0 ? { transform: `translateY(${dragY}px)` } : undefined}
-      >
-        <header
-          className="relative shrink-0 px-5 sm:px-6 pt-2 sm:pt-5 pb-3 touch-none sm:touch-auto"
-          onPointerDown={onGrabStart}
-          onPointerMove={onGrabMove}
-          onPointerUp={onGrabEnd}
-          onPointerCancel={onGrabEnd}
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="modal"
+          className="fixed inset-0 z-50 flex sm:items-center justify-center items-end"
+          // Mientras baja ya no intercepta toques: se puede seguir usando la
+          // página sin esperar a que termine la animación.
+          exit={{ pointerEvents: 'none' }}
         >
-          {/* Tirador: indica que la hoja se puede bajar con el dedo. */}
-          <div
+          <motion.div
+            className="absolute inset-0"
+            style={{ background: 'var(--scrim)' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.22 } }}
+            transition={{ duration: 0.28 }}
+            onClick={onClose}
             aria-hidden
-            className="sm:hidden mx-auto mb-2.5 h-[5px] w-9 rounded-full bg-hairline-strong"
           />
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 pt-1">
-              <h2
-                id={titleId}
-                className="text-[1.25rem] font-bold tracking-[-0.022em] leading-tight"
-              >
-                {view.title}
-              </h2>
-              {view.description && (
-                <p id={descId} className="text-[0.8125rem] text-ink-3 mt-1">
-                  {view.description}
-                </p>
-              )}
-            </div>
-            <div className="flex items-center gap-2 -mr-1 shrink-0">
-              {open && headerAction}
-              <IconButton
-                label="Cerrar"
-                size="sm"
-                variant="secondary"
-                onClick={onClose}
-                className="shrink-0"
-              >
-                <X className="size-[18px]" strokeWidth={2.4} />
-              </IconButton>
-            </div>
-          </div>
-        </header>
 
-        <div
-          ref={content}
-          className="overflow-y-auto overscroll-contain px-5 sm:px-6 pt-2 pb-5 grow"
-        >
-          {view.children}
-        </div>
-
-        {view.footer && (
-          <footer
-            ref={actions}
+          <motion.div
+            ref={panel}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            aria-describedby={description ? descId : undefined}
+            tabIndex={-1}
             className={cx(
-              'flex items-center justify-end gap-2 px-5 sm:px-6 pt-3 shrink-0',
-              'border-t border-hairline',
-              'pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:pb-5',
+              'relative w-full flex flex-col outline-none',
+              'bg-surface shadow-lg',
+              'rounded-t-[32px] sm:rounded-[32px] sm:mx-4',
+              'max-h-[94dvh] sm:max-h-[86dvh]',
+              widths[size],
             )}
+            initial={hidden}
+            animate={shown}
+            exit={{ ...hidden, transition: sheet ? { ...spring.smooth, bounce: 0 } : exitFast }}
+            transition={spring.smooth}
+            // Arrastre: solo en la hoja y solo desde la cabecera (el cuerpo
+            // tiene su propio desplazamiento).
+            drag={sheet && !reduce ? 'y' : false}
+            dragControls={dragControls}
+            dragListener={false}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0.04, bottom: 1 }}
+            onDragEnd={(_, info) => {
+              // Cuenta lo lejos que se ha bajado y con qué velocidad se
+              // suelta: un gesto corto pero decidido también cierra.
+              if (info.offset.y > 120 || (info.offset.y > 24 && info.velocity.y > 520)) onClose()
+            }}
           >
-            {view.footer}
-          </footer>
-        )}
-      </div>
-    </div>,
+            {/* En la hoja, el fondo se prolonga por debajo para que el rebote
+                del muelle no enseñe la página por el hueco inferior. */}
+            <span
+              aria-hidden
+              className="sm:hidden absolute inset-x-0 top-full h-24 bg-surface pointer-events-none"
+            />
+            <header
+              className="relative shrink-0 px-5 sm:px-6 pt-2 sm:pt-5 pb-3 touch-none sm:touch-auto"
+              onPointerDown={(event) => {
+                if (!sheet || (event.target as HTMLElement).closest('button, a, input')) return
+                dragControls.start(event)
+              }}
+            >
+              {/* Tirador: indica que la hoja se puede bajar con el dedo. */}
+              <div
+                aria-hidden
+                className="sm:hidden mx-auto mb-2.5 h-[5px] w-9 rounded-full bg-hairline-strong"
+              />
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 pt-1">
+                  <h2
+                    id={titleId}
+                    className="text-[1.25rem] font-bold tracking-[-0.022em] leading-tight"
+                  >
+                    {title}
+                  </h2>
+                  {description && (
+                    <p id={descId} className="text-[0.8125rem] text-ink-3 mt-1">
+                      {description}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 -mr-1 shrink-0">
+                  {headerAction}
+                  <IconButton
+                    label="Cerrar"
+                    size="sm"
+                    variant="secondary"
+                    onClick={onClose}
+                    className="shrink-0"
+                  >
+                    <X className="size-[18px]" strokeWidth={2.4} />
+                  </IconButton>
+                </div>
+              </div>
+            </header>
+
+            <div
+              ref={content}
+              className="overflow-y-auto overscroll-contain px-5 sm:px-6 pt-2 pb-5 grow"
+            >
+              {children}
+            </div>
+
+            {footer && (
+              <footer
+                ref={actions}
+                className={cx(
+                  'flex items-center justify-end gap-2 px-5 sm:px-6 pt-3 shrink-0',
+                  'border-t border-hairline',
+                  'pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:pb-5',
+                )}
+              >
+                {footer}
+              </footer>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
     document.body,
   )
 }

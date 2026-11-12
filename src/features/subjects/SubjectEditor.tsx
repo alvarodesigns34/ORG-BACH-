@@ -5,12 +5,22 @@ import { checkWeights } from '@/domain/grades'
 import { newId } from '@/domain/id'
 import { parseDecimal, toDecimalInput } from '@/domain/number'
 import { SUBJECT_COLORS, colorVar, nextColor } from '@/domain/palette'
-import type { GradeCategory, Subject, SubjectColor } from '@/domain/types'
+import type { GradeCategory, ScheduleSlot, Subject, SubjectColor } from '@/domain/types'
 import { useDispatch, useSettings } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
 import { Field, Input, NumberField, NumberInput } from '@/ui/fields'
 import { ConfirmDialog, Modal } from '@/ui/Modal'
 import { Button, IconButton, cx } from '@/ui/primitives'
+
+const SCHEDULE_DAYS: { value: ScheduleSlot['day']; label: string }[] = [
+  { value: 1, label: 'Lunes' },
+  { value: 2, label: 'Martes' },
+  { value: 3, label: 'Miércoles' },
+  { value: 4, label: 'Jueves' },
+  { value: 5, label: 'Viernes' },
+  { value: 6, label: 'Sábado' },
+  { value: 0, label: 'Domingo' },
+]
 
 interface SubjectEditorProps {
   open: boolean
@@ -31,6 +41,7 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
   const [weight, setWeight] = useState('4')
   const [target, setTarget] = useState('')
   const [categories, setCategories] = useState<GradeCategory[]>([])
+  const [schedule, setSchedule] = useState<ScheduleSlot[]>([])
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
@@ -50,6 +61,7 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
     // había pedido, y una nota con peso propio (25 %, por ejemplo) se
     // calculaba sobre ese reparto ajeno en vez de sobre el total.
     setCategories(subject ? subject.categories.map((c) => ({ ...c })) : [])
+    setSchedule(subject ? subject.schedule.map((slot) => ({ ...slot })) : [])
     setError(null)
     // `existing` cambia con cada guardado; incluirlo reiniciaría el formulario
     // en mitad de la edición.
@@ -82,10 +94,12 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
           ? Math.min(parsedTarget, settings.gradeScale.max)
           : undefined,
       categories: categories.filter((c) => c.name.trim()),
+      // Una franja que acaba antes de empezar no se puede colocar en el día.
+      schedule: schedule.filter((slot) => slot.start && slot.end && slot.end > slot.start),
     }
 
     if (subject) dispatch({ type: 'subject/update', id: subject.id, patch: payload })
-    else dispatch({ type: 'subject/add', subject: { ...payload, schedule: [] } })
+    else dispatch({ type: 'subject/add', subject: payload })
     onClose()
   }
 
@@ -222,6 +236,100 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
                 />
               )}
             </Field>
+          </div>
+
+          {/* --- Horario --- */}
+          <div className="flex flex-col gap-2.5">
+            <div>
+              <span className="text-[0.8125rem] font-medium text-ink-2">Horario</span>
+              <p className="text-[0.75rem] text-ink-3 mt-0.5">
+                Cuándo tienes clase. Con esto, Inicio te dice qué toca ahora y qué viene después.
+              </p>
+            </div>
+
+            {schedule.length > 0 && (
+              <ul className="flex flex-col rounded-[14px] bg-fill overflow-hidden">
+                {schedule.map((slot, index) => {
+                  const patch = (change: Partial<ScheduleSlot>) =>
+                    setSchedule((prev) =>
+                      prev.map((item) => (item.id === slot.id ? { ...item, ...change } : item)),
+                    )
+                  return (
+                    <li
+                      key={slot.id}
+                      className={cx(
+                        'flex items-center gap-1.5 pl-3 pr-1.5 py-1.5',
+                        index > 0 && 'border-t border-hairline',
+                      )}
+                    >
+                      <select
+                        aria-label="Día"
+                        value={slot.day}
+                        onChange={(e) => patch({ day: Number(e.target.value) as ScheduleSlot['day'] })}
+                        className="flex-1 min-w-0 h-9 bg-transparent text-[1rem] text-ink font-sans outline-none cursor-pointer"
+                      >
+                        {SCHEDULE_DAYS.map((day) => (
+                          <option key={day.value} value={day.value}>
+                            {day.label}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="time"
+                        aria-label="Empieza"
+                        value={slot.start}
+                        onChange={(e) => patch({ start: e.target.value })}
+                        className="h-9 w-[5.25rem] shrink-0 rounded-[9px] bg-raised px-2 text-[0.9375rem] tabular-nums text-ink outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                      />
+                      <span aria-hidden className="text-ink-3">
+                        –
+                      </span>
+                      <input
+                        type="time"
+                        aria-label="Termina"
+                        value={slot.end}
+                        aria-invalid={!!slot.end && !!slot.start && slot.end <= slot.start}
+                        onChange={(e) => patch({ end: e.target.value })}
+                        className="h-9 w-[5.25rem] shrink-0 rounded-[9px] bg-raised px-2 text-[0.9375rem] tabular-nums text-ink outline-none focus-visible:ring-2 focus-visible:ring-accent/40 aria-[invalid=true]:text-danger"
+                      />
+                      <IconButton
+                        label="Quitar franja"
+                        size="sm"
+                        onClick={() => setSchedule((prev) => prev.filter((i) => i.id !== slot.id))}
+                      >
+                        <X className="size-3.5" />
+                      </IconButton>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+
+            <div>
+              <Button
+                size="sm"
+                onClick={() =>
+                  setSchedule((prev) => {
+                    // La nueva franja propone el día siguiente a la última y
+                    // su misma hora: lo normal es repetir hora otro día.
+                    const last = prev[prev.length - 1]
+                    const day = last ? (((last.day % 5) + 1) as ScheduleSlot['day']) : 1
+                    return [
+                      ...prev,
+                      {
+                        id: newId('slot'),
+                        day,
+                        start: last?.start ?? '08:30',
+                        end: last?.end ?? '09:25',
+                      },
+                    ]
+                  })
+                }
+              >
+                <Plus className="size-3.5" />
+                Añadir clase
+              </Button>
+            </div>
           </div>
 
           {/* --- Reparto de pesos --- */}

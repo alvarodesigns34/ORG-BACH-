@@ -26,7 +26,7 @@ export default defineConfig({
         name: 'Bachillerato OS',
         short_name: 'Bachillerato',
         description:
-          'Centro de control académico personal: tareas, exámenes, notas y estudio en un solo sitio.',
+          'Centro de control académico personal: tareas, exámenes, horario y notas en un solo sitio.',
         lang: 'es',
         start_url: base,
         scope: base,

@@ -31,23 +31,22 @@ comprobación de tipos, y ahora se llama por lo que hace.
 | 1 · Fundación | Arquitectura, sistema visual, temas, navegación, responsive, persistencia, alta inicial | Hecha |
 | 2 · Productividad | Tareas, subtareas, prioridades, calendario, exámenes, asignaturas | Hecha |
 | 3 · Académico | Notas, categorías de peso, medias ponderadas, calculadora de nota, evaluaciones | Hecha |
-| 4 · Análisis | Estadísticas, gráficos, sesiones de estudio, objetivos | Hecha |
+| 4 · Análisis | Estadísticas, gráficos, objetivos | Hecha |
 | 5 · Pulido | Microinteracciones, accesibilidad avanzada, optimización, instalable sin conexión | Hecha |
 | 6 · Nube | Cuenta, sincronización sin conexión entre dispositivos, resumen diario push | Hecha |
+| 7 · Rediseño | Navegación flotante de cristal, muelles y gestos (Motion), Inicio personalizable, horario | Hecha |
 
-Tras una auditoría externa se hizo una **ronda de endurecimiento**: se corrigió
-el registro del inicio de las sesiones de estudio, se añadió validación campo a
-campo de los datos importados y del temporizador guardado, se resolvió qué pasa
+Tras una auditoría externa se hizo una **ronda de endurecimiento**: se añadió
+validación campo a campo de los datos importados, se resolvió qué pasa
 con los objetivos de una asignatura borrada, se arregló la entrada de decimales
 en Ajustes, se hizo consistente la confirmación al borrar y se ajustó el
 contraste de los textos secundarios en ambos temas.
 
-Hay **263 pruebas** sobre el dominio, el reductor, la persistencia, la fusión
+Hay **256 pruebas** sobre el dominio, el reductor, la persistencia, la fusión
 de la sincronización y el resumen diario. Recorren
 los casos que rompen este tipo de aplicaciones: pesos que no suman 100, notas
 sin peso junto a notas con peso, escalas distintas del 10, la nota del curso
-frente al saco único de notas, la coma decimal española, un temporizador que no
-se desvía en segundo plano ni al cambiar los ajustes a mitad de sesión, los
+frente al saco único de notas, la coma decimal española, los
 efectos en cadena de borrar o editar una asignatura, y archivos de importación
 corruptos o ajenos.
 
@@ -59,6 +58,42 @@ El dominio, el estado y la persistencia usan **rutas relativas con extensión**
 en sus importaciones. No es un capricho: permite que Node los ejecute
 directamente, y por eso las pruebas funcionan sin bundler ni loader. Las capas
 de interfaz conservan el alias `@/`.
+
+## Diseño e interacción
+
+Pensada para un iPhone y un iPad de 11": instalada como PWA se comporta como
+una app del sistema.
+
+- **Navegación flotante de cristal.** En el iPhone, una cápsula de pestañas
+  con lente que sigue al dedo y, a su derecha, el botón «+» del que sale el
+  menú para crear tarea, examen, nota o evento desde cualquier pantalla. En el
+  iPad en vertical la cápsula lleva todas las secciones; en horizontal pasa a
+  ser un panel lateral flotante. El contenido se desenfoca y se disuelve al
+  pasar bajo los bordes, sin barras con línea.
+- **Muelles, no duraciones.** Hojas, menús, selectores y avisos se mueven con
+  tres muelles definidos en `src/ui/motion.ts` (librería
+  [Motion](https://motion.dev)). Son interrumpibles: una hoja se arrastra desde
+  la cabecera y, al soltarla, decide con la velocidad que lleva.
+- **Gestos.** Deslizar una tarea a la derecha la completa y a la izquierda la
+  borra (con «Deshacer»). Al completar, la casilla se marca y el título se
+  tacha antes de que la fila se pliegue.
+- **Háptica.** Toque del sistema al cambiar de pestaña, marcar una casilla o
+  cruzar el umbral de un deslizamiento (en iOS, a través de un interruptor
+  nativo oculto; Safari no implementa `navigator.vibrate`).
+- **Inicio personalizable.** Un tablero de tarjetas (Ahora, Para hoy,
+  Exámenes, Media, Próximos 7 días, Objetivos, Avisos, Actividad).
+  «Personalizar Inicio» las pone a temblar: se quitan con «−», se arrastran
+  por el tirador y las ocultas esperan en la bandeja inferior. El orden se
+  guarda en los ajustes y se sincroniza.
+- **Horario.** Cada asignatura guarda cuándo hay clase; la tarjeta «Ahora»
+  dibuja el día como una línea de tiempo, dice qué toca y cuánto queda, y la
+  luz ambiente de la pantalla toma el color de esa asignatura.
+- Con «reducir movimiento» no hay recorridos; con «reducir transparencia», el
+  cristal es opaco.
+
+No hay registro de tiempo de estudio ni temporizador: se retiró porque no se
+usaba. Los datos de versiones anteriores que lo tenían se cargan sin avisos;
+las sesiones simplemente se ignoran.
 
 ## Arquitectura
 
@@ -73,8 +108,8 @@ src/
 │   ├── alerts.ts      Detección de situaciones que merecen aviso
 │   ├── dates.ts       Fechas en español, sin errores de zona horaria
 │   ├── number.ts      Lectura de números con coma decimal
-│   ├── study.ts       Temporizador y pomodoro
-│   ├── stats.ts       Evolución, rankings y reparto del tiempo
+│   ├── schedule.ts    Horario: qué clase toca ahora y cuál viene después
+│   ├── stats.ts       Evolución y rankings
 │   ├── goals.ts       Progreso de objetivos
 │   └── palette.ts     Claves de color de asignatura
 │
@@ -140,18 +175,6 @@ come el decimal en silencio. Por eso los campos numéricos no usan
 `type="text"` con `inputMode="decimal"`, y todo lo tecleado pasa por
 `parseDecimal` (`src/domain/number.ts`).
 
-### El temporizador
-
-El estado guarda **marcas de tiempo**, no un contador que se incrementa. Un
-contador con `setInterval` se retrasa en cuanto la pestaña pasa a segundo plano
-—los navegadores lo estrangulan— y una sesión de 50 minutos acabaría
-registrando 35. Con marcas de reloj no hay desvío, el intervalo solo repinta, y
-recargar la página sin querer no pierde la sesión.
-
-Los descansos no cuentan como estudio, y la sesión se registra con su hora de
-**inicio**, para que caiga en el día en que se empezó aunque termine pasada la
-medianoche.
-
 ### Los gráficos
 
 Dibujados a mano en SVG, sin librería. Una regla los gobierna: **el color no
@@ -174,7 +197,7 @@ sesiones de duración imposible que revientan la interfaz semanas después.
 Por eso cada entidad se revisa campo a campo antes de entrar, y el criterio es
 **descartar el registro roto, no el archivo entero**: de ciento veinte notas con
 dos corruptas se recuperan ciento dieciocho, y se dice cuántas se quedaron
-fuera. El mismo criterio se aplica al temporizador guardado.
+fuera.
 
 ### Los objetivos
 
@@ -205,8 +228,6 @@ Cosas decididas a conciencia, no olvidos:
 - **El enlace entre un examen y su nota solo se crea al apuntar la nota** desde
   el propio examen. No hay forma de enlazar después una nota ya existente con un
   examen, ni de cambiar el enlace.
-- **Las sesiones de estudio no se pueden editar**, solo crear desde el
-  temporizador y borrar desde la lista.
 - **Correo de la cuenta.** Mientras el proyecto de Supabase use su correo
   integrado, solo puede enviar (confirmación de cuenta, recuperar contraseña) a
   los miembros del equipo del proyecto y con un límite bajo por hora. Para más
@@ -319,7 +340,7 @@ apuntar…» de Inicio y en el menú lateral.
 - **Qué sabe hacer**: crear, cambiar, completar, reabrir y borrar tareas
   (también dividirlas en pasos); crear, mover y borrar exámenes; apuntar,
   corregir y borrar notas (con peso y evaluación); eventos; objetivos por
-  asignatura; registrar estudio; planes de repaso; y responder preguntas
+  asignatura; dividir tareas en pasos; y responder preguntas
   («¿qué tengo esta semana?», «¿cuál es mi media?», «¿qué necesito para un 7?»).
 - **Memoria de la conversación**: se reenvían al modelo los últimos 16
   mensajes. Cada respuesta suya va acompañada de lo que la app aplicó DE
@@ -354,7 +375,7 @@ apuntar…» de Inicio y en el menú lateral.
   `MISTRAL_API_KEY` de Supabase, nunca en la app ni en el repositorio.
 - **Qué viaja al modelo**: la conversación reciente y un resumen del curso
   (asignaturas con sus medias, tareas abiertas y recién completadas, exámenes,
-  notas recientes, eventos próximos y minutos de estudio).
+  notas recientes, y eventos próximos).
 
 ## Aplicación instalable (PWA)
 

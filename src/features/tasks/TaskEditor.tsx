@@ -13,7 +13,7 @@ import {
 } from '@/domain/types'
 import { useDispatch } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
-import { Checkbox, Field, Input, NumberInput, Select, Textarea } from '@/ui/fields'
+import { Checkbox, Field, Input, Select, Textarea } from '@/ui/fields'
 import { Modal } from '@/ui/Modal'
 import { useToast } from '@/ui/Toast'
 import { Button, IconButton, PRIORITY_LABEL, Progress, cx } from '@/ui/primitives'
@@ -249,20 +249,6 @@ export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
                   value={form.dueTime}
                   disabled={!form.dueDate}
                   onChange={(e) => set('dueTime', e.target.value)}
-                />
-              )}
-            </Field>
-
-            <Field label="Tiempo estimado">
-              {({ id }) => (
-                <NumberInput
-                  id={id}
-                  min={0}
-                  step={5}
-                  suffix="min"
-                  placeholder="45"
-                  value={form.estimatedMinutes}
-                  onChange={(e) => set('estimatedMinutes', e.target.value)}
                 />
               )}
             </Field>

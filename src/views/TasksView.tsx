@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowUpDown, ListChecks, Plus, Search, X } from 'lucide-react'
 
@@ -18,7 +19,8 @@ import { useStore, useToday } from '@/state/StoreProvider'
 import { useSubjectMap, useSubjects } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
 import { TaskEditor } from '@/features/tasks/TaskEditor'
-import { TaskRow } from '@/features/tasks/TaskRow'
+import { TaskList } from '@/features/tasks/TaskRow'
+import { spring } from '@/ui/motion'
 import { Menu } from '@/ui/Menu'
 import { Input, Select } from '@/ui/fields'
 import { Button, Card, EmptyState, PRIORITY_LABEL, Segmented, cx } from '@/ui/primitives'
@@ -259,8 +261,17 @@ export function TasksView() {
         </Card>
       ) : (
         <div className="flex flex-col gap-6">
+          <AnimatePresence initial={false}>
           {grouped.map((group) => (
-            <section key={group.key}>
+            <motion.section
+              key={group.key}
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ ...spring.smooth, bounce: 0 }}
+              // Sin esto, la sombra de la tarjeta se recorta mientras se pliega.
+              className="overflow-hidden -mx-2 px-2 -my-1 py-1"
+            >
               <h2
                 className={cx(
                   'flex items-baseline gap-2 mb-2 px-1 text-[1.125rem] font-bold tracking-[-0.02em]',
@@ -277,19 +288,11 @@ export function TasksView() {
                 </span>
               </h2>
               <Card flush className="overflow-hidden">
-                <ul>
-                  {group.tasks.map((task) => (
-                    <TaskRow
-                      key={task.id}
-                      task={task}
-                      subject={task.subjectId ? subjectMap.get(task.subjectId) : undefined}
-                      onOpen={setEditing}
-                    />
-                  ))}
-                </ul>
+                <TaskList tasks={group.tasks} subjects={subjectMap} onOpen={setEditing} />
               </Card>
-            </section>
+            </motion.section>
           ))}
+          </AnimatePresence>
         </div>
       )}
 

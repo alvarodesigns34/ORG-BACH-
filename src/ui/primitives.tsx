@@ -1,11 +1,7 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ButtonHTMLAttributes,
-  type ReactNode,
-} from 'react'
+import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { animate, motion, useReducedMotion } from 'motion/react'
+
+import { haptic, spring } from './motion'
 
 import { colorVar, quietVar } from '@/domain/palette'
 import type { Priority, Subject } from '@/domain/types'
@@ -283,7 +279,7 @@ export function Progress({ value, className, tone = 'accent', label }: ProgressP
       aria-label={label}
     >
       <div
-        className="h-full rounded-full transition-[width] duration-500 ease-[var(--spring)]"
+        className="h-full rounded-full transition-[width] duration-700 ease-[var(--spring)]"
         style={{ width: `${pct}%`, background: PROGRESS_TONE[tone] }}
       />
     </div>
@@ -311,24 +307,11 @@ export function Segmented<T extends string>({
   className,
   size = 'md',
 }: SegmentedProps<T>) {
-  // El indicador se mide sobre el botón activo real, así que se desliza bien
-  // aunque las etiquetas tengan anchos distintos o haya que desplazarse.
+  // El indicador es UN elemento compartido entre opciones (`layoutId`): al
+  // cambiar, Motion lo lleva de un botón a otro con un muelle, midiendo los
+  // dos, así que se desliza bien aunque las etiquetas tengan anchos distintos.
   const track = useRef<HTMLDivElement>(null)
-  const [thumb, setThumb] = useState<{ left: number; width: number } | null>(null)
-
-  useLayoutEffect(() => {
-    const node = track.current
-    if (!node) return
-    const measure = () => {
-      const active = node.querySelector<HTMLElement>('[aria-checked="true"]')
-      if (!active) return setThumb(null)
-      setThumb({ left: active.offsetLeft, width: active.offsetWidth })
-    }
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [value, options.length])
+  const thumbId = useId()
 
   // El activo siempre a la vista si la tira se desplaza.
   useEffect(() => {
@@ -338,8 +321,9 @@ export function Segmented<T extends string>({
   }, [value])
 
   return (
-    <div
+    <motion.div
       ref={track}
+      layoutScroll
       role="radiogroup"
       aria-label={label}
       className={cx(
@@ -348,13 +332,6 @@ export function Segmented<T extends string>({
         className,
       )}
     >
-      {thumb && (
-        <span
-          aria-hidden
-          className="absolute top-[3px] bottom-[3px] left-0 rounded-full bg-raised shadow-sm transition-[transform,width] duration-500 ease-[var(--spring)]"
-          style={{ width: thumb.width, transform: `translateX(${thumb.left}px)` }}
-        />
-      )}
       {options.map((option) => {
         const active = option.value === value
         return (
@@ -363,24 +340,35 @@ export function Segmented<T extends string>({
             role="radio"
             type="button"
             aria-checked={active}
-            onClick={() => onChange(option.value)}
+            onClick={() => {
+              if (!active) haptic()
+              onChange(option.value)
+            }}
             className={cx(
-              'relative z-[1] shrink-0 inline-flex items-center justify-center gap-1.5 rounded-full whitespace-nowrap',
+              'relative shrink-0 inline-flex items-center justify-center gap-1.5 rounded-full whitespace-nowrap',
               'transition-colors duration-200',
               size === 'sm' ? 'h-7 px-3 text-[0.75rem]' : 'h-8 px-3.5 text-[0.8125rem]',
               active ? 'text-ink font-semibold' : 'text-ink-2 font-medium hover:text-ink',
             )}
           >
-            {option.label}
+            {active && (
+              <motion.span
+                aria-hidden
+                layoutId={thumbId}
+                transition={spring.snappy}
+                className="absolute inset-0 rounded-full bg-raised shadow-sm"
+              />
+            )}
+            <span className="relative">{option.label}</span>
             {option.count !== undefined && (
-              <span className="tabular-nums text-[0.6875rem] font-semibold text-ink-3">
+              <span className="relative tabular-nums text-[0.6875rem] font-semibold text-ink-3">
                 {option.count}
               </span>
             )}
           </button>
         )
       })}
-    </div>
+    </motion.div>
   )
 }
 
@@ -492,4 +480,46 @@ export function Numeral({
       {suffix && <span className="text-[0.5em] font-semibold text-ink-3">{suffix}</span>}
     </span>
   )
+}
+
+/**
+ * Número que rueda hasta su nuevo valor cuando cambia.
+ *
+ * No anima al montarse: una cifra que cuenta desde cero cada vez que se abre
+ * la sección cansa a la tercera. Solo se mueve cuando el dato cambia de
+ * verdad (entra una nota, se completa una tarea), que es cuando el movimiento
+ * informa.
+ */
+export function CountUp({
+  value,
+  format,
+}: {
+  value: number | null
+  format: (value: number | null) => string
+}) {
+  const node = useRef<HTMLSpanElement>(null)
+  const previous = useRef(value)
+  const reduce = useReducedMotion()
+
+  useEffect(() => {
+    const from = previous.current
+    previous.current = value
+    if (reduce || from === null || value === null || from === value || !node.current) return
+    const el = node.current
+    const controls = animate(from, value, {
+      duration: 0.5,
+      ease: [0.16, 1, 0.3, 1],
+      onUpdate: (latest) => {
+        el.textContent = format(latest)
+      },
+      onComplete: () => {
+        el.textContent = format(value)
+      },
+    })
+    return () => controls.stop()
+    // `format` suele ser una función en línea; no debe relanzar la animación.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, reduce])
+
+  return <span ref={node}>{format(value)}</span>
 }

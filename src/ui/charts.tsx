@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { motion } from 'motion/react'
 
 import { cx } from './primitives'
 
@@ -568,5 +569,119 @@ export function RankedBars({
         </tbody>
       </table>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Anillo de progreso
+// ---------------------------------------------------------------------------
+
+/**
+ * Anillo que se llena con un muelle. Decorativo: quien lo usa pone el dato en
+ * texto al lado (o en `label`, que lo convierte en una imagen con nombre).
+ */
+export function Ring({
+  value,
+  size = 44,
+  stroke = 5,
+  color = 'var(--c-accent-fill)',
+  label,
+  children,
+}: {
+  /** 0–1. */
+  value: number
+  size?: number
+  stroke?: number
+  color?: string
+  label?: string
+  children?: ReactNode
+}) {
+  const radius = (size - stroke) / 2
+  const clamped = Math.max(0, Math.min(1, value))
+  return (
+    <span
+      className="relative inline-grid place-items-center shrink-0"
+      style={{ width: size, height: size }}
+      role={label ? 'img' : undefined}
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
+    >
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeOpacity={0.18}
+          strokeWidth={stroke}
+        />
+        <motion.circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: clamped }}
+          transition={{ type: 'spring', visualDuration: 0.7, bounce: 0.15 }}
+          // Con valor 0, el remate redondo dejaría un punto: se oculta.
+          style={{ opacity: clamped === 0 ? 0 : 1 }}
+        />
+      </svg>
+      {children && <span className="absolute inset-0 grid place-items-center">{children}</span>}
+    </span>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Minigráfico
+// ---------------------------------------------------------------------------
+
+/** Línea sin ejes: la forma de una evolución, no sus valores. Decorativa. */
+export function Sparkline({
+  values,
+  color = 'var(--c-accent)',
+  height = 36,
+  className,
+}: {
+  values: number[]
+  color?: string
+  height?: number
+  className?: string
+}) {
+  if (values.length < 2) return null
+  const width = 120
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const span = max - min || 1
+  const pad = 3
+  const points = values.map((value, i) => {
+    const x = (i / (values.length - 1)) * width
+    const y = pad + (1 - (value - min) / span) * (height - pad * 2)
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  })
+  return (
+    <svg
+      aria-hidden
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      className={className}
+      style={{ height, width: '100%', overflow: 'visible' }}
+    >
+      <path
+        d={`M${points.join(' L')}`}
+        pathLength={1}
+        fill="none"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+        className="animate-draw"
+      />
+    </svg>
   )
 }

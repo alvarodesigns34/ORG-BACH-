@@ -7,6 +7,7 @@ import type {
 } from 'react'
 
 import { parseDecimal, sanitizeNumericInput, toDecimalInput } from '@/domain/number'
+import { haptic } from './motion'
 import { cx } from './primitives'
 
 /** Estilo común a todo control de formulario, para que no deriven entre sí. */
@@ -357,7 +358,10 @@ export function Checkbox({
       <input
         type="checkbox"
         checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
+        onChange={(e) => {
+          haptic(e.target.checked ? 'success' : 'tick')
+          onChange(e.target.checked)
+        }}
         className="sr-only peer"
         aria-label={hideLabel ? label : undefined}
       />
@@ -365,7 +369,7 @@ export function Checkbox({
         aria-hidden
         className={cx(
           box,
-          'grid place-items-center rounded-full border-[1.75px] shrink-0',
+          'relative grid place-items-center rounded-full border-[1.75px] shrink-0',
           'transition-[background-color,border-color,transform] duration-300 ease-[var(--spring)]',
           'group-active:scale-90',
           'peer-focus-visible:outline peer-focus-visible:outline-[2.5px] peer-focus-visible:outline-accent peer-focus-visible:outline-offset-2',
@@ -375,9 +379,16 @@ export function Checkbox({
         )}
       >
         {checked && (
+          <span
+            aria-hidden
+            className="absolute inset-0 rounded-full bg-accent-fill animate-[check-burst_520ms_var(--ease-out)_both] pointer-events-none"
+          />
+        )}
+        {checked && (
           <svg
             viewBox="0 0 12 12"
             className={cx(
+              'relative',
               size === 'sm' ? 'size-2.5' : 'size-3',
               'animate-[check-pop_380ms_var(--spring)]',
             )}
@@ -452,7 +463,10 @@ export function SwitchControl({
       aria-checked={checked}
       aria-label={label}
       disabled={disabled}
-      onClick={() => onChange(!checked)}
+      onClick={() => {
+        haptic()
+        onChange(!checked)
+      }}
       className={cx(
         'group relative shrink-0 w-[51px] h-[31px] rounded-full transition-colors duration-300',
         'disabled:opacity-45',
