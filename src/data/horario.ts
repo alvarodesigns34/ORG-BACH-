@@ -14,7 +14,10 @@ export interface TimetableSubject {
   color: SubjectColor
   /** Horas semanales; pondera en la media si la asignatura es nueva. */
   weight: number
-  /** Otros nombres con los que puede estar ya creada la asignatura. */
+  /**
+   * Otros nombres con los que puede estar ya creada la asignatura. Si una
+   * asignatura existente tiene uno de ellos, se renombra al nombre simple.
+   */
   aliases?: string[]
 }
 
@@ -27,9 +30,10 @@ export const TIMETABLE_SUBJECTS: TimetableSubject[] = [
   },
   {
     code: 'LCLI',
-    name: 'Lengua Castellana y Literatura I',
+    name: 'Lengua',
     color: 'terracotta',
     weight: 4,
+    aliases: ['Lengua Castellana y Literatura I', 'Lengua Castellana y Literatura', 'Lengua Castellana'],
   },
   {
     code: 'FIL',
@@ -40,30 +44,33 @@ export const TIMETABLE_SUBJECTS: TimetableSubject[] = [
   },
   {
     code: 'LEI',
-    name: 'Lengua Extranjera I (Inglés)',
+    name: 'Inglés',
     color: 'sky',
     weight: 4,
-    aliases: ['Lengua Extranjera I', 'Inglés'],
+    aliases: ['Lengua Extranjera I (Inglés)', 'Lengua Extranjera I', 'Lengua Extranjera'],
   },
   {
     code: 'BGCA',
-    name: 'Biología, Geología y CC. Ambientales',
+    name: 'Biología',
     color: 'sage',
     weight: 4,
-    aliases: ['Biología y Geología'],
+    aliases: ['Biología, Geología y CC. Ambientales', 'Biología y Geología'],
   },
   {
     code: 'MAI',
-    name: 'Matemáticas I',
+    name: 'Matemáticas',
     color: 'indigo',
     weight: 4,
+    aliases: ['Matemáticas I'],
   },
   {
-    code: 'TICs',
-    name: 'Tecnologías de la Información y la Comunicación',
+    // En el horario del centro sale «TICs», pero la asignatura del alumno ya
+    // se llamaba «TIC» y así se queda.
+    code: 'TIC',
+    name: 'TIC',
     color: 'slate',
     weight: 2,
-    aliases: ['TIC'],
+    aliases: ['TICs', 'Tecnologías de la Información y la Comunicación'],
   },
   {
     code: 'EF',
@@ -89,8 +96,8 @@ export const TIMETABLE_PERIODS: readonly [start: string, end: string][] = [
  */
 export const TIMETABLE_WEEK: Record<1 | 2 | 3 | 4 | 5, string[][]> = {
   1: [['FQ'], ['FQ'], ['LCLI'], ['FIL'], ['LEI'], ['BGCA']],
-  2: [['TICs'], ['BGCA'], ['EF'], ['EF'], [], ['MAI']],
+  2: [['TIC'], ['BGCA'], ['EF'], ['EF'], [], ['MAI']],
   3: [['FQ'], ['MAI'], ['LCLI'], ['LCLI'], ['FIL'], ['LEI']],
-  4: [['TICs'], ['MAI'], ['LCLI'], ['FIL'], ['BGCA'], ['LEI']],
-  5: [['BGCA'], ['FQ'], ['FIL'], ['TICs'], ['LEI'], ['MAI']],
+  4: [['TIC'], ['MAI'], ['LCLI'], ['FIL'], ['BGCA'], ['LEI']],
+  5: [['BGCA'], ['FQ'], ['FIL'], ['TIC'], ['LEI'], ['MAI']],
 }

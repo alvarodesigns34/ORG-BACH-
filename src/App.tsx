@@ -16,6 +16,7 @@ import { CalendarView } from '@/views/CalendarView'
 import { SubjectsView } from '@/views/SubjectsView'
 import { SubjectDetailView } from '@/views/SubjectDetailView'
 import { GradesView } from '@/views/GradesView'
+import { ExamsView } from '@/views/ExamsView'
 import { StatsView } from '@/views/StatsView'
 import { GoalsView } from '@/views/GoalsView'
 import { SettingsView } from '@/views/SettingsView'
@@ -166,6 +167,8 @@ function renderRoute(route: Route, subjectCount: number) {
     }
     case 'notas':
       return <GradesView />
+    case 'examenes':
+      return <ExamsView />
     case 'estadisticas':
       return <StatsView />
     case 'objetivos':

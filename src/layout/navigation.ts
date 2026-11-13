@@ -1,6 +1,7 @@
 import {
   BookOpen,
   CalendarDays,
+  ClipboardList,
   GraduationCap,
   House,
   ListChecks,
@@ -26,6 +27,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'calendario', label: 'Calendario', icon: CalendarDays, group: 'dia' },
   { id: 'asignaturas', label: 'Asignaturas', icon: BookOpen, group: 'academico' },
   { id: 'notas', label: 'Notas', icon: GraduationCap, group: 'academico' },
+  { id: 'examenes', label: 'Exámenes', icon: ClipboardList, group: 'academico' },
   { id: 'estadisticas', label: 'Estadísticas', icon: TrendingUp, group: 'academico' },
   { id: 'objetivos', label: 'Objetivos', icon: Target, group: 'sistema' },
   { id: 'ajustes', label: 'Ajustes', icon: Settings, group: 'sistema' },
@@ -50,6 +52,7 @@ export const NAV_TINTS: Record<RouteId, string> = {
   calendario: '#ff453a',
   asignaturas: '#ff9f0a',
   notas: '#bf5af2',
+  examenes: '#ff6b35',
   estadisticas: '#30b158',
   objetivos: '#ff375f',
   ajustes: '#8e8e93',

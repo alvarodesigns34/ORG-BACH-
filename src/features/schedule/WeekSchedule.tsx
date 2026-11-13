@@ -3,7 +3,7 @@ import { CalendarClock, Download } from 'lucide-react'
 
 import { colorVar, quietVar } from '@/domain/palette'
 import { classesOn } from '@/domain/schedule'
-import { planTimetable } from '@/domain/timetable'
+import { hasTimetableChanges, planTimetable } from '@/domain/timetable'
 import { useDispatch, useStore } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
 import { Button, Card, EmptyState, GroupTitle, cx } from '@/ui/primitives'
@@ -39,6 +39,9 @@ export function WeekSchedule() {
     [subjects],
   )
   const hasSchedule = week.some((d) => d.classes.length > 0)
+  // Con el horario ya cargado, el botón solo vuelve a aparecer si falta una
+  // asignatura o alguna conserva el nombre largo.
+  const outdated = useMemo(() => hasTimetableChanges(planTimetable(data.subjects)), [data.subjects])
 
   const load = () => {
     const before = data
@@ -48,7 +51,7 @@ export function WeekSchedule() {
       dispatch({ type: 'subject/update', id: item.id, patch: item.patch })
     }
     toast({
-      text: `Horario cargado: ${plan.add.length} asignaturas nuevas, ${plan.update.length} actualizadas`,
+      text: `Horario cargado: ${plan.add.length} nuevas, ${plan.update.length} actualizadas`,
       action: { label: 'Deshacer', run: () => dispatch({ type: 'data/replace', data: before }) },
     })
   }
@@ -74,7 +77,18 @@ export function WeekSchedule() {
 
   return (
     <section aria-label="Horario semanal">
-      <GroupTitle title="Horario semanal" hint="Lo que toca cada día." />
+      <GroupTitle
+        title="Horario semanal"
+        hint="Lo que toca cada día."
+        action={
+          outdated ? (
+            <Button size="sm" onClick={load}>
+              <Download className="size-3.5" />
+              Actualizar
+            </Button>
+          ) : undefined
+        }
+      />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 max-w-[1180px]">
         {week.map(({ label, classes }) => (
           <Card key={label} flush className="overflow-hidden">

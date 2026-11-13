@@ -23,7 +23,7 @@ export interface TimetablePlan {
   /** Asignaturas que no existían y hay que crear. */
   add: NewSubject[]
   /** Asignaturas que ya existían: solo cambia su horario. */
-  update: { id: ID; name: string; patch: Pick<Subject, 'schedule'> }[]
+  update: { id: ID; name: string; patch: Pick<Subject, 'schedule'> & Partial<Pick<Subject, 'name'>> }[]
 }
 
 /** Franjas de una asignatura del horario, sin duplicados por día y hora. */
@@ -40,12 +40,16 @@ export function slotsFor(code: string): ScheduleSlot[] {
 }
 
 function findExisting(subjects: Subject[], def: TimetableSubject): Subject | undefined {
-  const names = new Set([def.name, ...(def.aliases ?? [])].map(normalize))
+  const exact = normalize(def.name)
+  const aliases = new Set((def.aliases ?? []).map(normalize))
   const code = normalize(def.code)
-  return subjects.find(
-    (s) =>
-      !s.archived &&
-      (names.has(normalize(s.name)) || normalize(s.shortName ?? '') === code),
+  const live = subjects.filter((s) => !s.archived)
+  // Si hay duplicados (p. ej. «TIC» y «TICs»), gana el de nombre exacto, y
+  // después el que coincide por la abreviatura, antes que el de un alias.
+  return (
+    live.find((s) => normalize(s.name) === exact) ??
+    live.find((s) => normalize(s.shortName ?? '') === code) ??
+    live.find((s) => aliases.has(normalize(s.name)))
   )
 }
 
@@ -79,8 +83,23 @@ export function planTimetable(subjects: Subject[]): TimetablePlan {
       return room ? { ...slot, room } : slot
     })
 
-    plan.update.push({ id: existing.id, name: existing.name, patch: { schedule } })
+    // Una asignatura con el nombre largo de siempre pasa al nombre simple; si
+    // el alumno la llamó de otra forma, se respeta.
+    const rename =
+      normalize(existing.name) !== normalize(def.name) &&
+      (def.aliases ?? []).some((alias) => normalize(alias) === normalize(existing.name))
+
+    plan.update.push({
+      id: existing.id,
+      name: existing.name,
+      patch: rename ? { schedule, name: def.name } : { schedule },
+    })
   }
 
   return plan
+}
+
+/** ¿Cargar el horario cambiaría algo más que reescribir franjas iguales? */
+export function hasTimetableChanges(plan: TimetablePlan): boolean {
+  return plan.add.length > 0 || plan.update.some((u) => u.patch.name !== undefined)
 }
