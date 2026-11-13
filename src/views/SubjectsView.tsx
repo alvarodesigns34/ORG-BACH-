@@ -9,6 +9,7 @@ import { hrefFor } from '@/router'
 import { useSettings, useStore, useToday } from '@/state/StoreProvider'
 import { useSubjectResults, useSubjects } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
+import { WeekSchedule } from '@/features/schedule/WeekSchedule'
 import { SubjectEditor } from '@/features/subjects/SubjectEditor'
 import { Button, Card, EmptyState, Numeral, cx } from '@/ui/primitives'
 
@@ -121,6 +122,10 @@ export function SubjectsView() {
           })}
         </ul>
       )}
+
+      <div className="mt-8">
+        <WeekSchedule />
+      </div>
 
       <SubjectEditor open={creating} onClose={() => setCreating(false)} />
     </Page>

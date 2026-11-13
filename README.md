@@ -221,10 +221,13 @@ Cosas decididas a conciencia, no olvidos:
   los datos, se separan por curso o se empieza de cero exportando antes.
 - **El catálogo de asignaturas del alta es genérico de LOMLOE**, sin distinguir
   optativas ni particularidades de cada comunidad autónoma.
-- **El horario semanal no existe todavía.** El modelo guarda las franjas
-  (`subject.schedule`) y la importación las valida, pero no hay ninguna pantalla
-  para crearlas ni verlas: el campo llega siempre vacío. Se conserva en el tipo
-  para no romper las copias que ya lo traigan.
+- **El horario semanal está escrito a mano en el código.** `src/data/horario.ts`
+  recoge el horario del centro y «Cargar mi horario» (en Asignaturas) lo vuelca
+  en las asignaturas: crea las que faltan y sustituye las franjas de las que ya
+  existen, conservando aula y profesor. No se importa de ninguna app del centro:
+  si cambia, hay que editar ese archivo o las franjas de cada asignatura. El
+  modelo de franja no guarda profesor, así que en desdobles (FQ, LEI) el
+  profesorado va junto en la asignatura.
 - **El enlace entre un examen y su nota solo se crea al apuntar la nota** desde
   el propio examen. No hay forma de enlazar después una nota ya existente con un
   examen, ni de cambiar el enlace.
