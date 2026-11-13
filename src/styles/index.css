@@ -508,10 +508,32 @@ html {
 }
 .edge-top {
   top: 0;
-  height: calc(env(safe-area-inset-top, 0px) + 76px);
-  background: linear-gradient(color-mix(in srgb, var(--c-canvas) 82%, transparent), transparent);
-  -webkit-mask-image: linear-gradient(#000 45%, transparent);
-  mask-image: linear-gradient(#000 45%, transparent);
+  height: calc(env(safe-area-inset-top, 0px) + 80px);
+  /* Sin desenfoque: solo un degradado del color de fondo. Un desenfoque aquí
+     pasaba por detrás de los botones y, en Safari de iPhone, los difuminaba. */
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: linear-gradient(
+    color-mix(in srgb, var(--c-canvas) 92%, transparent) 0%,
+    color-mix(in srgb, var(--c-canvas) 78%, transparent) 55%,
+    transparent 100%
+  );
+}
+/* El desenfoque, en una tira APARTE que empieza justo bajo la fila de
+   botones (48 px de barra, botones de 40 centrados: acaban en 44). Así
+   ningún elemento con desenfoque llega a solaparse con ellos. */
+.edge-top-blur {
+  position: fixed;
+  inset-inline: 0;
+  top: calc(env(safe-area-inset-top, 0px) + 44px);
+  height: 40px;
+  z-index: 19;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  backdrop-filter: blur(10px) saturate(160%);
+  -webkit-mask-image: linear-gradient(transparent, #000 35%, transparent);
+  mask-image: linear-gradient(transparent, #000 35%, transparent);
+  transition: opacity 260ms var(--ease-std);
 }
 .edge-bottom {
   bottom: 0;
@@ -522,6 +544,7 @@ html {
 }
 @media (prefers-reduced-transparency: reduce) {
   .edge-top,
+  .edge-top-blur,
   .edge-bottom {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;

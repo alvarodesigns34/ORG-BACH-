@@ -169,6 +169,7 @@ export function TopBar({
   return createPortal(
     <>
       <div aria-hidden className="edge-top lg:hidden" style={{ opacity: scrolled ? 1 : 0 }} />
+      <div aria-hidden className="edge-top-blur lg:hidden" style={{ opacity: scrolled ? 1 : 0 }} />
       <div className="lg:hidden fixed top-0 inset-x-0 z-40 pt-[env(safe-area-inset-top)] pointer-events-none">
         <div
           className="relative flex items-center justify-between gap-2 px-[max(0.75rem,env(safe-area-inset-left))]"
