@@ -446,6 +446,15 @@ html {
     0 8px 24px rgb(0 0 0 / 0.45);
 }
 
+/* Ficha de icono (Ajustes de iOS): canto de luz arriba, borde oscuro abajo y
+   una sombra mínima. El color lo pone el degradado en línea. */
+@utility tile {
+  box-shadow:
+    inset 0 0.5px 0 rgb(255 255 255 / 0.5),
+    inset 0 -0.5px 0 rgb(0 0 0 / 0.14),
+    0 1px 2px rgb(0 0 0 / 0.14);
+}
+
 /* Luz ambiente. Un solo tono, el del CONTEXTO: la asignatura que toca ahora
    en Inicio, la de la ficha que se está viendo, el acento en el resto. Es lo
    que refractan las barras de cristal; por eso no es un adorno fijo.
@@ -472,6 +481,15 @@ html {
   mask-image: linear-gradient(#000 30%, transparent);
 }
 
+/* Controles fijos de arriba (asistente, avatar, volver): siempre nítidos, en
+   una capa por encima del desenfoque del borde. */
+.chrome-controls {
+  position: relative;
+  z-index: 2;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
 /* Borde de desplazamiento (iOS 26): en vez de una barra con línea, el
    contenido se desenfoca y se disuelve al acercarse al borde de la pantalla.
    Un desenfoque recortado con una máscara en degradado. */
@@ -479,10 +497,13 @@ html {
 .edge-bottom {
   position: fixed;
   inset-inline: 0;
-  z-index: 29;
+  z-index: 20;
   pointer-events: none;
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
-  backdrop-filter: blur(14px) saturate(160%);
+  /* Capa propia: Safari de iPhone pinta a veces el desenfoque por ENCIMA de
+     los botones que flotan sobre él si no están en capas separadas. */
+  transform: translateZ(0);
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  backdrop-filter: blur(10px) saturate(160%);
   transition: opacity 260ms var(--ease-std);
 }
 .edge-top {

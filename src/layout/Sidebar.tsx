@@ -8,7 +8,7 @@ import { spring } from '@/ui/motion'
 import { cx } from '@/ui/primitives'
 import { AccountAvatar, CREATE_ITEMS, useChrome } from './chrome'
 import { BrandMark, BrandWordmark } from './Brand'
-import { NAV_GROUPS, NAV_ITEMS, NAV_TINTS } from './navigation'
+import { NAV_GROUPS, NAV_ITEMS, NAV_TINTS, tintFill } from './navigation'
 
 interface SidebarProps {
   current: RouteId
@@ -124,8 +124,8 @@ export function Sidebar({ current, badges }: SidebarProps) {
                             />
                           )}
                           <span
-                            className="relative grid place-items-center size-[26px] rounded-[8px] text-white shrink-0"
-                            style={{ background: NAV_TINTS[item.id] }}
+                            className="tile relative grid place-items-center size-[26px] rounded-[8px] text-white shrink-0"
+                            style={{ background: tintFill(NAV_TINTS[item.id]) }}
                           >
                             <item.icon className="size-[15px]" strokeWidth={2.3} />
                           </span>

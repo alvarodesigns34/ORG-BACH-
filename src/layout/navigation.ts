@@ -1,13 +1,13 @@
 import {
   BookOpen,
   CalendarDays,
-  ClipboardList,
+  ChartNoAxesColumn,
+  CircleCheckBig,
+  ClipboardCheck,
   GraduationCap,
   House,
-  ListChecks,
   Settings,
   Target,
-  TrendingUp,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -23,12 +23,12 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { id: 'inicio', label: 'Inicio', icon: House, group: 'dia' },
-  { id: 'tareas', label: 'Tareas', icon: ListChecks, group: 'dia' },
+  { id: 'tareas', label: 'Tareas', icon: CircleCheckBig, group: 'dia' },
   { id: 'calendario', label: 'Calendario', icon: CalendarDays, group: 'dia' },
   { id: 'asignaturas', label: 'Asignaturas', icon: BookOpen, group: 'academico' },
   { id: 'notas', label: 'Notas', icon: GraduationCap, group: 'academico' },
-  { id: 'examenes', label: 'Exámenes', icon: ClipboardList, group: 'academico' },
-  { id: 'estadisticas', label: 'Estadísticas', icon: TrendingUp, group: 'academico' },
+  { id: 'examenes', label: 'Exámenes', icon: ClipboardCheck, group: 'academico' },
+  { id: 'estadisticas', label: 'Estadísticas', icon: ChartNoAxesColumn, group: 'academico' },
   { id: 'objetivos', label: 'Objetivos', icon: Target, group: 'sistema' },
   { id: 'ajustes', label: 'Ajustes', icon: Settings, group: 'sistema' },
 ]
@@ -47,13 +47,21 @@ export const MOBILE_PRIMARY: RouteId[] = ['inicio', 'tareas', 'calendario', 'not
  * al estilo de Ajustes de iOS. Es decorativo: el nombre siempre va escrito.
  */
 export const NAV_TINTS: Record<RouteId, string> = {
-  inicio: '#0a84ff',
-  tareas: '#5e5ce6',
-  calendario: '#ff453a',
-  asignaturas: '#ff9f0a',
-  notas: '#bf5af2',
-  examenes: '#ff6b35',
-  estadisticas: '#30b158',
-  objetivos: '#ff375f',
+  inicio: '#007aff',
+  tareas: '#5856d6',
+  calendario: '#ff3b30',
+  asignaturas: '#ff9500',
+  notas: '#af52de',
+  examenes: '#32ade6',
+  estadisticas: '#34c759',
+  objetivos: '#ff2d55',
   ajustes: '#8e8e93',
+}
+
+/**
+ * Relleno de la ficha de un icono: el color de sistema con luz arriba, como
+ * los iconos de Ajustes de iOS. Se combina con la clase `.tile` (canto y sombra).
+ */
+export function tintFill(color: string): string {
+  return `linear-gradient(180deg, color-mix(in srgb, ${color} 72%, white) 0%, ${color} 100%)`
 }

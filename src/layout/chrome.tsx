@@ -169,7 +169,7 @@ export function TopBar({
   return createPortal(
     <>
       <div aria-hidden className="edge-top lg:hidden" style={{ opacity: scrolled ? 1 : 0 }} />
-      <div className="lg:hidden fixed top-0 inset-x-0 z-30 pt-[env(safe-area-inset-top)] pointer-events-none">
+      <div className="lg:hidden fixed top-0 inset-x-0 z-40 pt-[env(safe-area-inset-top)] pointer-events-none">
         <div
           className="relative flex items-center justify-between gap-2 px-[max(0.75rem,env(safe-area-inset-left))]"
           style={{ height: TOP_BAR }}
@@ -178,7 +178,7 @@ export function TopBar({
             <a
               href={back.href}
               aria-label={`Volver a ${back.label}`}
-              className="pressable liquid pointer-events-auto relative grid place-items-center size-10 rounded-full text-ink"
+              className="chrome-controls pressable liquid pointer-events-auto grid place-items-center size-10 rounded-full text-ink"
             >
               <ChevronLeft className="relative z-[2] size-[22px] -ml-0.5" strokeWidth={2.4} />
             </a>
@@ -201,7 +201,7 @@ export function TopBar({
             )}
           </AnimatePresence>
 
-          <ChromeActions className="pointer-events-auto relative z-[1]" />
+          <ChromeActions className="chrome-controls pointer-events-auto" />
         </div>
       </div>
     </>,

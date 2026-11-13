@@ -14,7 +14,7 @@ import { exitFast, haptic, spring, useMediaQuery } from '@/ui/motion'
 import { cx } from '@/ui/primitives'
 import { Modal } from '@/ui/Modal'
 import { CREATE_ITEMS, useChrome } from './chrome'
-import { MOBILE_PRIMARY, NAV_ITEMS, NAV_TINTS, type NavItem } from './navigation'
+import { MOBILE_PRIMARY, NAV_ITEMS, NAV_TINTS, tintFill, type NavItem } from './navigation'
 
 interface MobileNavProps {
   current: RouteId
@@ -380,8 +380,8 @@ function CreateButton() {
                       className="pressable w-full flex items-center gap-3 h-[3.25rem] pl-2 pr-4 rounded-[22px] text-left active:bg-fill disabled:opacity-40"
                     >
                       <span
-                        className="grid place-items-center size-9 rounded-full text-white shrink-0"
-                        style={{ background: item.tint }}
+                        className="tile grid place-items-center size-9 rounded-full text-white shrink-0"
+                        style={{ background: tintFill(item.tint) }}
                       >
                         <item.icon className="size-[18px]" strokeWidth={2.2} />
                       </span>
@@ -503,8 +503,8 @@ function MoreSheet({
                 )}
               >
                 <span
-                  className="grid place-items-center size-[30px] rounded-[8px] text-white shrink-0"
-                  style={{ background: NAV_TINTS[item.id] }}
+                  className="tile grid place-items-center size-[30px] rounded-[8px] text-white shrink-0"
+                  style={{ background: tintFill(NAV_TINTS[item.id]) }}
                 >
                   <item.icon className="size-[18px]" strokeWidth={2.2} />
                 </span>
