@@ -265,7 +265,7 @@ export function AccountAvatar({
       {...(decorative
         ? { 'aria-hidden': true }
         : { href: hrefFor('ajustes'), 'aria-label': label })}
-      className="pressable relative grid place-items-center rounded-full text-white font-semibold shrink-0 shadow-[inset_0_1px_0_rgb(255_255_255/0.35),inset_0_-1px_0_rgb(0_0_0/0.12),0_4px_14px_rgb(0_0_0/0.14)]"
+      className="pressable relative grid place-items-center rounded-full text-white font-semibold shrink-0 shadow-[inset_0_1px_0_rgb(255_255_255/0.35),inset_0_-1px_0_rgb(0_0_0/0.12),0_1px_3px_rgb(0_0_0/0.18)]"
       style={{
         width: size,
         height: size,

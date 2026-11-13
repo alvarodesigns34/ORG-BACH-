@@ -483,6 +483,14 @@ html {
 
 /* Controles fijos de arriba (asistente, avatar, volver): siempre nítidos, en
    una capa por encima del desenfoque del borde. */
+/* Sin halo: la sombra grande del cristal dejaba una mancha borrosa alrededor. */
+.chrome-controls.liquid,
+.chrome-controls .liquid {
+  box-shadow:
+    inset 0 0 0 0.5px var(--glass-edge),
+    inset 0 1px 1px -0.5px var(--glass-rim),
+    0 1px 3px rgb(0 0 0 / 0.14);
+}
 .chrome-controls {
   position: relative;
   z-index: 2;
@@ -508,14 +516,14 @@ html {
 }
 .edge-top {
   top: 0;
-  height: calc(env(safe-area-inset-top, 0px) + 80px);
+  /* Solo cubre la barra de estado (hora, batería): no llega a los botones. */
+  height: calc(env(safe-area-inset-top, 0px) + 6px);
   /* Sin desenfoque: solo un degradado del color de fondo. Un desenfoque aquí
      pasaba por detrás de los botones y, en Safari de iPhone, los difuminaba. */
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   background: linear-gradient(
-    color-mix(in srgb, var(--c-canvas) 92%, transparent) 0%,
-    color-mix(in srgb, var(--c-canvas) 78%, transparent) 55%,
+    color-mix(in srgb, var(--c-canvas) 85%, transparent) 0%,
     transparent 100%
   );
 }
