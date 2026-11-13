@@ -224,10 +224,9 @@ Cosas decididas a conciencia, no olvidos:
 - **El horario semanal está escrito a mano en el código.** `src/data/horario.ts`
   recoge el horario del centro y «Cargar mi horario» (en Asignaturas) lo vuelca
   en las asignaturas: crea las que faltan y sustituye las franjas de las que ya
-  existen, conservando aula y profesor. No se importa de ninguna app del centro:
-  si cambia, hay que editar ese archivo o las franjas de cada asignatura. El
-  modelo de franja no guarda profesor, así que en desdobles (FQ, LEI) el
-  profesorado va junto en la asignatura.
+  existen, conservando el aula que hubiera. No guarda profesores ni la tutoría.
+  No se importa de ninguna app del centro: si cambia, hay que editar ese
+  archivo o las franjas de cada asignatura.
 - **El enlace entre un examen y su nota solo se crea al apuntar la nota** desde
   el propio examen. No hay forma de enlazar después una nota ya existente con un
   examen, ni de cambiar el enlace.

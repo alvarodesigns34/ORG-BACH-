@@ -14,8 +14,6 @@ export interface TimetableSubject {
   color: SubjectColor
   /** Horas semanales; pondera en la media si la asignatura es nueva. */
   weight: number
-  /** Profesorado, el que más veces aparece primero. */
-  teachers: string[]
   /** Otros nombres con los que puede estar ya creada la asignatura. */
   aliases?: string[]
 }
@@ -26,21 +24,18 @@ export const TIMETABLE_SUBJECTS: TimetableSubject[] = [
     name: 'Física y Química',
     color: 'teal',
     weight: 4,
-    teachers: ['Nora Frías Gil', 'Elena María Castellanos Martínez'],
   },
   {
     code: 'LCLI',
     name: 'Lengua Castellana y Literatura I',
     color: 'terracotta',
     weight: 4,
-    teachers: ['Silvia Sáenz Romo'],
   },
   {
     code: 'FIL',
     name: 'Filosofía',
     color: 'plum',
     weight: 4,
-    teachers: ['Antonio Usero Vílchez'],
     aliases: ['Filosofia'],
   },
   {
@@ -48,7 +43,6 @@ export const TIMETABLE_SUBJECTS: TimetableSubject[] = [
     name: 'Lengua Extranjera I (Inglés)',
     color: 'sky',
     weight: 4,
-    teachers: ['Lorena Lozano Sufrategui', 'Andrea Rubio Goitia'],
     aliases: ['Lengua Extranjera I', 'Inglés'],
   },
   {
@@ -56,7 +50,6 @@ export const TIMETABLE_SUBJECTS: TimetableSubject[] = [
     name: 'Biología, Geología y CC. Ambientales',
     color: 'sage',
     weight: 4,
-    teachers: ['Luis Pérez Bobadilla'],
     aliases: ['Biología y Geología'],
   },
   {
@@ -64,14 +57,12 @@ export const TIMETABLE_SUBJECTS: TimetableSubject[] = [
     name: 'Matemáticas I',
     color: 'indigo',
     weight: 4,
-    teachers: ['Luis Roca Fernández'],
   },
   {
     code: 'TICs',
     name: 'Tecnologías de la Información y la Comunicación',
     color: 'slate',
     weight: 2,
-    teachers: ['Jorge Muro Hernández'],
     aliases: ['TIC'],
   },
   {
@@ -79,14 +70,6 @@ export const TIMETABLE_SUBJECTS: TimetableSubject[] = [
     name: 'Educación Física',
     color: 'moss',
     weight: 2,
-    teachers: ['Germán Lleyda Gómez'],
-  },
-  {
-    code: 'TU',
-    name: 'Tutoría',
-    color: 'clay',
-    weight: 1,
-    teachers: ['Lorena Lozano Sufrategui'],
   },
 ]
 
@@ -101,13 +84,13 @@ export const TIMETABLE_PERIODS: readonly [start: string, end: string][] = [
 ]
 
 /**
- * Qué hay cada hora, de lunes (1) a viernes (5). Una hora con dos códigos es
- * un desdoble: el centro lo muestra con las dos asignaturas a la vez.
+ * Qué hay cada hora, de lunes (1) a viernes (5). Una hora vacía es una hora
+ * sin clase (la tutoría de los martes a las 12:55 no se carga).
  */
 export const TIMETABLE_WEEK: Record<1 | 2 | 3 | 4 | 5, string[][]> = {
   1: [['FQ'], ['FQ'], ['LCLI'], ['FIL'], ['LEI'], ['BGCA']],
-  2: [['TICs'], ['BGCA'], ['EF'], ['EF'], ['TU'], ['MAI']],
+  2: [['TICs'], ['BGCA'], ['EF'], ['EF'], [], ['MAI']],
   3: [['FQ'], ['MAI'], ['LCLI'], ['LCLI'], ['FIL'], ['LEI']],
-  4: [['TICs'], ['MAI'], ['LCLI'], ['FIL'], ['BGCA', 'FQ'], ['LEI']],
+  4: [['TICs'], ['MAI'], ['LCLI'], ['FIL'], ['BGCA'], ['LEI']],
   5: [['BGCA'], ['FQ'], ['FIL'], ['TICs'], ['LEI'], ['MAI']],
 }

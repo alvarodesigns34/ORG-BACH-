@@ -2,7 +2,7 @@
  * Cargar el horario del centro en las asignaturas.
  *
  * `planTimetable` no toca nada: devuelve qué asignaturas habría que crear y
- * cuáles actualizar. Así se puede enseñar al alumno lo que va a pasar y probar
+ * cuáles actualizar (solo sus franjas). Así se puede enseñar al alumno lo que va a pasar y probar
  * sin una interfaz. Quien lo aplica es el reductor, con las acciones de
  * siempre (`subject/addMany` y `subject/update`).
  */
@@ -22,8 +22,8 @@ export type NewSubject = Omit<Subject, 'id' | 'createdAt'>
 export interface TimetablePlan {
   /** Asignaturas que no existían y hay que crear. */
   add: NewSubject[]
-  /** Asignaturas que ya existían: solo cambian horario (y profesor si faltaba). */
-  update: { id: ID; name: string; patch: Pick<Subject, 'schedule'> & Partial<Subject> }[]
+  /** Asignaturas que ya existían: solo cambia su horario. */
+  update: { id: ID; name: string; patch: Pick<Subject, 'schedule'> }[]
 }
 
 /** Franjas de una asignatura del horario, sin duplicados por día y hora. */
@@ -62,7 +62,6 @@ export function planTimetable(subjects: Subject[]): TimetablePlan {
         name: def.name,
         shortName: def.code,
         color: def.color,
-        teacher: def.teachers.join(', '),
         weight: def.weight,
         schedule: slots,
         categories: [],
@@ -80,15 +79,7 @@ export function planTimetable(subjects: Subject[]): TimetablePlan {
       return room ? { ...slot, room } : slot
     })
 
-    plan.update.push({
-      id: existing.id,
-      name: existing.name,
-      patch: {
-        schedule,
-        // El profesor que ya estuviera escrito manda sobre el del horario.
-        ...(existing.teacher?.trim() ? {} : { teacher: def.teachers.join(', ') }),
-      },
-    })
+    plan.update.push({ id: existing.id, name: existing.name, patch: { schedule } })
   }
 
   return plan

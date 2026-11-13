@@ -45,7 +45,6 @@ describe('horario del centro', () => {
       '09:40 BGCA',
       '10:50 EF',
       '11:45 EF',
-      '12:55 TU',
       '13:50 MAI',
     ])
     assert.deepEqual(day(subjects, 3), [
@@ -56,16 +55,14 @@ describe('horario del centro', () => {
       '12:55 FIL',
       '13:50 LEI',
     ])
-    // Jueves a las 12:55 hay desdoble: BGCA y FQ a la vez.
-    assert.deepEqual(day(subjects, 4).sort(), [
+    assert.deepEqual(day(subjects, 4), [
       '08:45 TICs',
       '09:40 MAI',
       '10:50 LCLI',
       '11:45 FIL',
       '12:55 BGCA',
-      '12:55 FQ',
       '13:50 LEI',
-    ].sort())
+    ])
     assert.deepEqual(day(subjects, 5), [
       '08:45 BGCA',
       '09:40 FQ',
@@ -113,8 +110,8 @@ describe('horario del centro', () => {
 
     const update = plan.update.find((u) => u.id === 'mat')
     assert.ok(update)
-    // Ni profesor ni color ni peso se tocan; el horario se sustituye.
-    assert.equal(update.patch.teacher, undefined)
+    // Solo se toca el horario: ni profesor ni color ni peso.
+    assert.deepEqual(Object.keys(update.patch), ['schedule'])
     assert.equal(update.patch.schedule.length, 4)
     assert.ok(!update.patch.schedule.some((s) => s.id === 'old' || s.id === 'gone'))
     // El aula de una franja que sigue existiendo se conserva.
@@ -122,18 +119,10 @@ describe('horario del centro', () => {
     assert.equal(tuesday?.room, 'Aula 12')
   })
 
-  it('rellena el profesor solo si estaba vacío', () => {
-    const existing: Subject = {
-      id: 'fil',
-      name: 'Filosofía',
-      color: 'plum',
-      weight: 3,
-      schedule: [],
-      categories: [],
-      createdAt: '2026-09-01T00:00:00.000Z',
-    }
-    const update = planTimetable([existing]).update[0]
-    assert.equal(update.patch.teacher, 'Antonio Usero Vílchez')
+  it('no crea Tutoría ni pone profesores', () => {
+    const { add } = planTimetable([])
+    assert.ok(!add.some((s) => s.shortName === 'TU' || /tutor/i.test(s.name)))
+    assert.ok(add.every((s) => s.teacher === undefined))
   })
 
   it('reconoce la asignatura por la abreviatura y sin importar tildes', () => {

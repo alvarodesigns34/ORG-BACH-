@@ -60,7 +60,7 @@ export function WeekSchedule() {
           compact
           icon={<CalendarClock className="size-5" />}
           title="Tu horario semanal"
-          description="Carga el horario del centro: se crean las asignaturas que falten y se rellenan sus clases y profesorado. Después podrás retocar cualquier franja desde la ficha de cada asignatura."
+          description="Carga el horario del centro: se crean las asignaturas que falten y se rellenan sus clases. Después podrás retocar cualquier franja desde la ficha de cada asignatura."
           action={
             <Button variant="primary" onClick={load}>
               <Download className="size-4" />
