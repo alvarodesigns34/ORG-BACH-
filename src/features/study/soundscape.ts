@@ -51,7 +51,27 @@ function context(): AudioContext | null {
   master = ctx.createGain()
   master.gain.value = volumeGain(volume)
   master.connect(limiter(ctx)).connect(ctx.destination)
+  watchInterruptions(ctx)
   return ctx
+}
+
+/**
+ * En iPad el audio se «interrumpe» al cambiar de app, bloquear la pantalla o
+ * recibir una llamada, y no vuelve solo. Al volver a la app se reanuda; si
+ * Safari exige un toque, el primero que haya lo reanuda.
+ */
+function watchInterruptions(c: AudioContext) {
+  const revive = () => {
+    if ((current || wanted) && c.state !== 'running' && c.state !== 'closed') void c.resume().catch(() => {})
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') revive()
+  })
+  window.addEventListener('pageshow', revive)
+  window.addEventListener('pointerdown', revive, { capture: true, passive: true })
+  c.addEventListener('statechange', () => {
+    if (document.visibilityState === 'visible') revive()
+  })
 }
 
 /**
