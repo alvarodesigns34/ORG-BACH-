@@ -138,6 +138,7 @@ function Shell() {
         <AppShell
           current={route.id}
           screenKey={`${route.id}:${route.params.get('id') ?? ''}`}
+          restoreScroll={![...route.params.keys()].some((k) => k !== 'id')}
           badges={badges}
         >
           {renderRoute(route, data.subjects.length)}

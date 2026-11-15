@@ -1,6 +1,15 @@
-import { useRef, useState } from 'react'
-import { AnimatePresence, motion, useMotionValue, useTransform } from 'motion/react'
-import { Check, Ellipsis, ListTree, Pencil, Trash2, Undo2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  AnimatePresence,
+  LayoutGroup,
+  Reorder,
+  motion,
+  useDragControls,
+  useMotionValue,
+  useTransform,
+  type DragControls,
+} from 'motion/react'
+import { Check, Ellipsis, ListTree, Menu as GripLines, Pencil, Trash2, Undo2 } from 'lucide-react'
 
 import { relativeDay } from '@/domain/dates'
 import { bucketOf, subtaskProgress } from '@/domain/tasks'
@@ -19,6 +28,15 @@ interface TaskRowProps {
   /** Oculta la etiqueta de asignatura cuando la lista ya está agrupada por ella. */
   hideSubject?: boolean
   className?: string
+  /** Dentro de una lista reordenable: el asa y el gesto de arrastre. */
+  reorder?: RowReorder
+}
+
+interface RowReorder {
+  controls: DragControls
+  lifted: boolean
+  onLift: () => void
+  onDrop: () => void
 }
 
 /** Tono del plazo. El texto ya dice «Ayer» o «En 3 días»: el color solo refuerza. */
@@ -49,7 +67,7 @@ const SWIPE_COMMIT = 92
  * Tiene que ir dentro de un `<AnimatePresence initial={false}>` para que la
  * entrada y la salida se animen (ver `TaskList`).
  */
-export function TaskRow({ task, subject, onOpen, hideSubject, className }: TaskRowProps) {
+export function TaskRow({ task, subject, onOpen, hideSubject, className, reorder }: TaskRowProps) {
   const dispatch = useDispatch()
   const today = useToday()
   const toast = useToast()
@@ -94,14 +112,8 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className }: TaskR
   const completeScale = useTransform(x, [0, SWIPE_COMMIT - 12, SWIPE_COMMIT], [0.6, 0.85, 1.25])
   const deleteScale = useTransform(x, [-SWIPE_COMMIT, -SWIPE_COMMIT + 12, 0], [1.25, 0.85, 0.6])
 
-  return (
-    <motion.li
-      initial={{ height: 0, opacity: 0 }}
-      animate={{ height: 'auto', opacity: 1 }}
-      exit={{ height: 0, opacity: 0, transition: { ...spring.smooth, bounce: 0, opacity: exitFast } }}
-      transition={{ ...spring.smooth, bounce: 0 }}
-      className={cx('task-row group relative overflow-hidden', className)}
-    >
+  const content = (
+    <>
       {coarse && (
         <>
           <motion.div
@@ -157,6 +169,8 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className }: TaskR
         className={cx(
           'task-body relative flex items-start gap-3 pl-4 pr-2 py-3 bg-surface touch-pan-y',
           'transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--c-ink)_3%,var(--c-surface))]',
+          // Al pulsar, la fila se ilumina como una celda de iOS.
+          'has-[button.task-open:active]:bg-[color-mix(in_srgb,var(--c-ink)_7%,var(--c-surface))]',
         )}
       >
       <div className="pt-0.5 shrink-0">
@@ -175,7 +189,7 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className }: TaskR
         onClick={() => {
           if (!dragged.current) onOpen(task)
         }}
-        className="flex-1 min-w-0 text-left rounded-xs"
+        className="task-open flex-1 min-w-0 text-left rounded-xs"
       >
         <span
           className={cx(
@@ -280,9 +294,98 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className }: TaskR
             </button>
           )}
         />
+
+        {reorder && <ReorderHandle title={task.title} controls={reorder.controls} />}
       </div>
       </motion.div>
+    </>
+  )
+
+  const presence = {
+    initial: { height: 0, opacity: 0 },
+    animate: { height: 'auto', opacity: 1 },
+    exit: { height: 0, opacity: 0, transition: { ...spring.smooth, bounce: 0, opacity: exitFast } },
+    transition: { ...spring.smooth, bounce: 0 },
+  } as const
+
+  if (reorder) {
+    return (
+      <Reorder.Item
+        value={task.id}
+        {...presence}
+        dragListener={false}
+        dragControls={reorder.controls}
+        onDragStart={reorder.onLift}
+        onDragEnd={reorder.onDrop}
+        // Levantada: un pelo más grande, como una celda de iOS al cogerla.
+        whileDrag={{ scale: 1.025 }}
+        aria-label={task.title}
+        aria-roledescription="tarea reordenable"
+        className={cx(
+          'task-row group relative overflow-hidden outline-none',
+          // Las esquinas de la tarjeta las ponen la primera y la última fila:
+          // la tarjeta no recorta, para que la fila levantada no se corte.
+          'first:rounded-t-[var(--radius-lg)] last:rounded-b-[var(--radius-lg)]',
+          'focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset',
+          'transition-[box-shadow,border-radius] duration-200',
+          reorder.lifted && 'task-row-lifted',
+          className,
+        )}
+      >
+        {content}
+      </Reorder.Item>
+    )
+  }
+
+  return (
+    <motion.li
+      {...presence}
+      // Al cambiar el orden o un filtro, las filas se deslizan a su sitio.
+      layout="position"
+      className={cx('task-row group relative overflow-hidden', className)}
+    >
+      {content}
     </motion.li>
+  )
+}
+
+/**
+ * El asa de reordenar (☰), como en Recordatorios. Solo ella inicia el
+ * arrastre: así el resto de la fila sigue respondiendo al desplazamiento, al
+ * deslizamiento lateral y al toque.
+ */
+function ReorderHandle({ title, controls }: { title: string; controls: DragControls }) {
+  const ref = useRef<HTMLSpanElement>(null)
+
+  // Escucha nativa, no de React: la fila entera también atiende al dedo (el
+  // deslizamiento lateral) con su propia escucha nativa, que salta antes que
+  // cualquier manejador de React. Parando aquí el evento, coger el asa
+  // arrastra la tarea y no la desliza.
+  useEffect(() => {
+    const node = ref.current
+    if (!node) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return
+      event.stopPropagation()
+      event.preventDefault()
+      controls.start(event)
+    }
+    node.addEventListener('pointerdown', onPointerDown)
+    return () => node.removeEventListener('pointerdown', onPointerDown)
+  }, [controls])
+
+  return (
+    <span
+      ref={ref}
+      aria-hidden
+      title={`Arrastra para mover «${title}»`}
+      className={cx(
+        'reorder-handle size-8 -mr-1 grid place-items-center rounded-sm text-ink-3 shrink-0',
+        'touch-none cursor-grab active:cursor-grabbing hover:text-ink-2',
+      )}
+    >
+      <GripLines className="size-[18px]" strokeWidth={2} />
+    </span>
   )
 }
 
@@ -304,18 +407,129 @@ export function TaskList({
   className?: string
 }) {
   return (
-    <ul className={className}>
+    <LayoutGroup>
+      <ul className={className}>
+        <AnimatePresence initial={false}>
+          {tasks.map((task) => (
+            <TaskRow
+              key={task.id}
+              task={task}
+              subject={task.subjectId ? subjects.get(task.subjectId) : undefined}
+              onOpen={onOpen}
+              hideSubject={hideSubject}
+            />
+          ))}
+        </AnimatePresence>
+      </ul>
+    </LayoutGroup>
+  )
+}
+
+/**
+ * Lista que se ordena arrastrando el asa de cada fila.
+ *
+ * Mientras se arrastra, el orden vive en un borrador local y la lista se
+ * recoloca en directo; al soltar se guarda UNA vez. Guardar en cada cruce
+ * llenaría la sincronización de cambios intermedios que nadie quería.
+ *
+ * Con teclado: Tab hasta la fila, Espacio para cogerla, flechas para
+ * moverla y Espacio para soltarla (Escape la devuelve a su sitio).
+ */
+export function ReorderableTaskList({
+  tasks,
+  subjects,
+  onOpen,
+  onReorder,
+  className,
+}: {
+  tasks: Task[]
+  subjects: Map<string, Subject>
+  onOpen: (task: Task) => void
+  onReorder: (ids: string[]) => void
+  className?: string
+}) {
+  const [draft, setDraft] = useState<string[] | null>(null)
+  const draftRef = useRef<string[] | null>(null)
+  const [lifted, setLifted] = useState<string | null>(null)
+
+  const byId = new Map(tasks.map((t) => [t.id, t]))
+  const ids = draft ?? tasks.map((t) => t.id)
+  const shown = ids.map((id) => byId.get(id)).filter((t): t is Task => !!t)
+  // Una tarea que llega mientras se arrastra (otro dispositivo) va al final.
+  for (const task of tasks) if (!ids.includes(task.id)) shown.push(task)
+
+  const lift = (id: string) => {
+    const start = tasks.map((t) => t.id)
+    draftRef.current = start
+    setDraft(start)
+    setLifted(id)
+    haptic()
+  }
+  const drop = () => {
+    const final = draftRef.current
+    draftRef.current = null
+    setLifted(null)
+    setDraft(null)
+    if (final && final.join() !== tasks.map((t) => t.id).join()) onReorder(final)
+  }
+
+  return (
+    <Reorder.Group
+      as="ul"
+      axis="y"
+      values={shown.map((t) => t.id)}
+      onReorder={(next: string[]) => {
+        if (draftRef.current) {
+          // Arrastrando con el dedo o el ratón: se recoloca, se guarda al soltar.
+          draftRef.current = next
+          setDraft(next)
+          haptic()
+        } else {
+          // Con el teclado cada movimiento es definitivo.
+          onReorder(next)
+        }
+      }}
+      className={className}
+    >
       <AnimatePresence initial={false}>
-        {tasks.map((task) => (
-          <TaskRow
+        {shown.map((task) => (
+          <ReorderableRow
             key={task.id}
             task={task}
             subject={task.subjectId ? subjects.get(task.subjectId) : undefined}
             onOpen={onOpen}
-            hideSubject={hideSubject}
+            lifted={lifted === task.id}
+            onLift={() => lift(task.id)}
+            onDrop={drop}
           />
         ))}
       </AnimatePresence>
-    </ul>
+    </Reorder.Group>
+  )
+}
+
+function ReorderableRow({
+  task,
+  subject,
+  onOpen,
+  lifted,
+  onLift,
+  onDrop,
+}: {
+  task: Task
+  subject?: Subject
+  onOpen: (task: Task) => void
+  lifted: boolean
+  onLift: () => void
+  onDrop: () => void
+}) {
+  const controls = useDragControls()
+  return (
+    <TaskRow
+      task={task}
+      subject={subject}
+      onOpen={onOpen}
+      reorder={{ controls, lifted, onLift, onDrop }}
+    />
   )
 }

@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { motion, useScroll, useTransform } from 'motion/react'
 import { TriangleAlert, X } from 'lucide-react'
 
@@ -13,6 +13,11 @@ interface AppShellProps {
   current: RouteId
   /** Cambia al entrar en otra pantalla (también en una ficha dentro de la sección). */
   screenKey: string
+  /**
+   * Vuelve a donde estaba al regresar a esta pantalla. Falso cuando se llega
+   * por un enlace con destino (una alerta, «Ver todas»): ahí toca empezar arriba.
+   */
+  restoreScroll?: boolean
   badges: Partial<Record<RouteId, number>>
   children: ReactNode
 }
@@ -54,7 +59,61 @@ export function StorageBanner() {
   )
 }
 
-export function AppShell({ current, screenKey, badges, children }: AppShellProps) {
+/**
+ * Memoria de desplazamiento por pantalla, como las pestañas de iOS: al volver
+ * a Tareas sigues donde lo dejaste. Una pantalla nueva (o con destino
+ * concreto) empieza arriba: heredar el desplazamiento de la anterior haría
+ * parecer que se ha cargado a medias.
+ *
+ * Quien se desplaza es la ventana, no `#contenido`.
+ */
+function useScrollMemory(key: string, restore: boolean) {
+  const positions = useRef(new Map<string, number>())
+  const current = useRef(key)
+
+  useEffect(() => {
+    const onScroll = () => positions.current.set(current.current, window.scrollY)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  // Antes de pintar: sin parpadeo de la pantalla nueva en la posición vieja.
+  useLayoutEffect(() => {
+    current.current = key
+    const target = (restore ? positions.current.get(key) : undefined) ?? 0
+    window.scrollTo({ top: target })
+    if (target === 0) return
+
+    // Parte del contenido termina de medirse en los fotogramas siguientes
+    // (listas animadas): si aún no había sitio para llegar, se reintenta
+    // unos pocos fotogramas, salvo que el dedo o la rueda tomen el control.
+    let frames = 0
+    let frame = 0
+    const giveUp = () => cancelAnimationFrame(frame)
+    const retry = () => {
+      if (Math.abs(window.scrollY - target) <= 1 || ++frames > 20) return
+      window.scrollTo({ top: target })
+      frame = requestAnimationFrame(retry)
+    }
+    frame = requestAnimationFrame(retry)
+    window.addEventListener('wheel', giveUp, { once: true, passive: true })
+    window.addEventListener('touchstart', giveUp, { once: true, passive: true })
+    return () => {
+      giveUp()
+      window.removeEventListener('wheel', giveUp)
+      window.removeEventListener('touchstart', giveUp)
+    }
+  }, [key, restore])
+}
+
+export function AppShell({
+  current,
+  screenKey,
+  restoreScroll = true,
+  badges,
+  children,
+}: AppShellProps) {
+  useScrollMemory(screenKey, restoreScroll)
   return (
     <div className="relative isolate min-h-dvh">
       {/* Luz ambiente con el color del contexto: lo que refracta el cristal. */}

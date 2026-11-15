@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowUpDown, ListChecks, Plus, Search, X } from 'lucide-react'
+import { ArrowUpDown, ListChecks, Menu as GripLines, Plus, Search, X } from 'lucide-react'
 
 import {
   EMPTY_FILTERS,
@@ -15,11 +15,11 @@ import {
 import { daysUntil, formatDuration } from '@/domain/dates'
 import { PRIORITIES, type Priority, type Task } from '@/domain/types'
 import { useRoute } from '@/router'
-import { useStore, useToday } from '@/state/StoreProvider'
+import { useDispatch, useStore, useToday } from '@/state/StoreProvider'
 import { useSubjectMap, useSubjects } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
 import { TaskEditor } from '@/features/tasks/TaskEditor'
-import { TaskList } from '@/features/tasks/TaskRow'
+import { ReorderableTaskList, TaskList } from '@/features/tasks/TaskRow'
 import { spring } from '@/ui/motion'
 import { Menu } from '@/ui/Menu'
 import { Input, Select } from '@/ui/fields'
@@ -34,6 +34,7 @@ const VIEW_LABELS: { value: TaskView; label: string }[] = [
 ]
 
 const SORT_LABELS: Record<TaskSort, string> = {
+  manual: 'Mi orden',
   fecha: 'Fecha límite',
   prioridad: 'Prioridad',
   asignatura: 'Asignatura',
@@ -64,7 +65,29 @@ const EMPTY_COPY: Record<TaskView, { title: string; description: string }> = {
   },
 }
 
+/** El orden elegido es una preferencia de este dispositivo, como el tema. */
+const SORT_STORAGE_KEY = 'org-bach:tareas-orden'
+
+function readSort(): TaskSort {
+  try {
+    const saved = window.localStorage.getItem(SORT_STORAGE_KEY)
+    if (saved && saved in SORT_LABELS) return saved as TaskSort
+  } catch {
+    // Almacenamiento bloqueado: se usa el orden por defecto.
+  }
+  return 'manual'
+}
+
+function saveSort(sort: TaskSort) {
+  try {
+    window.localStorage.setItem(SORT_STORAGE_KEY, sort)
+  } catch {
+    // Sin almacenamiento, el orden dura lo que la sesión.
+  }
+}
+
 export function TasksView() {
+  const dispatch = useDispatch()
   const { route } = useRoute()
   const { data } = useStore()
   const today = useToday()
@@ -72,7 +95,11 @@ export function TasksView() {
   const subjectMap = useSubjectMap()
 
   const [filters, setFilters] = useState<TaskFilters>(EMPTY_FILTERS)
-  const [sort, setSort] = useState<TaskSort>('fecha')
+  const [sort, setSortState] = useState<TaskSort>(readSort)
+  const setSort = (next: TaskSort) => {
+    setSortState(next)
+    saveSort(next)
+  }
   const [editing, setEditing] = useState<Task | null>(null)
   const [creating, setCreating] = useState(false)
 
@@ -91,7 +118,10 @@ export function TasksView() {
     [data.tasks, filters, sort, today],
   )
 
-  const grouped = useMemo(() => groupByDay(visible, today), [visible, today])
+  const grouped = useMemo(
+    () => (sort === 'manual' ? groupForManual(visible) : groupByDay(visible, today)),
+    [visible, today, sort],
+  )
   const filtersActive = !!(filters.query || filters.subjectId || filters.priority)
   const totalMinutes = visible.reduce((sum, t) => sum + (t.estimatedMinutes ?? 0), 0)
 
@@ -270,7 +300,11 @@ export function TasksView() {
               exit={{ opacity: 0, height: 0 }}
               transition={{ ...spring.smooth, bounce: 0 }}
               // Sin esto, la sombra de la tarjeta se recorta mientras se pliega.
-              className="overflow-hidden -mx-2 px-2 -my-1 py-1"
+              // La lista reordenable no recorta: la fila levantada flota fuera.
+              className={cx(
+                '-mx-2 px-2 -my-1 py-1',
+                group.reorderable ? 'overflow-visible' : 'overflow-hidden',
+              )}
             >
               <h2
                 className={cx(
@@ -286,10 +320,28 @@ export function TasksView() {
                 <span className="text-[0.875rem] text-ink-3 font-semibold tabular-nums">
                   {group.tasks.length}
                 </span>
+                {group.reorderable && group.tasks.length > 1 && (
+                  <span className="ml-auto inline-flex items-center gap-1 text-[0.75rem] font-medium tracking-normal text-ink-3">
+                    Arrastra
+                    <GripLines className="size-3.5" strokeWidth={2.2} aria-hidden />
+                    para ordenar
+                  </span>
+                )}
               </h2>
-              <Card flush className="overflow-hidden">
-                <TaskList tasks={group.tasks} subjects={subjectMap} onOpen={setEditing} />
-              </Card>
+              {group.reorderable ? (
+                <Card flush>
+                  <ReorderableTaskList
+                    tasks={group.tasks}
+                    subjects={subjectMap}
+                    onOpen={setEditing}
+                    onReorder={(ids) => dispatch({ type: 'task/reorder', ids })}
+                  />
+                </Card>
+              ) : (
+                <Card flush className="overflow-hidden">
+                  <TaskList tasks={group.tasks} subjects={subjectMap} onOpen={setEditing} />
+                </Card>
+              )}
             </motion.section>
           ))}
           </AnimatePresence>
@@ -311,6 +363,26 @@ interface TaskGroup {
   label: string
   tasks: Task[]
   tone?: 'danger' | 'warn'
+  /** Se ordena arrastrando («Mi orden»). */
+  reorderable?: boolean
+}
+
+/**
+ * «Mi orden»: lo pendiente en una sola lista, en el orden en que se piensa
+ * hacer, y lo hecho aparte, lo último completado primero. Partir lo pendiente
+ * por fechas aquí no tendría sentido: el orden lo decide el alumno.
+ */
+function groupForManual(tasks: Task[]): TaskGroup[] {
+  const pending = tasks.filter((t) => t.status !== 'completada')
+  const done = tasks
+    .filter((t) => t.status === 'completada')
+    .sort((a, b) => ((a.completedAt ?? '') < (b.completedAt ?? '') ? 1 : -1))
+  const groups: TaskGroup[] = []
+  if (pending.length > 0) {
+    groups.push({ key: 'porHacer', label: 'Por hacer', tasks: pending, reorderable: true })
+  }
+  if (done.length > 0) groups.push({ key: 'hechas', label: 'Completadas', tasks: done })
+  return groups
 }
 
 /**

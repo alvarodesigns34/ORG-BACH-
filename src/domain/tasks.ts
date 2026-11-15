@@ -105,7 +105,7 @@ export function subtaskProgress(task: Task): SubtaskProgress {
 // Orden
 // ---------------------------------------------------------------------------
 
-export type TaskSort = 'fecha' | 'prioridad' | 'asignatura' | 'creacion' | 'alfabetico'
+export type TaskSort = 'manual' | 'fecha' | 'prioridad' | 'asignatura' | 'creacion' | 'alfabetico'
 
 /**
  * Orden por defecto: primero lo que tiene fecha más cercana, y a igualdad de
@@ -122,9 +122,46 @@ function compareByDate(a: Task, b: Task): number {
   return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]
 }
 
+/**
+ * «Mi orden»: primero las tareas que el alumno ha colocado a mano, en su
+ * orden; detrás, las que aún no ha tocado (las nuevas), por fecha. Mientras
+ * no se haya arrastrado nada, coincide con el orden por fecha.
+ */
+function compareManual(a: Task, b: Task): number {
+  const ao = a.order ?? Number.POSITIVE_INFINITY
+  const bo = b.order ?? Number.POSITIVE_INFINITY
+  if (ao !== bo) return ao < bo ? -1 : 1
+  return compareByDate(a, b)
+}
+
+/**
+ * Coloca `ids` (en el orden dado) en los huecos que esas tareas ocupan dentro
+ * de «Mi orden» y devuelve el orden completo resultante.
+ *
+ * Así se puede reordenar una lista filtrada —solo «Hoy», solo Física— sin
+ * mover las tareas que no se ven: cada una conserva su sitio respecto a las
+ * ocultas y solo se intercambian entre sí las visibles.
+ */
+export function applyManualOrder(tasks: Task[], ids: string[]): Task[] {
+  const ordered = sortTasks(tasks, 'manual')
+  const byId = new Map(tasks.map((t) => [t.id, t]))
+  const moving = [...new Set(ids)].filter((id) => byId.has(id))
+  const movingSet = new Set(moving)
+  const slots: number[] = []
+  ordered.forEach((task, index) => {
+    if (movingSet.has(task.id)) slots.push(index)
+  })
+  slots.forEach((slot, k) => {
+    ordered[slot] = byId.get(moving[k])!
+  })
+  return ordered
+}
+
 export function sortTasks(tasks: Task[], sort: TaskSort = 'fecha'): Task[] {
   const copy = [...tasks]
   switch (sort) {
+    case 'manual':
+      return copy.sort(compareManual)
     case 'prioridad':
       return copy.sort(
         (a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || compareByDate(a, b),

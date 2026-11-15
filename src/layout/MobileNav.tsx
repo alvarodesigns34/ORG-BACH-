@@ -124,6 +124,8 @@ export function MobileNav({ current, badges }: MobileNavProps) {
       return
     }
     if (tab.id !== current) window.location.hash = hrefFor(tab.id).slice(1)
+    // Tocar la pestaña en la que ya estás sube al principio, como en iOS.
+    else window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -256,6 +258,10 @@ export function MobileNav({ current, badges }: MobileNavProps) {
                         draggable={false}
                         onClick={(e) => {
                           if (handledClick.current) e.preventDefault()
+                          else if (isCurrent) {
+                            e.preventDefault()
+                            window.scrollTo({ top: 0, behavior: 'smooth' })
+                          }
                         }}
                         className="block h-full rounded-full"
                       >

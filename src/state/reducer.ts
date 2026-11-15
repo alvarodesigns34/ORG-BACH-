@@ -9,6 +9,7 @@
 import { newId } from '../domain/id.ts'
 import { nowISO } from '../domain/dates.ts'
 import { deriveShortName } from '../domain/palette.ts'
+import { applyManualOrder } from '../domain/tasks.ts'
 import type {
   ActivityEntry,
   ActivityKind,
@@ -46,6 +47,8 @@ export type Action =
   /** Devuelve una tarea borrada tal cual estaba (mismo id): el «Deshacer». */
   | { type: 'task/restore'; task: Task }
   | { type: 'task/toggle'; id: ID }
+  /** «Mi orden»: `ids` en su nuevo orden (puede ser solo la parte visible). */
+  | { type: 'task/reorder'; ids: ID[] }
   | { type: 'grade/add'; grade: New<GradeEntry>; linkExamId?: ID }
   | { type: 'grade/update'; id: ID; patch: Partial<GradeEntry> }
   | { type: 'grade/remove'; id: ID }
@@ -275,6 +278,24 @@ export function reducer(state: AppData, action: Action): AppData {
             )
           : state.activity,
       }
+    }
+
+    case 'task/reorder': {
+      // Se numera todo de nuevo (0, 1, 2…) para que no queden empates ni
+      // tareas sin posición, pero solo se tocan las que cambian: la
+      // sincronización viaja campo a campo y no conviene mandar lo que no
+      // se ha movido.
+      const position = new Map(
+        applyManualOrder(state.tasks, action.ids).map((task, index) => [task.id, index]),
+      )
+      let changed = false
+      const tasks = state.tasks.map((task) => {
+        const order = position.get(task.id)
+        if (order === undefined || task.order === order) return task
+        changed = true
+        return { ...task, order }
+      })
+      return changed ? { ...state, tasks } : state
     }
 
     // --- Subtareas ---

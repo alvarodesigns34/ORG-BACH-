@@ -169,6 +169,11 @@ export interface Task {
   subtasks: Subtask[]
   createdAt: TimestampISO
   completedAt?: TimestampISO
+  /**
+   * Posición en «Mi orden», el orden en que el alumno piensa hacerlas. Lo
+   * fija al arrastrar; sin él, la tarea va detrás de las ya colocadas.
+   */
+  order?: number
   demo?: boolean
 }
 

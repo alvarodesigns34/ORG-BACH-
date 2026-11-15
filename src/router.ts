@@ -63,15 +63,5 @@ export function useRoute() {
     window.location.hash = hrefFor(id, params).slice(1)
   }, [])
 
-  // Cambiar de sección debe empezar arriba: heredar el desplazamiento de la
-  // vista anterior hace parecer que la nueva se ha cargado a medias.
-  //
-  // Quien se desplaza es la ventana, no `#contenido`: ese contenedor no lleva
-  // `overflow`, así que el `scrollTo` anterior no movía nada y el comentario
-  // describía algo que no llegaba a ocurrir.
-  useEffect(() => {
-    window.scrollTo({ top: 0 })
-  }, [route.id])
-
   return { route, navigate }
 }

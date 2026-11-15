@@ -609,6 +609,26 @@ html {
   background: var(--c-hairline);
 }
 
+/* Fila levantada al reordenar: flota sobre la lista con sombra amplia y
+   esquinas propias; las líneas de separación junto a ella desaparecen. */
+.task-row-lifted {
+  border-radius: var(--radius-md);
+  box-shadow:
+    0 0 0 0.5px var(--glass-edge),
+    0 8px 20px rgb(0 0 0 / 0.1),
+    0 24px 48px rgb(0 0 0 / 0.14);
+}
+[data-theme='dark'] .task-row-lifted {
+  box-shadow:
+    0 0 0 0.5px rgb(255 255 255 / 0.1),
+    0 8px 20px rgb(0 0 0 / 0.45),
+    0 24px 48px rgb(0 0 0 / 0.55);
+}
+.task-row-lifted > .task-body::before,
+.task-row-lifted + .task-row > .task-body::before {
+  opacity: 0;
+}
+
 /* Filas de lista agrupada: la línea entre filas empieza en el texto (tras el
    icono si lo hay), dibujada en la parte superior del cuerpo de la fila. */
 .list-item + .list-item .list-row-body {

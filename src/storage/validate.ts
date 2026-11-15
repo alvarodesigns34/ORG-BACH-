@@ -178,6 +178,7 @@ export function parseTask(raw: unknown): Task | null {
     // sin sello no entra en los objetivos de tareas; un sello en una pendiente
     // cuenta trabajo que no está hecho.
     completedAt: status === 'completada' ? (stamp ?? new Date().toISOString()) : undefined,
+    order: optNum(raw.order),
     demo: raw.demo === true,
   }
 }
