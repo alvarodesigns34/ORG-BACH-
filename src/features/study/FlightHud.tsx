@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
+  AudioWaveform,
   Check,
   ChevronLeft,
+  CloudLightning,
+  CloudRain,
+  Flame,
+  Waves,
+  Wind,
   Coffee,
   Layers,
   LocateFixed,
@@ -184,50 +190,52 @@ function SoundPanel({
   return (
     <>
       <p className="text-[0.9375rem] font-semibold mb-3">Sonido de fondo</p>
-      <div className="grid grid-cols-2 gap-2">
-        {SOUNDS.map((s) => {
+      {/* Rejilla de iconos, como el Centro de control: icono arriba,
+          nombre debajo. El activo, en azul y con barritas que se mueven. */}
+      <div className="grid grid-cols-4 gap-x-2 gap-y-3">
+        {[...SOUNDS, { id: 'ninguno' as const, label: 'Silencio' }].map((s) => {
           const active = sound === s.id
+          const Icon = SOUND_ICONS[s.id]
           return (
             <button
               key={s.id}
               type="button"
               aria-pressed={active}
+              aria-label={s.label}
               onClick={() => {
                 haptic()
-                onSound(active ? 'ninguno' : s.id)
+                onSound(active && s.id !== 'ninguno' ? 'ninguno' : s.id)
               }}
-              className={cx(
-                'pressable text-left rounded-[16px] px-3.5 py-2.5 transition-colors duration-150',
-                active ? 'bg-[#0064d2] text-white' : 'bg-[var(--glass-tint)] hover:bg-[color-mix(in_srgb,var(--glass-tint)_100%,var(--c-ink)_5%)]',
-              )}
+              className="group flex flex-col items-center gap-1.5"
             >
-              <span className="flex items-center justify-between">
-                <span className="text-[0.875rem] font-semibold">{s.label}</span>
-                {active && <SoundBars />}
+              <span
+                className={cx(
+                  'pressable relative grid place-items-center size-[3.75rem] rounded-[18px] transition-colors duration-200',
+                  active
+                    ? s.id === 'ninguno'
+                      ? 'bg-ink text-canvas'
+                      : 'bg-[#0a84ff] text-white shadow-[0_6px_16px_rgb(10_132_255/0.35)]'
+                    : 'bg-[var(--glass-tint)] text-ink-2 group-hover:text-ink',
+                )}
+              >
+                <Icon className="size-6" strokeWidth={2} />
+                {active && s.id !== 'ninguno' && (
+                  <span className="absolute top-1.5 right-2">
+                    <SoundBars />
+                  </span>
+                )}
               </span>
-              <span className={cx('block text-[0.6875rem] mt-0.5', active ? 'text-white/75' : 'text-ink-3')}>
-                {s.hint}
+              <span
+                className={cx(
+                  'text-[0.6875rem] leading-tight text-center',
+                  active ? 'font-semibold text-ink' : 'font-medium text-ink-3',
+                )}
+              >
+                {s.label}
               </span>
             </button>
           )
         })}
-        <button
-          type="button"
-          aria-pressed={sound === 'ninguno'}
-          onClick={() => {
-            haptic()
-            onSound('ninguno')
-          }}
-          className={cx(
-            'pressable text-left rounded-[16px] px-3.5 py-2.5 transition-colors',
-            sound === 'ninguno' ? 'bg-ink text-canvas' : 'bg-[var(--glass-tint)]',
-          )}
-        >
-          <span className="text-[0.875rem] font-semibold">Silencio</span>
-          <span className={cx('block text-[0.6875rem] mt-0.5', sound === 'ninguno' ? 'opacity-70' : 'text-ink-3')}>
-            Sin sonido
-          </span>
-        </button>
       </div>
 
       <div className="flex items-center gap-3 mt-4">
@@ -257,14 +265,25 @@ function SoundPanel({
   )
 }
 
+const SOUND_ICONS: Record<SoundId | 'ninguno', typeof Plane> = {
+  cabina: Plane,
+  lluvia: CloudRain,
+  tormenta: CloudLightning,
+  olas: Waves,
+  viento: Wind,
+  chimenea: Flame,
+  marron: AudioWaveform,
+  ninguno: VolumeX,
+}
+
 /** Tres barritas que se mueven: suena. */
 function SoundBars() {
   return (
-    <span aria-hidden className="flex items-end gap-[2px] h-3">
+    <span aria-hidden className="flex items-end gap-[1.5px] h-2.5">
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className="sound-bar w-[3px] rounded-full bg-current"
+          className="sound-bar w-[2px] rounded-full bg-current"
           style={{ animationDelay: `${i * 160}ms` }}
         />
       ))}

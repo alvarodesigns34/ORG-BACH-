@@ -21,7 +21,7 @@ const DEFAULTS: StudyPrefs = {
   map: 'minimal',
   labels: true,
   sound: 'cabina',
-  volume: 0.55,
+  volume: 0.7,
   keepAwake: true,
   minutes: 45,
   layover: 0,

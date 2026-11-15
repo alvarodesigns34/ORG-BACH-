@@ -23,20 +23,20 @@ export type SoundId =
   | 'chimenea'
   | 'marron'
 
-export const SOUNDS: { id: SoundId; label: string; hint: string }[] = [
-  { id: 'cabina', label: 'Cabina', hint: 'Rumor de crucero' },
-  { id: 'lluvia', label: 'Lluvia', hint: 'Suave, constante' },
-  { id: 'tormenta', label: 'Tormenta', hint: 'Lluvia y truenos lejanos' },
-  { id: 'olas', label: 'Olas', hint: 'Mar en calma' },
-  { id: 'viento', label: 'Viento', hint: 'Ráfagas lentas' },
-  { id: 'chimenea', label: 'Chimenea', hint: 'Fuego que crepita' },
-  { id: 'marron', label: 'Ruido marrón', hint: 'Grave y uniforme' },
+export const SOUNDS: { id: SoundId; label: string }[] = [
+  { id: 'cabina', label: 'Cabina' },
+  { id: 'lluvia', label: 'Lluvia' },
+  { id: 'tormenta', label: 'Tormenta' },
+  { id: 'olas', label: 'Olas' },
+  { id: 'viento', label: 'Viento' },
+  { id: 'chimenea', label: 'Chimenea' },
+  { id: 'marron', label: 'Ruido marrón' },
 ]
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
 let current: { id: SoundId; gain: GainNode; stop: () => void } | null = null
-let volume = 0.55
+let volume = 0.7
 const cache = new Map<string, AudioBuffer>()
 
 function context(): AudioContext | null {
@@ -47,21 +47,95 @@ function context(): AudioContext | null {
   if (!Ctor) return null
   ctx = new Ctor()
   master = ctx.createGain()
-  master.gain.value = volume
-  // Un limitador suave: ningún pico (un trueno) se dispara por encima.
-  const limiter = ctx.createDynamicsCompressor()
-  limiter.threshold.value = -10
-  limiter.knee.value = 12
-  limiter.ratio.value = 6
-  limiter.attack.value = 0.01
-  limiter.release.value = 0.4
-  master.connect(limiter).connect(ctx.destination)
+  master.gain.value = volumeGain(volume)
+  master.connect(limiter(ctx)).connect(ctx.destination)
   return ctx
 }
 
+/**
+ * Limitador al final: deja subir el nivel sin que ningún pico (un trueno, la
+ * cresta de una ola) sature. Rápido y casi sin rodilla, como el de un móvil.
+ */
+function limiter(c: BaseAudioContext): DynamicsCompressorNode {
+  const l = c.createDynamicsCompressor()
+  l.threshold.value = -6
+  l.knee.value = 2
+  l.ratio.value = 20
+  l.attack.value = 0.003
+  l.release.value = 0.25
+  return l
+}
+
+/**
+ * Del control (0–1) a ganancia: curva como la del volumen de iOS, que sube
+ * despacio abajo y deja margen arriba. Al 70 % suena a nivel de conversación
+ * en los altavoces del iPad; al máximo, con fuerza pero sin saturar.
+ */
+function volumeGain(v: number): number {
+  return 1.5 * Math.pow(Math.min(1, Math.max(0, v)), 1.6)
+}
+
 export function unlockAudio(): void {
+  ignoreSilentSwitch()
   const c = context()
   if (c && c.state === 'suspended') void c.resume()
+}
+
+let silentLoop: HTMLAudioElement | null = null
+
+/**
+ * En iPhone y iPad, el audio web es por defecto «de ambiente»: el modo
+ * silencio lo apaga. Para estudiar con sonido, se pide la categoría de
+ * reproducción (como una app de música):
+ *
+ * - Safari 16.4+: `navigator.audioSession.type = 'playback'`.
+ * - Versiones anteriores: el truco conocido de reproducir en bucle un audio
+ *   HTML silencioso, que cambia la sesión de audio de la página entera.
+ *
+ * Tiene que llamarse dentro de un toque.
+ */
+function ignoreSilentSwitch(): void {
+  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession
+  if (session) {
+    try {
+      session.type = 'playback'
+      return
+    } catch {
+      // Sigue con el truco de abajo.
+    }
+  }
+  if (silentLoop || !/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) return
+  silentLoop = new Audio(silentWav())
+  silentLoop.loop = true
+  silentLoop.setAttribute('playsinline', '')
+  void silentLoop.play().catch(() => {
+    silentLoop = null
+  })
+}
+
+/** Medio segundo de silencio en WAV (8 kHz, 8 bits), como data URI. */
+function silentWav(): string {
+  const samples = 4000
+  const bytes = new Uint8Array(44 + samples)
+  const view = new DataView(bytes.buffer)
+  const text = (at: number, value: string) =>
+    [...value].forEach((ch, i) => view.setUint8(at + i, ch.charCodeAt(0)))
+  text(0, 'RIFF')
+  view.setUint32(4, 36 + samples, true)
+  text(8, 'WAVEfmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, 1, true)
+  view.setUint32(24, 8000, true)
+  view.setUint32(28, 8000, true)
+  view.setUint16(32, 1, true)
+  view.setUint16(34, 8, true)
+  text(36, 'data')
+  view.setUint32(40, samples, true)
+  bytes.fill(128, 44)
+  let binary = ''
+  for (const b of bytes) binary += String.fromCharCode(b)
+  return `data:audio/wav;base64,${btoa(binary)}`
 }
 
 export function audioRunning(): boolean {
@@ -242,11 +316,15 @@ function wobble(c: AudioContext, param: AudioParam, base: number, depth: number,
 
 const BUILD: Record<SoundId, Build> = {
   cabina: (c, out) => {
+    // Cuerpo grave del motor + el siseo del aire de cabina, que es lo que
+    // de verdad se oye en un avión y lo que reproduce un altavoz pequeño.
     const body = loop(c, brown(c))
-    const low = filter(c, 'lowpass', 380, 0.5)
+    const low = filter(c, 'lowpass', 520, 0.5)
+    const bodyGain = gain(c, 0.85)
     const air = loop(c, pink(c))
-    const band = filter(c, 'bandpass', 700, 0.45)
-    const airGain = gain(c, 0.16)
+    const band = filter(c, 'lowpass', 2600, 0.5)
+    const airHp = filter(c, 'highpass', 220, 0.5)
+    const airGain = gain(c, 0.5)
     // Zumbido de motor: dos tonos graves casi iguales que «laten» despacio.
     const hum = gain(c, 0.018)
     const h1 = c.createOscillator()
@@ -257,9 +335,9 @@ const BUILD: Record<SoundId, Build> = {
     h2.connect(hum)
     h1.start()
     h2.start()
-    const lfo = wobble(c, low.frequency, 380, 55, 0.07)
-    body.connect(low).connect(out)
-    air.connect(band).connect(airGain).connect(out)
+    const lfo = wobble(c, low.frequency, 520, 70, 0.07)
+    body.connect(low).connect(bodyGain).connect(out)
+    air.connect(airHp).connect(band).connect(airGain).connect(out)
     hum.connect(out)
     return () => [body, air, h1, h2, lfo].forEach(stopNode)
   },
@@ -380,15 +458,20 @@ function stopNode(node: AudioScheduledSourceNode) {
 
 const FADE = 1.6
 
-/** Ajuste de nivel por ambiente, medido: todos quedan en torno a −20 dB. */
+/**
+ * Ajuste de nivel por ambiente, medido: todos quedan a −16 dB contando a la
+ * vez cómo suenan con cascos y en un altavoz pequeño (que pierde los graves
+ * por debajo de ~250 Hz). Así cambiar de ambiente no da saltos de volumen,
+ * y ninguno desaparece en el iPad o el portátil.
+ */
 const TRIM: Record<SoundId, number> = {
-  cabina: 0.55,
-  lluvia: 1,
-  tormenta: 1,
-  olas: 0.75,
-  viento: 0.88,
-  chimenea: 1,
-  marron: 0.65,
+  cabina: 1.3,
+  lluvia: 1.88,
+  tormenta: 1.86,
+  olas: 1.43,
+  viento: 1.8,
+  chimenea: 2.45,
+  marron: 1.41,
 }
 
 export function playSound(id: SoundId): void {
@@ -434,7 +517,7 @@ export function setVolume(next: number): void {
   const t = ctx.currentTime
   master.gain.cancelScheduledValues(t)
   master.gain.setValueAtTime(master.gain.value, t)
-  master.gain.linearRampToValueAtTime(volume, t + 0.15)
+  master.gain.linearRampToValueAtTime(volumeGain(volume), t + 0.15)
 }
 
 /** Atenúa (pausa, escala) o restaura el ambiente sin pararlo. */
@@ -450,7 +533,7 @@ export function duck(on: boolean): void {
 export function chime(): void {
   const c = context()
   if (!c) return
-  const out = gain(c, 0.2)
+  const out = gain(c, 0.32)
   out.connect(c.destination)
   const tone = (freq: number, at: number) => {
     for (const [mult, amp] of [
@@ -479,10 +562,20 @@ export function chime(): void {
  * Renderiza unos segundos de un ambiente sin altavoz (para comprobar niveles
  * en pruebas): devuelve el canal izquierdo.
  */
-export async function renderSound(id: SoundId, seconds = 6): Promise<Float32Array> {
+export async function renderSound(
+  id: SoundId,
+  seconds = 6,
+  /** Con la cadena completa: ajuste del ambiente, volumen y limitador. */
+  atVolume?: number,
+): Promise<Float32Array> {
   const c = new OfflineAudioContext(2, Math.floor(44100 * seconds), 44100)
   const out = c.createGain()
-  out.connect(c.destination)
+  if (atVolume === undefined) {
+    out.connect(c.destination)
+  } else {
+    out.gain.value = TRIM[id] * volumeGain(atVolume)
+    out.connect(limiter(c)).connect(c.destination)
+  }
   BUILD[id](c as unknown as AudioContext, out)
   const rendered = await c.startRendering()
   return rendered.getChannelData(0)
