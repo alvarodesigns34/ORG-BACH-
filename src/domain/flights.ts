@@ -288,8 +288,117 @@ export function formatFlightTime(minutes: number): string {
   return rest === 0 ? `${h} h` : `${h} h ${String(rest).padStart(2, '0')} min`
 }
 
-/** Bandera de un país a partir de su código ISO (🇪🇸). */
-export function flag(country: string): string {
-  if (!/^[A-Z]{2}$/.test(country)) return ''
-  return String.fromCodePoint(...[...country].map((c) => 0x1f1a5 + c.charCodeAt(0)))
+const REGION_NAMES = (() => {
+  try {
+    return new Intl.DisplayNames(['es'], { type: 'region' })
+  } catch {
+    return null
+  }
+})()
+
+/** Nombre del país en español a partir de su código ISO («Francia»). */
+export function countryName(code: string): string {
+  try {
+    return REGION_NAMES?.of(code) ?? code
+  } catch {
+    return code
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Escalas
+// ---------------------------------------------------------------------------
+
+/** En la escala ahora mismo: la pausa abierta es la de la escala. */
+export function inLayover(session: FocusSession): boolean {
+  return !!session.layoverAt && session.pausedAt === session.layoverAt
+}
+
+/** Toca empezar la escala: mitad de vuelo, aún no hecha, sin pausa abierta. */
+export function layoverDue(session: FocusSession, now: number): boolean {
+  return (
+    session.status === 'en_vuelo' &&
+    !!session.layoverMinutes &&
+    !session.layoverAt &&
+    !session.pausedAt &&
+    progress(session, now) >= 0.5
+  )
+}
+
+/** Milisegundos que quedan de escala (0 si ya terminó o no se está en ella). */
+export function layoverRemainingMs(session: FocusSession, now: number): number {
+  if (!inLayover(session) || !session.layoverMinutes) return 0
+  return Math.max(0, Date.parse(session.layoverAt!) + session.layoverMinutes * 60_000 - now)
+}
+
+/** Aeropuerto más cercano a un punto, sin contar los de `exclude`. */
+export function nearestAirport(
+  point: LatLon,
+  airports: Airport[],
+  exclude: string[] = [],
+): Airport | undefined {
+  let best: Airport | undefined
+  let bestKm = Infinity
+  for (const a of airports) {
+    if (!a.major || exclude.includes(a.iata)) continue
+    const km = distanceKm(point, a)
+    if (km < bestKm) {
+      bestKm = km
+      best = a
+    }
+  }
+  return best
+}
+
+// ---------------------------------------------------------------------------
+// Diario y pasaporte
+// ---------------------------------------------------------------------------
+
+export interface Passport {
+  flights: number
+  minutes: number
+  km: number
+  /** Ciudades visitadas (aterrizadas), la primera vez que se llegó a cada una. */
+  stamps: { iata: string; firstAt: string; visits: number; subjectId?: ID }[]
+  countries: string[]
+}
+
+export function passport(sessions: FocusSession[], countryOf: (iata: string) => string | undefined): Passport {
+  const landed = sessions
+    .filter((s) => s.status === 'aterrizado' && s.endedAt)
+    .sort((a, b) => (a.endedAt! < b.endedAt! ? -1 : 1))
+  const stamps = new Map<string, Passport['stamps'][number]>()
+  const countries = new Set<string>()
+  let minutes = 0
+  let km = 0
+  for (const s of landed) {
+    minutes += s.focusedMinutes ?? s.plannedMinutes
+    km += s.distanceKm
+    const held = stamps.get(s.to)
+    if (held) held.visits++
+    else stamps.set(s.to, { iata: s.to, firstAt: s.endedAt!, visits: 1, subjectId: s.subjectId })
+    const country = countryOf(s.to)
+    if (country) countries.add(country)
+  }
+  // También cuenta el país de salida del primer vuelo: ya «estabas» allí.
+  if (landed[0]) {
+    const home = countryOf(landed[0].from)
+    if (home) countries.add(home)
+  }
+  return { flights: landed.length, minutes, km, stamps: [...stamps.values()].reverse(), countries: [...countries] }
+}
+
+/** Minutos estudiados (vuelos cerrados) por asignatura desde `since`. */
+export function minutesBySubject(
+  sessions: FocusSession[],
+  since: number,
+): Map<string | undefined, number> {
+  const out = new Map<string | undefined, number>()
+  for (const s of sessions) {
+    if (s.status === 'en_vuelo' || !s.endedAt || Date.parse(s.endedAt) < since) continue
+    const m = s.focusedMinutes ?? 0
+    if (m <= 0) continue
+    out.set(s.subjectId, (out.get(s.subjectId) ?? 0) + m)
+  }
+  return out
 }

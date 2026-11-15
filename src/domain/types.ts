@@ -352,6 +352,10 @@ export interface FocusSession {
   endedAt?: TimestampISO
   /** Minutos de estudio efectivos, fijados al aterrizar o abandonar. */
   focusedMinutes?: number
+  /** Escala: descanso de estos minutos a mitad de vuelo (opcional). */
+  layoverMinutes?: number
+  /** Cuándo empezó la escala. Mientras `pausedAt` sea este instante, se está en ella. */
+  layoverAt?: TimestampISO
   createdAt: TimestampISO
 }
 

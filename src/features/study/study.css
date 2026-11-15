@@ -1,39 +1,70 @@
 /* ==========================================================================
-   Modo estudio: piezas del mapa y de la cabina.
+   Modo estudio: material, mapa, avión y tarjeta.
    ========================================================================== */
 
-.study-map {
-  transition: filter 600ms var(--ease-std);
-}
-.study-map.is-paused {
-  filter: saturate(0.4) brightness(0.85);
-}
-
-/* Sobre un mapa lleno de rótulos, el cristal fino deja leer lo de debajo a
-   través de la tarjeta. Aquí el material es el «grueso» de Apple Mapas: más
-   opaco y con más desenfoque. */
+/* --- Material de las hojas sobre el mapa ---------------------------------
+   El cristal fino de la app deja leer los rótulos del mapa a través de la
+   tarjeta, y en claro todo se volvía un mismo blanco. Aquí el material es el
+   «grueso» de Apple Mapas: casi opaco, con mucho desenfoque, un canto nítido
+   y una sombra amplia que lo despega del mapa. */
 .study-root .liquid {
   background:
-    linear-gradient(180deg, var(--glass-sheen), transparent 46%),
-    color-mix(in srgb, var(--c-surface) 80%, transparent);
-  -webkit-backdrop-filter: blur(32px) saturate(180%);
-  backdrop-filter: blur(32px) saturate(180%);
+    linear-gradient(180deg, rgb(255 255 255 / 0.5), transparent 40%),
+    color-mix(in srgb, var(--c-surface) 90%, transparent);
+  -webkit-backdrop-filter: blur(36px) saturate(170%);
+  backdrop-filter: blur(36px) saturate(170%);
+  box-shadow:
+    inset 0 0 0 0.5px rgb(0 0 0 / 0.08),
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 12px 32px rgb(0 0 0 / 0.14),
+    0 32px 80px rgb(0 0 0 / 0.12);
+}
+.study-root [data-theme='dark'] .liquid,
+[data-theme='dark'] .study-root .liquid {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.06), transparent 40%),
+    color-mix(in srgb, #1c1c1e 86%, transparent);
+  box-shadow:
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.1),
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 12px 32px rgb(0 0 0 / 0.45),
+    0 32px 80px rgb(0 0 0 / 0.35);
 }
 
-/* Atribución del mapa, discreta y en el idioma visual de la app. */
+/* Velo sobre el mapa cuando algo ocupa el centro (asiento, tarjeta). */
+.study-veil {
+  background: color-mix(in srgb, var(--c-canvas) 38%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  backdrop-filter: blur(14px) saturate(120%);
+}
+[data-theme='dark'] .study-veil {
+  background: rgb(0 0 0 / 0.45);
+}
+
+.study-map {
+  transition: filter 700ms var(--ease-std);
+}
+.study-map.is-paused {
+  filter: saturate(0.3) brightness(0.8);
+}
+
+/* Atribución del mapa, discreta. */
 .study-root .maplibregl-ctrl-attrib {
   font: 500 10px/1.4 var(--font-sans);
-  background: color-mix(in srgb, var(--c-surface) 70%, transparent) !important;
+  background: color-mix(in srgb, var(--c-surface) 72%, transparent) !important;
   border-radius: 999px !important;
+  color: var(--c-ink-3);
 }
 .study-root .maplibregl-ctrl-attrib a {
   color: var(--c-ink-3);
 }
 .study-root .maplibregl-ctrl-bottom-right {
   bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
+  right: 4px;
 }
 
-/* --- Origen: punto con pulso, como «tu ubicación» en Mapas --- */
+/* --- Origen: punto con pulso, como «tu ubicación» --- */
 .fm-origin {
   position: relative;
   width: 18px;
@@ -43,33 +74,33 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: var(--c-accent-fill);
+  background: #0064d2;
   border: 3px solid #fff;
-  box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
+  box-shadow: 0 1px 5px rgb(0 0 0 / 0.35);
 }
 .fm-origin-pulse {
   position: absolute;
-  inset: -14px;
+  inset: -16px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--c-accent-fill) 30%, transparent);
-  animation: fm-pulse 2.4s var(--ease-out) infinite;
+  background: rgb(0 100 210 / 0.25);
+  animation: fm-pulse 2.6s var(--ease-out) infinite;
 }
 @keyframes fm-pulse {
   from {
-    transform: scale(0.35);
+    transform: scale(0.3);
     opacity: 1;
   }
   to {
-    transform: scale(1.4);
+    transform: scale(1.35);
     opacity: 0;
   }
 }
 
-/* --- Destinos posibles: cápsulas con el código IATA --- */
+/* --- Destinos: cápsulas con el código IATA --- */
 .fm-pin {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   height: 24px;
   padding: 0 8px;
   border-radius: 999px;
@@ -78,24 +109,24 @@
   font: 700 11px/1 ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
   letter-spacing: 0.04em;
   box-shadow:
-    0 0 0 0.5px rgb(0 0 0 / 0.12),
-    0 2px 6px rgb(0 0 0 / 0.14);
+    0 0 0 0.5px rgb(0 0 0 / 0.14),
+    0 2px 8px rgb(0 0 0 / 0.16);
   cursor: pointer;
   transition:
     transform 320ms var(--spring),
-    background-color 160ms var(--ease-std),
-    color 160ms var(--ease-std);
+    background-color 180ms var(--ease-std),
+    color 180ms var(--ease-std);
   animation: pop 320ms var(--spring) both;
 }
 .fm-pin:hover {
   transform: scale(1.08);
 }
 .fm-pin.is-selected {
-  background: var(--c-accent-fill);
+  background: #0064d2;
   color: #fff;
-  transform: scale(1.12);
-  height: 28px;
-  padding: 0 10px;
+  height: 30px;
+  padding: 0 11px;
+  transform: scale(1.06);
 }
 .fm-pin-city {
   font: 600 12px/1 var(--font-sans);
@@ -107,95 +138,293 @@
 
 /* --- Destino de la ruta --- */
 .fm-dest {
-  padding: 5px 9px;
+  padding: 6px 10px;
   border-radius: 999px;
-  background: var(--c-accent-fill);
+  background: #0064d2;
   color: #fff;
   font: 700 12px/1 ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
   letter-spacing: 0.04em;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.28);
 }
 
 /* --- El avión --- */
 .fm-plane {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   color: #fff;
-  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.45)) drop-shadow(0 8px 14px rgb(0 0 0 / 0.3));
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.5)) drop-shadow(0 10px 16px rgb(0 0 0 / 0.35));
 }
 .fm-plane svg {
   width: 100%;
   height: 100%;
   fill: currentColor;
 }
-.study-map[data-look='light'] .fm-plane {
-  color: var(--c-accent-fill);
+.study-map [data-look='light'] .fm-plane {
+  color: #0064d2;
 }
 
-/* --- Fuselaje (selección de asiento) --- */
-.fuselage {
-  background:
-    linear-gradient(
-      90deg,
-      rgb(0 0 0 / 0.07),
-      transparent 14%,
-      transparent 86%,
-      rgb(0 0 0 / 0.07)
-    ),
-    var(--c-surface);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.6),
-    0 2px 6px rgb(0 0 0 / 0.06),
-    0 30px 70px rgb(0 0 0 / 0.22);
+/* --- Dibujo del avión (elegir asiento) ----------------------------------- */
+.plane-drawing {
+  filter: drop-shadow(0 30px 60px rgb(0 0 0 / 0.22)) drop-shadow(0 4px 10px rgb(0 0 0 / 0.08));
+  overflow: visible;
 }
-[data-theme='dark'] .fuselage {
-  background:
-    linear-gradient(90deg, rgb(0 0 0 / 0.35), transparent 14%, transparent 86%, rgb(0 0 0 / 0.35)),
-    var(--c-raised);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.08),
-    0 30px 70px rgb(0 0 0 / 0.6);
+.pd-body {
+  stop-color: #ffffff;
 }
-.cockpit-window {
-  display: block;
-  width: 40px;
-  height: 26px;
-  border-radius: 10px 10px 6px 6px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--c-ink) 55%, transparent), color-mix(in srgb, var(--c-ink) 30%, transparent));
+.pd-edge {
+  stop-color: #dedde3;
 }
-.seat {
-  background: var(--c-sunken);
-  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.06);
+.pd-line {
+  stroke: rgb(0 0 0 / 0.08);
+  stroke-width: 1.5;
 }
-.seat:hover {
-  background: color-mix(in srgb, var(--c-accent-fill) 18%, var(--c-sunken));
+.pd-engine {
+  fill: #cfced6;
+  stroke: rgb(0 0 0 / 0.08);
 }
-.seat.is-selected {
-  background: var(--c-accent-fill);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--c-accent-fill) 45%, transparent);
+.pd-glass path {
+  fill: #2c3440;
+}
+.pd-window rect {
+  fill: #b8c3d1;
+}
+.pd-divider {
+  stroke: #d8d7de;
+  stroke-width: 2;
+  stroke-dasharray: 2 6;
+  stroke-linecap: round;
+}
+.pd-caption {
+  font: 700 11px var(--font-sans);
+  letter-spacing: 0.18em;
+  fill: #a1a0a8;
+}
+.pd-row {
+  font: 600 13px var(--font-sans);
+  fill: #a1a0a8;
+}
+.pd-exit path {
+  fill: #ff9f0a;
+}
+.pd-seat {
+  cursor: pointer;
+  transition: transform 260ms var(--spring);
+  outline: none;
+}
+.pd-seat .pd-seat-base {
+  fill: #ecebf0;
+  transition: fill 180ms var(--ease-std);
+}
+.pd-seat .pd-seat-back {
+  fill: #dad9e0;
+  transition: fill 180ms var(--ease-std);
+}
+.pd-seat .pd-seat-check {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+.pd-seat.is-free:hover .pd-seat-base,
+.pd-seat.is-free:focus-visible .pd-seat-base {
+  fill: color-mix(in srgb, var(--seat) 22%, #ecebf0);
+}
+.pd-seat.is-taken {
+  cursor: not-allowed;
+}
+.pd-seat.is-taken .pd-seat-base {
+  fill: #b9b8c0;
+}
+.pd-seat.is-taken .pd-seat-back {
+  fill: #a9a8b1;
+}
+.pd-seat.is-selected {
+  transform: scale(1.08);
+}
+.pd-seat.is-selected .pd-seat-base {
+  fill: var(--seat);
+}
+.pd-seat.is-selected .pd-seat-back {
+  fill: color-mix(in srgb, var(--seat) 75%, #000);
+}
+.pd-seat.is-selected .pd-seat-check {
+  opacity: 1;
+  transition: opacity 200ms 80ms;
+}
+
+[data-theme='dark'] .plane-drawing {
+  filter: drop-shadow(0 30px 60px rgb(0 0 0 / 0.6));
+}
+[data-theme='dark'] .pd-body {
+  stop-color: #3a3a3e;
+}
+[data-theme='dark'] .pd-edge {
+  stop-color: #232326;
+}
+[data-theme='dark'] .pd-line {
+  stroke: rgb(255 255 255 / 0.08);
+}
+[data-theme='dark'] .pd-engine {
+  fill: #2a2a2e;
+}
+[data-theme='dark'] .pd-glass path {
+  fill: #0f1318;
+}
+[data-theme='dark'] .pd-window rect {
+  fill: #59636f;
+}
+[data-theme='dark'] .pd-divider {
+  stroke: #4a4a50;
+}
+[data-theme='dark'] .pd-caption,
+[data-theme='dark'] .pd-row {
+  fill: #7c7c84;
+}
+[data-theme='dark'] .pd-seat .pd-seat-base {
+  fill: #505056;
+}
+[data-theme='dark'] .pd-seat .pd-seat-back {
+  fill: #626269;
+}
+[data-theme='dark'] .pd-seat.is-free:hover .pd-seat-base {
+  fill: color-mix(in srgb, var(--seat) 35%, #505056);
+}
+[data-theme='dark'] .pd-seat.is-taken .pd-seat-base {
+  fill: #2b2b2f;
+}
+[data-theme='dark'] .pd-seat.is-taken .pd-seat-back {
+  fill: #333338;
 }
 
 /* --- Tarjeta de embarque --- */
 .pass-texture {
-  background-image: radial-gradient(color-mix(in srgb, var(--c-ink) 9%, transparent) 1px, transparent 1.2px);
+  background-image: radial-gradient(color-mix(in srgb, var(--c-ink) 8%, transparent) 1px, transparent 1.2px);
   background-size: 9px 9px;
-  -webkit-mask-image: radial-gradient(70% 90% at 75% 20%, #000, transparent 70%);
-  mask-image: radial-gradient(70% 90% at 75% 20%, #000, transparent 70%);
+  -webkit-mask-image: radial-gradient(70% 90% at 80% 15%, #000, transparent 70%);
+  mask-image: radial-gradient(70% 90% at 80% 15%, #000, transparent 70%);
 }
-/* Línea perforada con las dos muescas de los lados. */
+/* Línea perforada con dos muescas. */
 .pass-perforation {
   -webkit-mask:
-    radial-gradient(circle 10px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
-    radial-gradient(circle 10px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+    radial-gradient(circle 11px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 11px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
   mask:
-    radial-gradient(circle 10px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
-    radial-gradient(circle 10px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+    radial-gradient(circle 11px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 11px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
 }
 .pass-perforation::after {
   content: '';
   position: absolute;
-  left: 18px;
-  right: 18px;
+  left: 20px;
+  right: 20px;
   top: 50%;
   border-top: 2px dashed var(--c-hairline-strong);
+}
+
+/* --- Interruptor pequeño (estilo iOS) en los paneles --- */
+.study-switch {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--c-fill);
+  transition: background-color 200ms var(--ease-std);
+  flex-shrink: 0;
+}
+.study-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.2);
+  transition: transform 280ms var(--spring);
+}
+.study-switch[aria-checked='true'] {
+  background: var(--c-switch-on);
+}
+.study-switch[aria-checked='true']::after {
+  transform: translateX(18px);
+}
+
+/* Control deslizante de volumen. */
+.study-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 28px;
+  background: transparent;
+}
+.study-range::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--c-ink-2) var(--fill, 50%),
+    var(--c-fill) var(--fill, 50%)
+  );
+}
+.study-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 24px;
+  height: 24px;
+  margin-top: -9px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 0.1),
+    0 3px 8px rgb(0 0 0 / 0.2);
+}
+.study-range::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--c-fill);
+}
+.study-range::-moz-range-progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--c-ink-2);
+}
+.study-range::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 3px 8px rgb(0 0 0 / 0.2);
+}
+
+/* Luces de pista de la pantalla de despegue. */
+.runway-light {
+  opacity: 0.15;
+  box-shadow: 0 0 8px rgb(255 255 255 / 0.7);
+  animation: runway 1.4s var(--ease-std) infinite;
+}
+@keyframes runway {
+  0%,
+  100% {
+    opacity: 0.12;
+  }
+  35% {
+    opacity: 1;
+  }
+}
+
+/* Barritas de «está sonando». */
+.sound-bar {
+  height: 40%;
+  animation: sound-bar 900ms var(--ease-std) infinite alternate;
+}
+@keyframes sound-bar {
+  from {
+    height: 25%;
+  }
+  to {
+    height: 100%;
+  }
 }

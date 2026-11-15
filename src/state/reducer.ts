@@ -54,13 +54,22 @@ export type Action =
       type: 'session/start'
       session: Pick<
         FocusSession,
-        'from' | 'to' | 'distanceKm' | 'plannedMinutes' | 'seat' | 'subjectId' | 'taskId'
+        | 'from'
+        | 'to'
+        | 'distanceKm'
+        | 'plannedMinutes'
+        | 'seat'
+        | 'subjectId'
+        | 'taskId'
+        | 'layoverMinutes'
       >
       /** El texto de la actividad: «Madrid → Barcelona». */
       route?: string
     }
   | { type: 'session/pause'; id: ID }
   | { type: 'session/resume'; id: ID }
+  /** Empieza la escala: una pausa marcada, que la vista reanuda sola. */
+  | { type: 'session/layover'; id: ID }
   | { type: 'session/land'; id: ID; route?: string }
   | { type: 'session/cancel'; id: ID }
   | { type: 'grade/add'; grade: New<GradeEntry>; linkExamId?: ID }
@@ -338,6 +347,13 @@ export function reducer(state: AppData, action: Action): AppData {
       const s = state.sessions.find((x) => x.id === action.id)
       if (!s || s.status !== 'en_vuelo' || s.pausedAt) return state
       return { ...state, sessions: patchById(state.sessions, s.id, { pausedAt: nowISO() }) }
+    }
+
+    case 'session/layover': {
+      const s = state.sessions.find((x) => x.id === action.id)
+      if (!s || s.status !== 'en_vuelo' || s.pausedAt || s.layoverAt || !s.layoverMinutes) return state
+      const now = nowISO()
+      return { ...state, sessions: patchById(state.sessions, s.id, { pausedAt: now, layoverAt: now }) }
     }
 
     case 'session/resume': {

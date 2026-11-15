@@ -90,7 +90,7 @@ export function DurationRuler({
         className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 z-10 flex items-center"
       >
         <span className="size-0 border-y-[6px] border-y-transparent border-l-[7px] border-l-accent-fill" />
-        <span className="flex-1 h-[2px] rounded-full bg-accent-fill" />
+        <span className="w-4 h-[2.5px] rounded-full bg-accent-fill" />
       </div>
 
       <div

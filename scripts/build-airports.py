@@ -17,6 +17,7 @@ import csv
 import json
 import sys
 
+
 NAMES = {
     # España
     'FUE': 'Fuerteventura', 'VDE': 'El Hierro', 'SPC': 'La Palma', 'LPA': 'Gran Canaria',
@@ -51,6 +52,23 @@ NAMES = {
     'PEK': 'Pekín', 'PKX': 'Pekín', 'NRT': 'Tokio', 'HND': 'Tokio', 'KIX': 'Osaka',
     'SVX': 'Ekaterimburgo', 'LED': 'San Petersburgo', 'KBP': 'Kiev', 'MSQ': 'Minsk',
     'LPL': 'Liverpool', 'BHX': 'Birmingham', 'GLA': 'Glasgow', 'BRS': 'Brístol',
+    'VRN': 'Verona', 'BVA': 'París', 'FKB': 'Karlsruhe', 'HHN': 'Fráncfort-Hahn',
+    'NRN': 'Düsseldorf-Weeze', 'CRL': 'Bruselas', 'TSF': 'Venecia', 'BGY': 'Bérgamo',
+    'LGG': 'Lieja', 'LEJ': 'Leipzig', 'FMO': 'Münster', 'PAD': 'Paderborn', 'KSF': 'Kassel',
+    'EMA': 'East Midlands', 'MME': 'Teesside', 'SEN': 'Londres', 'NYO': 'Estocolmo',
+    'ETZ': 'Metz', 'RNS': 'Rennes', 'CHQ': 'La Canea', 'VBS': 'Brescia', 'TRS': 'Trieste',
+    'AOI': 'Ancona', 'EBA': 'Elba', 'OSR': 'Ostrava', 'GRZ': 'Graz', 'LUG': 'Lugano',
+    'SKP': 'Skopie', 'CLJ': 'Cluj-Napoca', 'CND': 'Constanza', 'TGM': 'Târgu Mureș',
+    'BNX': 'Banja Luka', 'TZL': 'Tuzla', 'BAY': 'Baia Mare', 'KGD': 'Kaliningrado',
+    'ARH': 'Arcángel', 'PDL': 'Ponta Delgada', 'FNC': 'Madeira', 'TER': 'Terceira',
+    'SMA': 'Santa María', 'GHV': 'Brasov', 'TIA': 'Tirana', 'PRN': 'Pristina',
+    'FCN': 'Cuxhaven', 'BLE': 'Borlänge', 'SCR': 'Sälen', 'IEG': 'Zielona Góra',
+    'SZZ': 'Szczecin', 'SZY': 'Olsztyn', 'HDF': 'Usedom', 'MXP': 'Milán', 'LIN': 'Milán',
+    'ZAG': 'Zagreb', 'WMI': 'Varsovia', 'LYS': 'Lyon', 'MRS': 'Marsella', 'TRN': 'Turín',
+    'PSR': 'Pescara', 'RMI': 'Rímini', 'TPS': 'Trápani', 'SUF': 'Lamezia Terme',
+    'IOM': 'Isla de Man', 'NOC': 'Knock', 'LSI': 'Shetland', 'MAN': 'Mánchester',
+    'KUF': 'Samara', 'GSV': 'Sarátov', 'IAR': 'Yaroslavl', 'ZIA': 'Moscú', 'KVX': 'Kírov',
+    'MRV': 'Mineralnye Vody', 'ACH': 'San Galo', 'SOB': 'Hévíz', 'PVK': 'Préveza',
     'OUD': 'Uchda', 'ORN': 'Orán', 'TLM': 'Tremecén', 'NDR': 'Nador', 'TTU': 'Tetuán',
     'AHU': 'Alhucemas', 'FEZ': 'Fez', 'RBA': 'Rabat', 'AGA': 'Agadir', 'ESU': 'Esauira',
     'AAE': 'Annaba', 'CZL': 'Constantina', 'TMR': 'Tamanrasset',

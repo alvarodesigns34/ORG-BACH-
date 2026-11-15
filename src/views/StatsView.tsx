@@ -15,6 +15,7 @@ import { useSettings, useStore, useToday } from '@/state/StoreProvider'
 import { useGlobalAverage, useSubjectResults, useSubjects } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
 import { LineChart, RankedBars, type RankedBar } from '@/ui/charts'
+import { StudyStatsCard } from '@/features/study/StudyStatsCard'
 import { Button, Card, EmptyState, Numeral, SectionHeader, Segmented, cx } from '@/ui/primitives'
 
 type Scope = TermId | 'todas'
@@ -74,6 +75,12 @@ export function StatsView() {
             }
           />
         </Card>
+        {/* Los vuelos del modo estudio no dependen de notas ni tareas. */}
+        {data.sessions.length > 0 && (
+          <div className="mt-5">
+            <StudyStatsCard />
+          </div>
+        )}
       </Page>
     )
   }
@@ -237,6 +244,11 @@ export function StatsView() {
               emptyLabel="Ninguna asignatura tiene notas todavía."
             />
           </Card>
+        </div>
+
+        {/* --- Modo estudio --- */}
+        <div className="lg:col-span-5">
+          <StudyStatsCard />
         </div>
 
         {/* --- Mejores y peores --- */}

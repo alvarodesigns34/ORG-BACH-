@@ -16,7 +16,12 @@ import {
   distanceKm,
   elapsedMs,
   formatFlightTime,
+  inLayover,
   interpolate,
+  layoverDue,
+  layoverRemainingMs,
+  minutesBySubject,
+  passport,
   minutesFor,
   progress,
   remainingMs,
@@ -212,5 +217,78 @@ describe('parseSession', () => {
       session({ status: 'cancelado', pausedAt: '2026-11-15T10:05:00.000Z', endedAt: '2026-11-15T10:06:00.000Z' }),
     )
     assert.equal(parsed?.pausedAt, undefined)
+  })
+})
+
+describe('escalas', () => {
+  it('toca a mitad de vuelo, una sola vez y solo si se pidió', () => {
+    const half = at('2026-11-15T10:24:00.000Z')
+    assert.equal(layoverDue(session({ layoverMinutes: 10 }), half), true)
+    assert.equal(layoverDue(session(), half), false)
+    assert.equal(layoverDue(session({ layoverMinutes: 10 }), at('2026-11-15T10:10:00.000Z')), false)
+    assert.equal(
+      layoverDue(session({ layoverMinutes: 10, layoverAt: '2026-11-15T10:24:00.000Z' }), half),
+      false,
+    )
+  })
+
+  it('cuenta atrás de la escala y estado', () => {
+    const s = session({
+      layoverMinutes: 10,
+      layoverAt: '2026-11-15T10:24:00.000Z',
+      pausedAt: '2026-11-15T10:24:00.000Z',
+    })
+    assert.equal(inLayover(s), true)
+    assert.equal(layoverRemainingMs(s, at('2026-11-15T10:30:00.000Z')), 4 * 60_000)
+    assert.equal(layoverRemainingMs(s, at('2026-11-15T10:40:00.000Z')), 0)
+    // Una pausa normal posterior no es la escala.
+    assert.equal(inLayover({ ...s, pausedAt: '2026-11-15T10:50:00.000Z' }), false)
+  })
+
+  it('el reductor inicia la escala y la reanudación descuenta el descanso', () => {
+    let state = reducer(createEmptyData(), {
+      type: 'session/start',
+      session: {
+        from: 'MAD',
+        to: 'BCN',
+        distanceKm: 483,
+        plannedMinutes: 48,
+        seat: '02C',
+        layoverMinutes: 5,
+      },
+    })
+    const id = state.sessions[0].id
+    state = reducer(state, { type: 'session/layover', id })
+    assert.ok(state.sessions[0].layoverAt)
+    assert.equal(state.sessions[0].pausedAt, state.sessions[0].layoverAt)
+    // Segunda vez, nada.
+    assert.equal(reducer(state, { type: 'session/layover', id }), state)
+    state = reducer(state, { type: 'session/resume', id })
+    assert.equal(state.sessions[0].pausedAt, undefined)
+    assert.ok(state.sessions[0].layoverAt)
+  })
+})
+
+describe('pasaporte y tiempo por asignatura', () => {
+  const list = [
+    session({ id: 'a', to: 'BCN', status: 'aterrizado', endedAt: '2026-11-10T10:00:00.000Z', focusedMinutes: 48, subjectId: 'fis' }),
+    session({ id: 'b', from: 'BCN', to: 'MAD', status: 'aterrizado', endedAt: '2026-11-12T10:00:00.000Z', focusedMinutes: 48, subjectId: 'mat' }),
+    session({ id: 'c', from: 'MAD', to: 'BCN', status: 'aterrizado', endedAt: '2026-11-14T10:00:00.000Z', focusedMinutes: 48, subjectId: 'fis' }),
+    session({ id: 'd', from: 'BCN', to: 'MRS', status: 'cancelado', endedAt: '2026-11-15T10:00:00.000Z', focusedMinutes: 12, subjectId: 'fis' }),
+  ]
+  const country: Record<string, string> = { MAD: 'ES', BCN: 'ES', MRS: 'FR' }
+
+  it('un sello por ciudad, con sus visitas; los abandonados no cuentan', () => {
+    const p = passport(list, (iata) => country[iata])
+    assert.equal(p.flights, 3)
+    assert.equal(p.minutes, 144)
+    assert.deepEqual(p.stamps.map((s) => [s.iata, s.visits]).sort(), [['BCN', 2], ['MAD', 1]])
+    assert.deepEqual(p.countries, ['ES'])
+  })
+
+  it('suma minutos por asignatura desde una fecha, abandonados incluidos', () => {
+    const by = minutesBySubject(list, at('2026-11-11T00:00:00.000Z'))
+    assert.equal(by.get('fis'), 60)
+    assert.equal(by.get('mat'), 48)
   })
 })

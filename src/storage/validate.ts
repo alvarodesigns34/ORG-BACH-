@@ -423,6 +423,11 @@ export function parseSession(raw: unknown): FocusSession | null {
       status !== 'en_vuelo' && isNum(raw.focusedMinutes) && raw.focusedMinutes >= 0
         ? raw.focusedMinutes
         : undefined,
+    layoverMinutes:
+      isNum(raw.layoverMinutes) && raw.layoverMinutes > 0 && raw.layoverMinutes <= 60
+        ? raw.layoverMinutes
+        : undefined,
+    layoverAt: isStamp(raw.layoverAt) ? raw.layoverAt : undefined,
     createdAt: isStamp(raw.createdAt) ? raw.createdAt : raw.startedAt,
   }
 }

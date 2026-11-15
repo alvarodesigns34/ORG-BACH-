@@ -25,6 +25,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 
 setWorkerUrl(workerUrl)
 
+import { buildStyle, type MapLookOptions } from './mapStyle'
 import {
   arc,
   bearing,
@@ -35,18 +36,18 @@ import {
   type LatLon,
 } from '@/domain/flights'
 
-export type MapLook = 'light' | 'dark'
+export type { MapLookOptions }
 
-const STYLE_URL: Record<MapLook, string> = {
-  light: 'https://tiles.openfreemap.org/styles/positron',
-  dark: 'https://tiles.openfreemap.org/styles/dark',
+/** Colores de lo que se dibuja encima, según el mapa de debajo. */
+function inkFor(look: MapLookOptions) {
+  if (look.kind === 'satelite' || look.tone === 'dark') {
+    return { accent: '#4da3ff', route: '#ffffff', muted: 'rgba(255, 255, 255, 0.42)', history: 'rgba(255,255,255,0.28)' }
+  }
+  return { accent: '#0064d2', route: '#0064d2', muted: 'rgba(0, 100, 210, 0.5)', history: 'rgba(0, 70, 150, 0.32)' }
 }
 
-/** Colores de lo que se dibuja encima, por estilo de mapa. */
-const INK: Record<MapLook, { accent: string; route: string; muted: string }> = {
-  light: { accent: '#0071e3', route: '#0071e3', muted: 'rgba(0, 113, 227, 0.45)' },
-  dark: { accent: '#5aa8ff', route: '#ffffff', muted: 'rgba(255, 255, 255, 0.38)' },
-}
+const sameLook = (a: MapLookOptions, b: MapLookOptions) =>
+  a.kind === b.kind && a.tone === b.tone && a.labels === b.labels
 
 export interface Padding {
   top: number
@@ -82,7 +83,7 @@ const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matc
 
 export class FlightMap {
   readonly map: MapLibreMap
-  private look: MapLook
+  private look: MapLookOptions
   private ready = false
   private queue: (() => void)[] = []
 
@@ -101,11 +102,11 @@ export class FlightMap {
   /** El usuario ha movido el mapa a mano: deja de seguir al avión. */
   onUserMove: (() => void) | null = null
 
-  constructor(container: HTMLElement, look: MapLook, center: LatLon) {
+  constructor(container: HTMLElement, look: MapLookOptions, center: LatLon) {
     this.look = look
     this.map = new MapLibreMap({
       container,
-      style: STYLE_URL[look],
+      style: buildStyle(look),
       center: ll(center),
       zoom: 4.6,
       attributionControl: { compact: true },
@@ -138,12 +139,11 @@ export class FlightMap {
     this.map.resize()
   }
 
-  setLook(look: MapLook): void {
-    if (look === this.look) return
+  setLook(look: MapLookOptions): void {
+    if (sameLook(look, this.look)) return
     this.look = look
     this.ready = false
-    this.map.setStyle(STYLE_URL[look], { diff: false })
-    this.map.getContainer().dataset.look = look
+    this.map.setStyle(buildStyle(look), { diff: false })
   }
 
   private whenReady(run: () => void) {
@@ -153,31 +153,27 @@ export class FlightMap {
 
   private addLayers() {
     const map = this.map
-    const ink = INK[this.look]
-    map.getContainer().dataset.look = this.look
+    const ink = inkFor(this.look)
+    map.getContainer().dataset.look =
+      this.look.kind === 'satelite' || this.look.tone === 'dark' ? 'dark' : 'light'
 
-    // Rótulos en español donde OpenStreetMap lo tiene («España», «Londres»).
-    for (const layer of map.getStyle().layers ?? []) {
-      if (layer.type !== 'symbol') continue
-      const field = map.getLayoutProperty(layer.id, 'text-field')
-      if (!field) continue
-      map.setLayoutProperty(layer.id, 'text-field', [
-        'coalesce',
-        ['get', 'name:es'],
-        ['get', 'name:latin'],
-        ['get', 'name'],
-      ])
-    }
-
+    map.addSource('history', { type: 'geojson', data: this.historyData() })
     map.addSource('range', { type: 'geojson', data: this.rangeData() })
     map.addSource('route-done', { type: 'geojson', data: this.lineData(this.routeDone) })
     map.addSource('route-todo', { type: 'geojson', data: this.lineData(this.routeTodo) })
 
     map.addLayer({
+      id: 'history',
+      type: 'line',
+      source: 'history',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': ink.history, 'line-width': 1.6 },
+    })
+    map.addLayer({
       id: 'range-fill',
       type: 'fill',
       source: 'range',
-      paint: { 'fill-color': ink.accent, 'fill-opacity': this.look === 'dark' ? 0.1 : 0.07 },
+      paint: { 'fill-color': ink.accent, 'fill-opacity': 0.09 },
     })
     map.addLayer({
       id: 'range-line',
@@ -207,6 +203,36 @@ export class FlightMap {
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-color': ink.route, 'line-width': 2.5, 'line-opacity': 0.95 },
     })
+  }
+
+  private history: [number, number][][] = []
+
+  private historyData(): FeatureCollection {
+    return {
+      type: 'FeatureCollection',
+      features: this.history.map((coordinates) => ({
+        type: 'Feature' as const,
+        properties: {},
+        geometry: { type: 'LineString' as const, coordinates },
+      })),
+    }
+  }
+
+  /** Todas las rutas voladas, finas, para el diario y el pasaporte. */
+  setHistory(routes: { from: LatLon; to: LatLon }[]): void {
+    this.history = routes.map((r) => arc(r.from, r.to, 0, 1, 48))
+    this.whenReady(() => this.source('history')?.setData(this.historyData()))
+  }
+
+  /** Encuadra un conjunto de puntos (el pasaporte entero). */
+  fitPoints(points: LatLon[], padding: Padding): void {
+    if (points.length === 0) return
+    if (points.length === 1) {
+      this.showPlace(points[0], 5, padding)
+      return
+    }
+    const camera = this.map.cameraForBounds(boundsOf(points.map(ll)), { padding, maxZoom: 6.5 })
+    if (camera) this.move({ ...camera, duration: 1200 }, true)
   }
 
   private rangeData(): FeatureCollection {
@@ -307,7 +333,11 @@ export class FlightMap {
    * La ruta: recorrida (línea continua) y por recorrer (discontinua). Con
    * `progress` = 0, toda discontinua.
    */
-  setRoute(origin: LatLon | null, dest: Airport | null, progress = 0): void {
+  setRoute(origin: LatLon | null, dest: Airport | null, progress = 0, label = true): void {
+    if (!label) {
+      this.destMarker?.remove()
+      this.destMarker = null
+    }
     if (!origin || !dest) {
       this.routeDone = []
       this.routeTodo = []
@@ -317,11 +347,16 @@ export class FlightMap {
       const p = Math.min(1, Math.max(0, progress))
       this.routeDone = p > 0 ? arc(origin, dest, 0, p) : []
       this.routeTodo = p < 1 ? arc(origin, dest, p, 1) : []
-      if (!this.destMarker) {
+      if (!label) {
+        // Sin etiqueta: en la reserva ya la pone la cápsula del destino.
+      } else if (!this.destMarker) {
         const el = document.createElement('div')
         el.className = 'fm-dest'
         el.textContent = dest.iata
-        this.destMarker = new Marker({ element: el }).setLngLat(ll(dest)).addTo(this.map)
+        // Encima del punto, no sobre él: el avión aterriza justo ahí.
+        this.destMarker = new Marker({ element: el, anchor: 'bottom', offset: [0, -10] })
+          .setLngLat(ll(dest))
+          .addTo(this.map)
       } else {
         this.destMarker.setLngLat(ll(dest))
         this.destMarker.getElement().textContent = dest.iata
