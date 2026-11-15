@@ -3,8 +3,8 @@ import { useId } from 'react'
 /**
  * Marca de la aplicación: Órbita.
  *
- * Un planeta con su órbita y un pequeño satélite: todo lo de tus estudios
- * girando a tu alrededor. La órbita pasa por delante del planeta en su mitad
+ * Un planeta con su órbita y un avión que la recorre: todo lo de tus
+ * estudios girando a tu alrededor, y el modo estudio en forma de vuelo. La órbita pasa por delante del planeta en su mitad
  * inferior (más opaca) y por detrás en la superior, para que tenga volumen.
  */
 export function BrandMark({ size = 30 }: { size?: number }) {
@@ -40,7 +40,10 @@ export function BrandMark({ size = 30 }: { size?: number }) {
         strokeWidth="1.35"
         strokeLinecap="round"
       />
-      <circle cx="22.2" cy="15.4" r="1.55" fill="#fff" />
+      {/* El avión que da la vuelta: el modo estudio dentro de la marca. */}
+      <g transform="translate(23.49 14.1) rotate(41) scale(0.118) translate(-32 -32)">
+        <path d="M32 3c2.2 0 3.6 2.6 3.6 6.4V24l20.4 12.2c.8.5 1.3 1.3 1.3 2.2v3.1L35.6 34.8V49l6.2 4.6c.4.3.7.8.7 1.3V58l-10.5-3-10.5 3v-3.1c0-.5.3-1 .7-1.3l6.2-4.6V34.8L6.7 41.5v-3.1c0-.9.5-1.7 1.3-2.2L28.4 24V9.4C28.4 5.6 29.8 3 32 3z" fill="#fff" stroke="#1a5fd0" strokeWidth="5" paintOrder="stroke" />
+      </g>
     </svg>
   )
 }
