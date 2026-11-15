@@ -486,50 +486,70 @@ function crickets(c: BaseAudioContext) {
 }
 
 /**
- * Trueno: un retumbo grave hecho de varios golpes que se encadenan (el
- * trueno «rueda»). Los cercanos empiezan con un chasquido seco; los lejanos
- * son solo un rumor sordo.
+ * Trueno. Tres capas, como uno de verdad:
+ * - Chasquido (solo los cercanos): un desgarro seco de ruido en medios y
+ *   agudos, con varias réplicas rápidas, que es lo que asusta.
+ * - Rodadura: golpes de ruido en 150–1500 Hz que se encadenan y vibran
+ *   (el trueno «rueda» por el cielo). Es la parte que se oye en un altavoz
+ *   pequeño; antes faltaba y el trueno solo era graves que el iPad no da.
+ * - Retumbo: el grave largo de fondo, para los cascos.
+ * Los lejanos no tienen chasquido y son más sordos y largos.
  */
 function thunder(c: BaseAudioContext): { buffer: AudioBuffer; near: boolean } {
-  const near = Math.random() < 0.45
-  const seconds = near ? rnd(7, 10) : rnd(8, 12)
+  const near = Math.random() < 0.5
+  const seconds = near ? rnd(7, 10) : rnd(9, 13)
   const buffer = stereo(c, seconds, (L, R, rate) => {
     const n = L.length
+    // Envolvente de la rodadura: golpes que llegan y se apagan, con un
+    // temblor rápido encima.
     const env = new Float32Array(n)
-    let t = near ? 0.12 : rnd(0.2, 0.8)
-    const lumps = Math.floor(rnd(5, 9))
+    let t = near ? 0.18 : rnd(0.3, 0.9)
+    const lumps = Math.floor(near ? rnd(8, 13) : rnd(6, 10))
     for (let k = 0; k < lumps; k++) {
-      const amp = (k === 0 ? 1 : rnd(0.35, 0.9)) * Math.exp(-k * 0.18)
-      const attack = rnd(0.05, 0.3)
-      const tau = rnd(0.5, 1.6)
+      const amp = (k === 0 ? 1 : rnd(0.35, 0.95)) * Math.exp(-k * (near ? 0.14 : 0.1))
+      const attack = rnd(0.03, near ? 0.15 : 0.35)
+      const tau = rnd(0.35, near ? 1.1 : 1.8)
       const start = Math.floor(t * rate)
       for (let i = start; i < n; i++) {
         const s = (i - start) / rate
         env[i] += amp * Math.min(1, s / attack) * Math.exp(-s / tau)
       }
-      t += rnd(0.15, 1.1)
+      t += rnd(0.12, near ? 0.7 : 1.1)
     }
+    const flutterHz = rnd(5, 11)
     for (const [ch, side] of [[L, 0], [R, 1]] as const) {
-      brownInto(ch, 5)
-      for (let i = 0; i < n; i++) ch[i] *= env[i]
-      biquad(ch, 'lp', near ? 190 : 95, 0.7, rate)
-      biquad(ch, 'lp', near ? 260 : 140, 0.7, rate)
+      // Rodadura (medios).
+      const roll = new Float32Array(n)
+      for (let i = 0; i < n; i++) roll[i] = Math.random() * 2 - 1
+      biquad(roll, 'bp', near ? 520 : 320, 0.55, rate)
+      biquad(roll, 'lp', near ? 1600 : 800, 0.7, rate)
+      // Retumbo (graves).
+      const body = new Float32Array(n)
+      brownInto(body, 5)
+      biquad(body, 'lp', near ? 220 : 140, 0.7, rate)
+      for (let i = 0; i < n; i++) {
+        const s = i / rate
+        const flutter = 0.72 + 0.28 * Math.sin(2 * Math.PI * flutterHz * s + side * 1.3)
+        ch[i] = (roll[i] * (near ? 1.4 : 1) * flutter + body[i] * 0.9) * env[i]
+      }
       if (near) {
-        // El chasquido inicial.
-        const len = Math.floor(rate * 0.45)
-        const crack = new Float32Array(len)
-        for (let i = 0; i < len; i++) {
-          const s = i / rate
-          crack[i] = (Math.random() * 2 - 1) * Math.exp(-s / 0.07) * (1 + 0.6 * Math.sin(s * 90 + side))
+        // El chasquido inicial y sus réplicas.
+        for (let k = 0; k < 4; k++) {
+          const len = Math.floor(rate * rnd(0.12, 0.35))
+          const crack = new Float32Array(len)
+          const tau = rnd(0.03, 0.08)
+          for (let i = 0; i < len; i++) crack[i] = (Math.random() * 2 - 1) * Math.exp(-i / rate / tau)
+          biquad(crack, 'hp', rnd(500, 900), 0.6, rate)
+          biquad(crack, 'lp', rnd(4500, 7000), 0.6, rate)
+          const at = Math.floor(rate * (0.04 + k * rnd(0.04, 0.12)))
+          addAt(ch, crack, at, k === 0 ? 2.2 : rnd(0.7, 1.3))
         }
-        biquad(crack, 'bp', 1400, 0.5, rate)
-        addAt(ch, crack, Math.floor(rate * 0.05), 1.1)
       }
       let peak = 0
       for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(ch[i]))
       const scale = peak > 0 ? 0.95 / peak : 1
       for (let i = 0; i < n; i++) ch[i] *= scale
-      seam(ch, rate, 0.3)
+      seam(ch, rate, 0.4)
     }
   })
   return { buffer, near }
@@ -651,21 +671,33 @@ const BUILD: Record<SoundId, Build> = {
   lluvia: (c, out) => rainLayer(c, out, false),
 
   tormenta: (c, out) => {
-    const stopRain = rainLayer(c, out, true)
-    const stopWind = windLayer(c, out, 0.45)
-    // Truenos: el primero enseguida (para que se sepa qué es), luego cada
-    // 18–40 s, unos cerca y otros lejos.
+    // La lluvia y el viento van por su propio canal para poder bajarlos un
+    // momento cuando truena: así el trueno se oye por encima.
+    // La lluvia, de fondo (no a tope): deja margen para que el trueno se
+    // oiga muy por encima sin que el limitador lo aplaste.
+    const BED = 0.45
+    const bed = gain(c, BED)
+    bed.connect(out)
+    const stopRain = rainLayer(c, bed, true)
+    const stopWind = windLayer(c, bed, 0.5)
     let timer = 0
     const strike = () => {
       const { buffer, near } = thunder(c)
       const src = c.createBufferSource()
       src.buffer = buffer
-      const g = gain(c, near ? rnd(1.3, 1.7) : rnd(0.8, 1.1))
+      const g = gain(c, near ? rnd(3, 3.6) : rnd(2.3, 2.7))
       src.connect(g).connect(out)
+      const t = c.currentTime
+      bed.gain.cancelScheduledValues(t)
+      bed.gain.setValueAtTime(bed.gain.value, t)
+      bed.gain.linearRampToValueAtTime(BED * (near ? 0.55 : 0.75), t + 0.08)
+      bed.gain.setValueAtTime(BED * (near ? 0.55 : 0.75), t + 1.5)
+      bed.gain.linearRampToValueAtTime(BED, t + 5)
       src.start()
-      timer = window.setTimeout(strike, rnd(18000, 40000))
+      // El primero enseguida, para que se sepa qué es; luego cada 10–25 s.
+      timer = window.setTimeout(strike, rnd(10000, 25000))
     }
-    timer = window.setTimeout(strike, rnd(3500, 6000))
+    timer = window.setTimeout(strike, rnd(2000, 4000))
     return () => {
       window.clearTimeout(timer)
       stopRain()
@@ -859,7 +891,7 @@ export async function renderSound(
     const src = c.createBufferSource()
     src.buffer = thunder(c).buffer
     const g = c.createGain()
-    g.gain.value = 1.5
+    g.gain.value = 3.3
     src.connect(g).connect(out)
     src.start(4)
   }

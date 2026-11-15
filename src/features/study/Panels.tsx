@@ -193,7 +193,7 @@ function Summary({
 
   return (
     <>
-      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
+      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar page-enter">
         <div className="px-6 pt-6">
           <p className="text-[0.875rem] font-medium text-ink-3">Estás en</p>
           <h1 className="display text-[2.75rem] leading-[1.02] mt-0.5 tracking-[-0.03em]">{origin.city}</h1>
@@ -644,7 +644,14 @@ export function BookingPanel({
             const reachable = d.minutes >= MIN_MINUTES && d.minutes <= MAX_MINUTES
             const isSelected = selected?.airport.iata === d.airport.iata
             return (
-              <li key={d.airport.iata}>
+              // Al mover la regla, los destinos se recolocan deslizándose.
+              <motion.li
+                key={d.airport.iata}
+                layout="position"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={spring.snappy}
+              >
                 <button
                   type="button"
                   disabled={!reachable}
@@ -687,7 +694,7 @@ export function BookingPanel({
                     {formatFlightTime(d.minutes)}
                   </span>
                 </button>
-              </li>
+              </motion.li>
             )
           })}
           {searching && query && results.length === 0 && (

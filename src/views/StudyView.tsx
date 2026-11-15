@@ -30,6 +30,7 @@ import { haptic } from '@/ui/motion'
 import { useToast } from '@/ui/Toast'
 import { AIRPORTS, AIRPORT_BY_IATA } from '@/features/study/airports'
 import { FlightMap, type Padding } from '@/features/study/flightMap'
+import { mapEdgeColor } from '@/features/study/mapStyle'
 import { BookingPanel, HomePanel, PANEL_WIDTH, SidePanel, type HomeTab } from '@/features/study/Panels'
 import { SeatPicker, type SeatChoice } from '@/features/study/SeatPicker'
 import { BoardingPass, Takeoff } from '@/features/study/BoardingPass'
@@ -140,6 +141,22 @@ export default function StudyView() {
     mapRef.current?.setLook(look)
   }, [look])
 
+  // La barra de estado del iPad toma el color del mapa (no el gris claro de
+  // la app) mientras dure el modo estudio; al salir se deja como estaba.
+  useEffect(() => {
+    const metas = [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')]
+    const before = metas.map((m) => m.getAttribute('content'))
+    const color = mapEdgeColor(look)
+    for (const m of metas) m.setAttribute('content', color)
+    const html = document.documentElement
+    const bg = html.style.backgroundColor
+    html.style.backgroundColor = color
+    return () => {
+      metas.forEach((m, i) => before[i] !== null && m.setAttribute('content', before[i]!))
+      html.style.backgroundColor = bg
+    }
+  }, [look])
+
   // --- Sesión en el aire (también si despegó en otro dispositivo) ---
   const sessionShown =
     active ?? (landedId ? data.sessions.find((s) => s.id === landedId) : undefined)
@@ -239,7 +256,6 @@ export default function StudyView() {
       map.setRange(null, 0)
       map.clearPins()
       map.setPlane(null, null, 0)
-      map.setOrigin(origin)
       map.setRoute(null, null)
       if (tab === 'resumen') {
         map.setHistory([])
@@ -255,7 +271,6 @@ export default function StudyView() {
     if (stage === 'reserva') {
       map.setHistory([])
       map.setPlane(null, null, 0)
-      map.setOrigin(origin)
       map.setRange(origin, kmFor(minutes))
       map.setPins(candidates, selected?.airport.iata ?? null, (iata) => {
         const airport = AIRPORT_BY_IATA.get(iata)
@@ -287,7 +302,6 @@ export default function StudyView() {
     map.clearPins()
     map.setRange(null, 0)
     map.setHistory([])
-    map.setOrigin(flightFrom)
     map.setRoute(flightFrom, flightTo, prog)
     const here = map.setPlane(flightFrom, flightTo, prog)
     if (!here) return
@@ -618,7 +632,7 @@ export default function StudyView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[5] pointer-events-none bg-black/30"
+            className="absolute inset-0 z-[5] pointer-events-none bg-black/12"
           />
         )}
       </AnimatePresence>

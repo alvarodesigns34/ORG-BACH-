@@ -5,6 +5,7 @@ import { StoreProvider } from '@/state/StoreProvider'
 import { useTaskSummary } from '@/state/selectors'
 import { useRoute, type Route, type RouteId } from '@/router'
 import { AppShell, StorageBanner } from '@/layout/AppShell'
+import { BrandMark } from '@/layout/Brand'
 import { TaskEditor } from '@/features/tasks/TaskEditor'
 import { ExamEditor } from '@/features/exams/ExamEditor'
 import { GradeEditor } from '@/features/grades/GradeEditor'
@@ -168,7 +169,7 @@ function renderRoute(route: Route, subjectCount: number) {
       return <CalendarView />
     case 'estudio':
       return (
-        <Suspense fallback={null}>
+        <Suspense fallback={<StudyLoading />}>
           <StudyView />
         </Suspense>
       )
@@ -190,4 +191,25 @@ function renderRoute(route: Route, subjectCount: number) {
     default:
       return <DashboardView hasSubjects={subjectCount > 0} />
   }
+}
+
+/**
+ * Mientras se descarga el modo estudio (mapa y aeropuertos), en lugar de
+ * una pantalla vacía: el color del mapa y la marca latiendo.
+ */
+function StudyLoading() {
+  return (
+    <div
+      role="status"
+      aria-label="Cargando el modo estudio"
+      className="fixed inset-0 z-[35] grid place-items-center bg-[#e6e3dc] dark:bg-[#2e3036]"
+    >
+      <div className="flex flex-col items-center gap-4 animate-fade">
+        <span className="animate-[pulse-soft_1.6s_var(--ease-std)_infinite]">
+          <BrandMark size={64} />
+        </span>
+        <span className="text-[0.875rem] font-medium text-ink-3">Preparando el mapa…</span>
+      </div>
+    </div>
+  )
 }

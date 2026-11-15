@@ -104,6 +104,10 @@ export class FlightMap {
 
   constructor(container: HTMLElement, look: MapLookOptions, center: LatLon) {
     this.look = look
+    // El mapa aparece con un fundido cuando ya tiene teselas, no como un
+    // lienzo gris que se va rellenando a trozos.
+    container.style.opacity = '0'
+    container.style.transition = 'opacity 700ms cubic-bezier(0.2, 0, 0, 1)'
     this.map = new MapLibreMap({
       container,
       style: buildStyle(look),
@@ -117,6 +121,12 @@ export class FlightMap {
       fadeDuration: 150,
     })
     this.map.touchZoomRotate.disableRotation()
+    const reveal = () => {
+      container.style.opacity = '1'
+    }
+    this.map.once('load', reveal)
+    // Sin red, las teselas no llegan: a los 2,5 s se muestra igualmente.
+    window.setTimeout(reveal, 2500)
     this.map.on('style.load', () => {
       this.addLayers()
       this.ready = true

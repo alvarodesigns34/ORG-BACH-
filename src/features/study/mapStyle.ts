@@ -56,16 +56,18 @@ const PALETTE: Record<MapTone, Palette> = {
     halo: 'rgba(230, 227, 220, 0.9)',
     waterLabel: '#6a87a1',
   },
+  // Noche con contraste: tierra gris pizarra y mar azul noche bien
+  // distintos (antes los dos eran casi negros y no se distinguía la costa).
   dark: {
-    land: '#1d1d20',
-    water: '#0c1620',
-    wood: '#20241e',
-    ice: '#2a2b2e',
-    border: '#4b4b52',
-    label: '#7d7d84',
-    labelStrong: '#b4b4ba',
-    halo: 'rgba(29, 29, 32, 0.9)',
-    waterLabel: '#4f6a82',
+    land: '#2e3036',
+    water: '#0d1b2b',
+    wood: '#30362f',
+    ice: '#3a3c42',
+    border: '#6b6d76',
+    label: '#a3a4ad',
+    labelStrong: '#d2d3da',
+    halo: 'rgba(46, 48, 54, 0.92)',
+    waterLabel: '#5f82a3',
   },
 }
 
@@ -261,4 +263,14 @@ export function buildStyle({ kind, tone, labels }: MapLookOptions): StyleSpecifi
     sources,
     layers,
   }
+}
+
+/**
+ * Color con el que el sistema debe fundir la barra de estado sobre el mapa.
+ * iPadOS/iOS tiñen el borde superior de las apps web con el «theme-color»;
+ * con el gris claro de la interfaz salía una mancha blanca sobre el mapa.
+ */
+export function mapEdgeColor({ kind, tone }: Pick<MapLookOptions, 'kind' | 'tone'>): string {
+  if (kind === 'satelite') return '#1d2a33'
+  return PALETTE[tone].land
 }
