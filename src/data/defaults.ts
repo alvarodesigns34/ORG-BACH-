@@ -54,6 +54,7 @@ export function createEmptyData(): AppData {
     events: [],
     goals: [],
     activity: [],
+    sessions: [],
   }
 }
 

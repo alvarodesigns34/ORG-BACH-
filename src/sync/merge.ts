@@ -28,6 +28,7 @@ import { DEFAULT_SETTINGS } from '../data/defaults.ts'
 import type { AppData, Settings } from '../domain/types.ts'
 import {
   parseActivity,
+  parseSession,
   parseEvent,
   parseExam,
   parseGoal,
@@ -46,6 +47,9 @@ export const ENTITY_COLLECTIONS = [
   'events',
   'goals',
   'activity',
+  // Los vuelos del modo estudio. El nombre es el que el servidor ya admitía
+  // para las sesiones de estudio; las antiguas, sin ruta, no pasan el validador.
+  'sessions',
 ] as const
 
 export type EntityCollection = (typeof ENTITY_COLLECTIONS)[number]
@@ -263,6 +267,7 @@ const PARSERS: Record<EntityCollection, (raw: unknown) => { id: string } | null>
   events: parseEvent,
   goals: parseGoal,
   activity: parseActivity,
+  sessions: parseSession,
 }
 
 function isEntityCollection(value: string): value is EntityCollection {

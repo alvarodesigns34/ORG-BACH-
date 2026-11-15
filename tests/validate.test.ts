@@ -289,7 +289,9 @@ describe('sanitizeSettings', () => {
     assert.equal(report.totalDropped, 0)
     assert.deepEqual(report.data.goals.map((g) => g.id), ['g2'])
     assert.equal(report.data.activity.length, 0)
-    assert.equal('sessions' in report.data, false)
+    // La colección existe ahora para los vuelos del modo estudio, pero las
+    // sesiones del temporizador antiguo no entran (ni cuentan como rotas).
+    assert.deepEqual(report.data.sessions, [])
     assert.equal('pomodoroMinutes' in report.data.settings, false)
   })
 

@@ -12,6 +12,7 @@ export type RouteId =
   | 'inicio'
   | 'tareas'
   | 'calendario'
+  | 'estudio'
   | 'asignaturas'
   | 'notas'
   | 'examenes'
@@ -23,6 +24,7 @@ export const ROUTE_IDS: RouteId[] = [
   'inicio',
   'tareas',
   'calendario',
+  'estudio',
   'asignaturas',
   'notas',
   'examenes',

@@ -28,6 +28,7 @@ import type {
   Subject,
   Subtask,
   Task,
+  FocusSession,
   TermId,
 } from '../domain/types.ts'
 
@@ -285,6 +286,7 @@ export function parseActivity(raw: unknown): ActivityEntry | null {
       'examen_creado',
       'asignatura_creada',
       'objetivo_creado',
+      'vuelo_aterrizado',
     )(raw.kind)
       ? raw.kind
       : 'tarea_creada',
@@ -390,4 +392,37 @@ export function parseCollection<T extends { id: string }>(
   }
 
   return { items, dropped }
+}
+
+export function parseSession(raw: unknown): FocusSession | null {
+  // Las sesiones del antiguo temporizador no traen ruta: no son vuelos.
+  if (!isRow(raw) || !isId(raw.id) || raw.kind !== 'vuelo') return null
+  const iata = (v: unknown) => typeof v === 'string' && /^[A-Z0-9]{3}$/.test(v)
+  if (!iata(raw.from) || !iata(raw.to) || !isStamp(raw.startedAt)) return null
+  if (!isNum(raw.plannedMinutes) || raw.plannedMinutes <= 0) return null
+  const status = oneOf('en_vuelo', 'aterrizado', 'cancelado')(raw.status) ? raw.status : 'cancelado'
+  const ended = isStamp(raw.endedAt) ? raw.endedAt : undefined
+  return {
+    id: raw.id,
+    kind: 'vuelo',
+    from: raw.from as string,
+    to: raw.to as string,
+    distanceKm: isNum(raw.distanceKm) && raw.distanceKm >= 0 ? raw.distanceKm : 0,
+    plannedMinutes: Math.min(raw.plannedMinutes, 24 * 60),
+    seat: isText(raw.seat) && raw.seat.length <= 4 ? raw.seat : '01A',
+    subjectId: optId(raw.subjectId),
+    taskId: optId(raw.taskId),
+    status,
+    startedAt: raw.startedAt,
+    pausedMs: isNum(raw.pausedMs) && raw.pausedMs >= 0 ? raw.pausedMs : 0,
+    // Una pausa abierta solo tiene sentido en un vuelo en el aire.
+    pausedAt: status === 'en_vuelo' && isStamp(raw.pausedAt) ? raw.pausedAt : undefined,
+    // Un vuelo cerrado sin hora de cierre se cierra en su hora de salida.
+    endedAt: status === 'en_vuelo' ? undefined : (ended ?? raw.startedAt),
+    focusedMinutes:
+      status !== 'en_vuelo' && isNum(raw.focusedMinutes) && raw.focusedMinutes >= 0
+        ? raw.focusedMinutes
+        : undefined,
+    createdAt: isStamp(raw.createdAt) ? raw.createdAt : raw.startedAt,
+  }
 }

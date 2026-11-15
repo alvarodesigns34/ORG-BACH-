@@ -1,0 +1,201 @@
+/* ==========================================================================
+   Modo estudio: piezas del mapa y de la cabina.
+   ========================================================================== */
+
+.study-map {
+  transition: filter 600ms var(--ease-std);
+}
+.study-map.is-paused {
+  filter: saturate(0.4) brightness(0.85);
+}
+
+/* Sobre un mapa lleno de rótulos, el cristal fino deja leer lo de debajo a
+   través de la tarjeta. Aquí el material es el «grueso» de Apple Mapas: más
+   opaco y con más desenfoque. */
+.study-root .liquid {
+  background:
+    linear-gradient(180deg, var(--glass-sheen), transparent 46%),
+    color-mix(in srgb, var(--c-surface) 80%, transparent);
+  -webkit-backdrop-filter: blur(32px) saturate(180%);
+  backdrop-filter: blur(32px) saturate(180%);
+}
+
+/* Atribución del mapa, discreta y en el idioma visual de la app. */
+.study-root .maplibregl-ctrl-attrib {
+  font: 500 10px/1.4 var(--font-sans);
+  background: color-mix(in srgb, var(--c-surface) 70%, transparent) !important;
+  border-radius: 999px !important;
+}
+.study-root .maplibregl-ctrl-attrib a {
+  color: var(--c-ink-3);
+}
+.study-root .maplibregl-ctrl-bottom-right {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
+}
+
+/* --- Origen: punto con pulso, como «tu ubicación» en Mapas --- */
+.fm-origin {
+  position: relative;
+  width: 18px;
+  height: 18px;
+}
+.fm-origin-dot {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--c-accent-fill);
+  border: 3px solid #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
+}
+.fm-origin-pulse {
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c-accent-fill) 30%, transparent);
+  animation: fm-pulse 2.4s var(--ease-out) infinite;
+}
+@keyframes fm-pulse {
+  from {
+    transform: scale(0.35);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+/* --- Destinos posibles: cápsulas con el código IATA --- */
+.fm-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--c-surface);
+  color: var(--c-ink);
+  font: 700 11px/1 ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.04em;
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 0.12),
+    0 2px 6px rgb(0 0 0 / 0.14);
+  cursor: pointer;
+  transition:
+    transform 320ms var(--spring),
+    background-color 160ms var(--ease-std),
+    color 160ms var(--ease-std);
+  animation: pop 320ms var(--spring) both;
+}
+.fm-pin:hover {
+  transform: scale(1.08);
+}
+.fm-pin.is-selected {
+  background: var(--c-accent-fill);
+  color: #fff;
+  transform: scale(1.12);
+  height: 28px;
+  padding: 0 10px;
+}
+.fm-pin-city {
+  font: 600 12px/1 var(--font-sans);
+  letter-spacing: -0.01em;
+}
+.fm-pin-city:empty {
+  display: none;
+}
+
+/* --- Destino de la ruta --- */
+.fm-dest {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--c-accent-fill);
+  color: #fff;
+  font: 700 12px/1 ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.04em;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+}
+
+/* --- El avión --- */
+.fm-plane {
+  width: 34px;
+  height: 34px;
+  color: #fff;
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.45)) drop-shadow(0 8px 14px rgb(0 0 0 / 0.3));
+}
+.fm-plane svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+.study-map[data-look='light'] .fm-plane {
+  color: var(--c-accent-fill);
+}
+
+/* --- Fuselaje (selección de asiento) --- */
+.fuselage {
+  background:
+    linear-gradient(
+      90deg,
+      rgb(0 0 0 / 0.07),
+      transparent 14%,
+      transparent 86%,
+      rgb(0 0 0 / 0.07)
+    ),
+    var(--c-surface);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.6),
+    0 2px 6px rgb(0 0 0 / 0.06),
+    0 30px 70px rgb(0 0 0 / 0.22);
+}
+[data-theme='dark'] .fuselage {
+  background:
+    linear-gradient(90deg, rgb(0 0 0 / 0.35), transparent 14%, transparent 86%, rgb(0 0 0 / 0.35)),
+    var(--c-raised);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 30px 70px rgb(0 0 0 / 0.6);
+}
+.cockpit-window {
+  display: block;
+  width: 40px;
+  height: 26px;
+  border-radius: 10px 10px 6px 6px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c-ink) 55%, transparent), color-mix(in srgb, var(--c-ink) 30%, transparent));
+}
+.seat {
+  background: var(--c-sunken);
+  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.06);
+}
+.seat:hover {
+  background: color-mix(in srgb, var(--c-accent-fill) 18%, var(--c-sunken));
+}
+.seat.is-selected {
+  background: var(--c-accent-fill);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--c-accent-fill) 45%, transparent);
+}
+
+/* --- Tarjeta de embarque --- */
+.pass-texture {
+  background-image: radial-gradient(color-mix(in srgb, var(--c-ink) 9%, transparent) 1px, transparent 1.2px);
+  background-size: 9px 9px;
+  -webkit-mask-image: radial-gradient(70% 90% at 75% 20%, #000, transparent 70%);
+  mask-image: radial-gradient(70% 90% at 75% 20%, #000, transparent 70%);
+}
+/* Línea perforada con las dos muescas de los lados. */
+.pass-perforation {
+  -webkit-mask:
+    radial-gradient(circle 10px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 10px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle 10px at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle 10px at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+}
+.pass-perforation::after {
+  content: '';
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  top: 50%;
+  border-top: 2px dashed var(--c-hairline-strong);
+}

@@ -16,6 +16,7 @@ import { DEFAULT_SETTINGS } from '../data/defaults.ts'
 import type { AppData } from '../domain/types.ts'
 import {
   parseActivity,
+  parseSession,
   parseCollection,
   parseEvent,
   parseExam,
@@ -40,6 +41,7 @@ const COLLECTIONS = [
   'events',
   'goals',
   'activity',
+  'sessions',
 ] as const
 
 /** Validadores de cada colección, en el orden en que se aplican. */
@@ -51,6 +53,7 @@ const PARSERS = {
   events: parseEvent,
   goals: parseGoal,
   activity: parseActivity,
+  sessions: parseSession,
 } as const
 
 export interface MigrateReport {
@@ -78,6 +81,12 @@ function withoutStudy(input: Record<string, unknown>): Record<string, unknown> {
     ...input,
     goals: keep(input.goals, 'horas_estudio'),
     activity: keep(input.activity, 'estudio_registrado'),
+    // Las sesiones del antiguo temporizador no son vuelos: fuera sin contar.
+    sessions: Array.isArray(input.sessions)
+      ? input.sessions.filter(
+          (item) => item && typeof item === 'object' && (item as { kind?: unknown }).kind === 'vuelo',
+        )
+      : input.sessions,
   }
 }
 

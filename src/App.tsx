@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useSettings, useStore } from '@/state/StoreProvider'
 import { StoreProvider } from '@/state/StoreProvider'
@@ -20,6 +20,10 @@ import { ExamsView } from '@/views/ExamsView'
 import { StatsView } from '@/views/StatsView'
 import { GoalsView } from '@/views/GoalsView'
 import { SettingsView } from '@/views/SettingsView'
+
+// El modo estudio trae su propio mapa (MapLibre) y los aeropuertos: se
+// descarga solo al entrar, para que el resto de la app no cargue con él.
+const StudyView = lazy(() => import('@/views/StudyView'))
 import { Button } from '@/ui/primitives'
 import { LinkChoiceDialog, RecoveryDialog } from '@/features/account/Account'
 import { syncEngine } from '@/sync/engine'
@@ -162,6 +166,12 @@ function renderRoute(route: Route, subjectCount: number) {
       return <TasksView />
     case 'calendario':
       return <CalendarView />
+    case 'estudio':
+      return (
+        <Suspense fallback={null}>
+          <StudyView />
+        </Suspense>
+      )
     case 'asignaturas': {
       const id = route.params.get('id')
       return id ? <SubjectDetailView subjectId={id} /> : <SubjectsView />

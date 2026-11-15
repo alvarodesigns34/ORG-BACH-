@@ -20,6 +20,7 @@ import type {
   Goal,
   ID,
   Settings,
+  FocusSession,
   Subject,
   Task,
 } from '../domain/types.ts'
@@ -49,6 +50,19 @@ export type Action =
   | { type: 'task/toggle'; id: ID }
   /** «Mi orden»: `ids` en su nuevo orden (puede ser solo la parte visible). */
   | { type: 'task/reorder'; ids: ID[] }
+  | {
+      type: 'session/start'
+      session: Pick<
+        FocusSession,
+        'from' | 'to' | 'distanceKm' | 'plannedMinutes' | 'seat' | 'subjectId' | 'taskId'
+      >
+      /** El texto de la actividad: «Madrid → Barcelona». */
+      route?: string
+    }
+  | { type: 'session/pause'; id: ID }
+  | { type: 'session/resume'; id: ID }
+  | { type: 'session/land'; id: ID; route?: string }
+  | { type: 'session/cancel'; id: ID }
   | { type: 'grade/add'; grade: New<GradeEntry>; linkExamId?: ID }
   | { type: 'grade/update'; id: ID; patch: Partial<GradeEntry> }
   | { type: 'grade/remove'; id: ID }
@@ -177,6 +191,10 @@ export function reducer(state: AppData, action: Action): AppData {
         subjects: state.subjects.filter((s) => s.id !== action.id),
         grades: state.grades.filter((g) => g.subjectId !== action.id),
         exams: state.exams.filter((e) => e.subjectId !== action.id),
+        // Los vuelos son tiempo estudiado de verdad: se quedan, sin asignatura.
+        sessions: state.sessions.map((s) =>
+          s.subjectId === action.id ? { ...s, subjectId: undefined } : s,
+        ),
         tasks: state.tasks.map((t) =>
           t.subjectId === action.id ? { ...t, subjectId: undefined } : t,
         ),
@@ -296,6 +314,87 @@ export function reducer(state: AppData, action: Action): AppData {
         return { ...task, order }
       })
       return changed ? { ...state, tasks } : state
+    }
+
+    // --- Modo estudio ---
+
+    case 'session/start': {
+      // Un solo vuelo en el aire: el otro dispositivo pudo despegar antes.
+      if (state.sessions.some((s) => s.status === 'en_vuelo')) return state
+      const now = nowISO()
+      const session: FocusSession = {
+        ...action.session,
+        id: newId('vuelo'),
+        kind: 'vuelo',
+        status: 'en_vuelo',
+        startedAt: now,
+        pausedMs: 0,
+        createdAt: now,
+      }
+      return { ...state, sessions: [...state.sessions, session] }
+    }
+
+    case 'session/pause': {
+      const s = state.sessions.find((x) => x.id === action.id)
+      if (!s || s.status !== 'en_vuelo' || s.pausedAt) return state
+      return { ...state, sessions: patchById(state.sessions, s.id, { pausedAt: nowISO() }) }
+    }
+
+    case 'session/resume': {
+      const s = state.sessions.find((x) => x.id === action.id)
+      if (!s || s.status !== 'en_vuelo' || !s.pausedAt) return state
+      const paused = Math.max(0, Date.now() - Date.parse(s.pausedAt))
+      return {
+        ...state,
+        sessions: patchById(state.sessions, s.id, {
+          pausedAt: undefined,
+          pausedMs: s.pausedMs + paused,
+        }),
+      }
+    }
+
+    case 'session/land': {
+      const s = state.sessions.find((x) => x.id === action.id)
+      if (!s || s.status !== 'en_vuelo') return state
+      // La hora real de aterrizaje, no la de ahora: si el iPad estuvo
+      // bloqueado, el vuelo terminó cuando tocaba y así cuenta en su día.
+      const pausedOpen = s.pausedAt ? Date.now() - Date.parse(s.pausedAt) : 0
+      const landed = Math.min(
+        Date.now(),
+        Date.parse(s.startedAt) + s.pausedMs + pausedOpen + s.plannedMinutes * 60_000,
+      )
+      const subject = subjectName(state, s.subjectId)
+      return {
+        ...state,
+        sessions: patchById(state.sessions, s.id, {
+          status: 'aterrizado',
+          pausedAt: undefined,
+          endedAt: new Date(landed).toISOString(),
+          focusedMinutes: s.plannedMinutes,
+        }),
+        activity: logActivity(
+          state,
+          'vuelo_aterrizado',
+          `Vuelo ${action.route ?? `${s.from} → ${s.to}`}${subject ? ` · ${subject}` : ''}`,
+          s.subjectId,
+        ),
+      }
+    }
+
+    case 'session/cancel': {
+      const s = state.sessions.find((x) => x.id === action.id)
+      if (!s || s.status !== 'en_vuelo') return state
+      const end = s.pausedAt ? Date.parse(s.pausedAt) : Date.now()
+      const minutes = Math.floor(Math.max(0, end - Date.parse(s.startedAt) - s.pausedMs) / 60_000)
+      return {
+        ...state,
+        sessions: patchById(state.sessions, s.id, {
+          status: 'cancelado',
+          pausedAt: undefined,
+          endedAt: new Date(end).toISOString(),
+          focusedMinutes: Math.min(minutes, s.plannedMinutes),
+        }),
+      }
     }
 
     // --- Subtareas ---

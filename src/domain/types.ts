@@ -253,6 +253,7 @@ export type ActivityKind =
   | 'examen_creado'
   | 'asignatura_creada'
   | 'objetivo_creado'
+  | 'vuelo_aterrizado'
 
 export interface ActivityEntry {
   id: ID
@@ -316,6 +317,44 @@ export interface Settings {
   onboarded: boolean
 }
 
+// ---------------------------------------------------------------------------
+// Modo estudio: sesiones como vuelos
+// ---------------------------------------------------------------------------
+
+export type FocusSessionStatus = 'en_vuelo' | 'aterrizado' | 'cancelado'
+
+/**
+ * Una sesión de estudio, contada como un vuelo de `from` a `to`.
+ *
+ * El tiempo no se guarda segundo a segundo: se deduce de `startedAt`, de las
+ * pausas acumuladas y de la hora actual. Así cerrar la app, bloquear el iPad o
+ * abrirla en el ordenador no para ni descuadra el vuelo.
+ */
+export interface FocusSession {
+  id: ID
+  /** Marca de esquema: distingue los vuelos de las sesiones del antiguo temporizador. */
+  kind: 'vuelo'
+  /** Códigos IATA de origen y destino. */
+  from: string
+  to: string
+  distanceKm: number
+  plannedMinutes: number
+  /** «03C». */
+  seat: string
+  subjectId?: ID
+  taskId?: ID
+  status: FocusSessionStatus
+  startedAt: TimestampISO
+  /** Milisegundos pasados en pausa (las pausas ya cerradas). */
+  pausedMs: number
+  /** En pausa desde este instante. */
+  pausedAt?: TimestampISO
+  endedAt?: TimestampISO
+  /** Minutos de estudio efectivos, fijados al aterrizar o abandonar. */
+  focusedMinutes?: number
+  createdAt: TimestampISO
+}
+
 export interface AppData {
   /** Version del esquema. La usa el migrador al cargar. */
   version: number
@@ -327,4 +366,5 @@ export interface AppData {
   events: CalendarEvent[]
   goals: Goal[]
   activity: ActivityEntry[]
+  sessions: FocusSession[]
 }
