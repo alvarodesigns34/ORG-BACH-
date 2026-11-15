@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react'
-import { ClipboardList } from 'lucide-react'
+import { CalendarPlus, ClipboardList } from 'lucide-react'
 
-import { MONTHS_LONG, parseDay, WEEKDAYS_LONG } from '@/domain/dates'
+import { MONTHS_LONG, daysUntil, parseDay, WEEKDAYS_LONG } from '@/domain/dates'
 import { colorVar, quietVar } from '@/domain/palette'
 import { TERMS, termName, type Exam, type GradeEntry, type Subject, type TermId } from '@/domain/types'
 import { useSettings, useStore, useToday } from '@/state/StoreProvider'
 import { useSubjectMap } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
 import { ExamEditor } from '@/features/exams/ExamEditor'
-import { Card, EmptyState, GroupTitle, Segmented, cx } from '@/ui/primitives'
+import { Button, Card, EmptyState, GroupTitle, Segmented, cx } from '@/ui/primitives'
 
 type Scope = TermId | 'todas'
 type Order = 'fecha' | 'asignatura'
@@ -28,8 +28,16 @@ function scoreText(grade: GradeEntry, decimals: number): string {
   return grade.maxScore === 10 ? fmt(grade.score) : `${fmt(grade.score)} / ${fmt(grade.maxScore)}`
 }
 
+/** «Hoy», «Mañana», «En 4 días». */
+function countdown(days: number): string {
+  if (days <= 0) return 'Hoy'
+  if (days === 1) return 'Mañana'
+  return `En ${days} días`
+}
+
 /**
- * Exámenes ya hechos, por evaluación, y dentro de cada una por fecha o por
+ * Arriba, los próximos (con su cuenta atrás); debajo, los ya hechos, por
+ * evaluación, y dentro de cada una por fecha o por
  * asignatura. «Hecho» = su fecha ya llegó o ya tiene la nota apuntada; los
  * que están por venir se ven en Inicio y en Calendario.
  */
@@ -42,11 +50,20 @@ export function ExamsView() {
   const [scope, setScope] = useState<Scope>(settings.activeTerm)
   const [order, setOrder] = useState<Order>('fecha')
   const [editing, setEditing] = useState<Exam | null>(null)
+  const [creating, setCreating] = useState(false)
 
   const grades = useMemo(() => new Map(data.grades.map((g) => [g.id, g])), [data.grades])
 
   const done = useMemo(
     () => data.exams.filter((e) => e.date <= today || (e.gradeEntryId && grades.has(e.gradeEntryId))),
+    [data.exams, grades, today],
+  )
+
+  const upcoming = useMemo(
+    () =>
+      data.exams
+        .filter((e) => e.date > today && !(e.gradeEntryId && grades.has(e.gradeEntryId)))
+        .sort(byDate),
     [data.exams, grades, today],
   )
 
@@ -101,6 +118,12 @@ export function ExamsView() {
     <Page className="max-w-[900px]">
       <PageHeader
         title="Exámenes"
+        actions={
+          <Button variant="primary" onClick={() => setCreating(true)} className="max-lg:hidden">
+            <CalendarPlus className="size-4" strokeWidth={2.3} />
+            Nuevo examen
+          </Button>
+        }
         subtitle={
           total > 0
             ? `${total} ${total === 1 ? 'examen hecho' : 'exámenes hechos'} · ${termName(scope)}`
@@ -130,9 +153,58 @@ export function ExamsView() {
         }
       />
 
+      {upcoming.length > 0 && (
+        <section aria-label="Próximos exámenes" className="mb-8">
+          <GroupTitle title="Próximos" hint={`${upcoming.length} ${upcoming.length === 1 ? 'examen' : 'exámenes'}`} />
+          <ul className="card overflow-hidden">
+            {upcoming.map((exam, i) => {
+              const subject = subjects.get(exam.subjectId)
+              const days = daysUntil(exam.date, today)
+              const near = days <= 3
+              return (
+                <li key={exam.id} className={cx(i > 0 && 'inset-separator-wide')}>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(exam)}
+                    className="w-full text-left flex items-center gap-3.5 pl-4 pr-4 py-3 transition-colors duration-150 active:bg-fill hover:bg-fill/50"
+                  >
+                    <DateLeaf date={exam.date} subject={subject} />
+                    <span className="flex-1 min-w-0">
+                      <span
+                        className="block text-[0.75rem] font-semibold truncate"
+                        style={{ color: subject ? colorVar(subject.color) : undefined }}
+                      >
+                        {subject?.name ?? 'Sin asignatura'}
+                      </span>
+                      <span className="block text-[0.9375rem] font-medium text-ink leading-snug truncate">
+                        {exam.title}
+                      </span>
+                      {exam.topics && (
+                        <span className="block text-[0.75rem] text-ink-3 mt-0.5 truncate">{exam.topics}</span>
+                      )}
+                    </span>
+                    <span
+                      className={cx(
+                        'shrink-0 rounded-full px-2.5 h-7 inline-flex items-center text-[0.8125rem] font-semibold tabular-nums',
+                        near ? 'bg-warn-quiet text-warn' : 'bg-fill text-ink-2',
+                      )}
+                    >
+                      {countdown(days)}
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
+
+      {upcoming.length > 0 && <GroupTitle title="Hechos" />}
+
       {blocks.length === 0 ? (
         <Card>
           <EmptyState
+            compact={upcoming.length > 0}
             icon={<ClipboardList className="size-5" />}
             title="Aún no hay exámenes hechos"
             description={`Cuando pase la fecha de un examen de la ${termName(scope === 'todas' ? 'T1' : scope).toLowerCase()} aparecerá aquí, con su nota si ya la has apuntado.`}
@@ -170,6 +242,7 @@ export function ExamsView() {
       )}
 
       <ExamEditor open={editing !== null} onClose={() => setEditing(null)} exam={editing} />
+      <ExamEditor open={creating} onClose={() => setCreating(false)} />
     </Page>
   )
 }

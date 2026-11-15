@@ -257,6 +257,8 @@ interface ProgressProps {
   value: number
   className?: string
   tone?: 'accent' | 'ok' | 'warn' | 'danger'
+  /** Color propio (el de una asignatura); manda sobre `tone`. */
+  color?: string
   label?: string
 }
 
@@ -267,7 +269,7 @@ const PROGRESS_TONE = {
   danger: 'var(--c-danger)',
 }
 
-export function Progress({ value, className, tone = 'accent', label }: ProgressProps) {
+export function Progress({ value, className, tone = 'accent', color, label }: ProgressProps) {
   const pct = Math.max(0, Math.min(100, value))
   return (
     <div
@@ -278,9 +280,13 @@ export function Progress({ value, className, tone = 'accent', label }: ProgressP
       aria-valuemax={100}
       aria-label={label}
     >
-      <div
-        className="h-full rounded-full transition-[width] duration-700 ease-[var(--spring)]"
-        style={{ width: `${pct}%`, background: PROGRESS_TONE[tone] }}
+      {/* Crece desde cero al aparecer, y con muelle si cambia después. */}
+      <motion.div
+        className="h-full rounded-full"
+        initial={{ width: 0 }}
+        animate={{ width: `${pct}%` }}
+        transition={{ ...spring.smooth, visualDuration: 0.7, bounce: 0 }}
+        style={{ background: color ?? PROGRESS_TONE[tone] }}
       />
     </div>
   )

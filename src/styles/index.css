@@ -294,6 +294,11 @@
     text-wrap: balance;
   }
 
+  /* Párrafos sin una palabra sola en la última línea. */
+  p {
+    text-wrap: pretty;
+  }
+
   ::selection {
     background: color-mix(in srgb, var(--c-accent) 26%, transparent);
   }
@@ -372,6 +377,15 @@ html {
   background: var(--c-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xs);
+  transition: box-shadow 260ms var(--ease-std);
+}
+
+/* Con puntero (trackpad del iPad, ordenador), las tarjetas que se pueden
+   pulsar se elevan un poco al pasar por encima: dicen «esto responde». */
+@media (hover: hover) and (pointer: fine) {
+  .card:has(a, button):hover {
+    box-shadow: var(--shadow-sm), 0 6px 20px rgb(0 0 0 / 0.05);
+  }
 }
 
 /* Material translúcido. Se degrada a opaco donde no hay desenfoque o el

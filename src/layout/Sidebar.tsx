@@ -111,7 +111,9 @@ export function Sidebar({ current, badges }: SidebarProps) {
                           className={cx(
                             'pressable relative flex items-center gap-2.5 h-10 pl-2 pr-3 rounded-[12px]',
                             'text-[0.9375rem] transition-colors duration-150',
-                            active ? 'text-ink font-semibold' : 'text-ink-2 hover:text-ink',
+                            active
+                              ? 'text-ink font-semibold'
+                              : 'text-ink-2 hover:text-ink hover:bg-[var(--glass-tint)]/60',
                           )}
                         >
                           {/* Un solo indicador que viaja de una sección a otra. */}

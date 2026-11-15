@@ -34,9 +34,12 @@
 
 /* Velo sobre el mapa cuando algo ocupa el centro (asiento, tarjeta). */
 .study-veil {
-  background: color-mix(in srgb, var(--c-canvas) 38%, transparent);
-  -webkit-backdrop-filter: blur(14px) saturate(120%);
-  backdrop-filter: blur(14px) saturate(120%);
+  /* Atenuación gris, como iOS al abrir una hoja: lo blanco (el avión, la
+     tarjeta de embarque, el panel) se recorta contra el mapa. Con el velo
+     claro de antes, todo era un mismo blanco. */
+  background: rgb(44 44 52 / 0.34);
+  -webkit-backdrop-filter: blur(16px) saturate(110%);
+  backdrop-filter: blur(16px) saturate(110%);
 }
 [data-theme='dark'] .study-veil {
   background: rgb(0 0 0 / 0.45);
@@ -163,139 +166,159 @@
   color: #0064d2;
 }
 
-/* --- Dibujo del avión (elegir asiento) ----------------------------------- */
-.plane-drawing {
-  filter: drop-shadow(0 30px 60px rgb(0 0 0 / 0.22)) drop-shadow(0 4px 10px rgb(0 0 0 / 0.08));
-  overflow: visible;
+/* --- El avión (elegir asiento) -------------------------------------------
+   Gris perla con los cantos algo más oscuros, como un fuselaje visto desde
+   arriba con luz cenital; una sombra amplia lo despega del mapa. */
+.plane-scroll > div {
+  -webkit-mask-image: linear-gradient(#000 82%, transparent);
+  mask-image: linear-gradient(#000 82%, transparent);
 }
-.pd-body {
-  stop-color: #ffffff;
+.fuselage-v3 {
+  width: clamp(300px, calc(100vw - 30rem), 420px);
+  filter: drop-shadow(0 30px 60px rgb(0 0 0 / 0.3)) drop-shadow(0 2px 6px rgb(0 0 0 / 0.12));
 }
-.pd-edge {
-  stop-color: #dedde3;
+.fs-mid {
+  stop-color: #f6f6f8;
 }
-.pd-line {
-  stroke: rgb(0 0 0 / 0.08);
-  stroke-width: 1.5;
+.fs-edge {
+  stop-color: #cfcfd6;
 }
-.pd-engine {
-  fill: #cfced6;
-  stroke: rgb(0 0 0 / 0.08);
+.fs-glass {
+  fill: #cfd0d6;
 }
-.pd-glass path {
-  fill: #2c3440;
+.fs-body {
+  background: linear-gradient(90deg, #cfcfd6, #f6f6f8 13%, #f6f6f8 87%, #cfcfd6);
+  border-radius: 0 0 40px 40px;
 }
-.pd-window rect {
-  fill: #b8c3d1;
+.fs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.05fr 1fr 1fr;
+  column-gap: 3.5%;
+  align-items: center;
 }
-.pd-divider {
-  stroke: #d8d7de;
-  stroke-width: 2;
-  stroke-dasharray: 2 6;
-  stroke-linecap: round;
-}
-.pd-caption {
-  font: 700 11px var(--font-sans);
-  letter-spacing: 0.18em;
-  fill: #a1a0a8;
-}
-.pd-row {
+.fs-letter {
+  text-align: center;
   font: 600 13px var(--font-sans);
-  fill: #a1a0a8;
+  color: #9b9ba3;
+  padding: 4px 0 14px;
 }
-.pd-exit path {
-  fill: #ff9f0a;
+.fs-row {
+  text-align: center;
+  font: 600 13px ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+  color: #a3a3ab;
 }
-.pd-seat {
+.fs-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 13% 16px;
+  font: 700 10px var(--font-sans);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #a3a3ab;
+}
+.fs-divider::before,
+.fs-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1.5px dashed #d2d2d8;
+}
+.is-exit::before,
+.is-exit::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 14px;
+  margin-top: -7px;
+  background: #ff9f0a;
+  clip-path: polygon(0 50%, 100% 0, 100% 100%);
+}
+.is-exit::before {
+  left: 3%;
+}
+.is-exit::after {
+  right: 3%;
+  transform: scaleX(-1);
+}
+.fs-seat {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 24%;
+  background: #e3e3e8;
+  box-shadow:
+    inset 0 -3px 0 rgb(0 0 0 / 0.05),
+    inset 0 1px 0 rgb(255 255 255 / 0.7);
+  transition:
+    background-color 200ms var(--ease-std),
+    box-shadow 200ms var(--ease-std);
   cursor: pointer;
-  transition: transform 260ms var(--spring);
-  outline: none;
 }
-.pd-seat .pd-seat-base {
-  fill: #ecebf0;
-  transition: fill 180ms var(--ease-std);
+.fs-seat.is-business {
+  border-radius: 28%;
 }
-.pd-seat .pd-seat-back {
-  fill: #dad9e0;
-  transition: fill 180ms var(--ease-std);
+.fs-seat:hover:not(:disabled):not(.is-selected) {
+  background: color-mix(in srgb, #0071e3 14%, #e3e3e8);
 }
-.pd-seat .pd-seat-check {
-  fill: none;
-  stroke: #fff;
-  stroke-width: 3.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  opacity: 0;
+.fs-seat:focus-visible {
+  outline: 2.5px solid #0a84ff;
+  outline-offset: 3px;
 }
-.pd-seat.is-free:hover .pd-seat-base,
-.pd-seat.is-free:focus-visible .pd-seat-base {
-  fill: color-mix(in srgb, var(--seat) 22%, #ecebf0);
-}
-.pd-seat.is-taken {
+.fs-seat.is-taken {
+  background: #c4c4cb;
+  box-shadow: inset 0 2px 4px rgb(0 0 0 / 0.08);
   cursor: not-allowed;
 }
-.pd-seat.is-taken .pd-seat-base {
-  fill: #b9b8c0;
-}
-.pd-seat.is-taken .pd-seat-back {
-  fill: #a9a8b1;
-}
-.pd-seat.is-selected {
-  transform: scale(1.08);
-}
-.pd-seat.is-selected .pd-seat-base {
-  fill: var(--seat);
-}
-.pd-seat.is-selected .pd-seat-back {
-  fill: color-mix(in srgb, var(--seat) 75%, #000);
-}
-.pd-seat.is-selected .pd-seat-check {
-  opacity: 1;
-  transition: opacity 200ms 80ms;
+.fs-seat.is-selected {
+  background: var(--seat);
+  box-shadow:
+    0 8px 18px color-mix(in srgb, var(--seat) 45%, transparent),
+    inset 0 1px 0 rgb(255 255 255 / 0.25);
 }
 
-[data-theme='dark'] .plane-drawing {
+[data-theme='dark'] .fuselage-v3 {
   filter: drop-shadow(0 30px 60px rgb(0 0 0 / 0.6));
 }
-[data-theme='dark'] .pd-body {
+[data-theme='dark'] .fs-mid {
   stop-color: #3a3a3e;
 }
-[data-theme='dark'] .pd-edge {
-  stop-color: #232326;
+[data-theme='dark'] .fs-edge {
+  stop-color: #26262a;
 }
-[data-theme='dark'] .pd-line {
-  stroke: rgb(255 255 255 / 0.08);
+[data-theme='dark'] .fs-shine {
+  opacity: 0.25;
 }
-[data-theme='dark'] .pd-engine {
-  fill: #2a2a2e;
+[data-theme='dark'] .fs-glass {
+  fill: #121317;
 }
-[data-theme='dark'] .pd-glass path {
-  fill: #0f1318;
+[data-theme='dark'] .fs-body {
+  background: linear-gradient(90deg, #26262a, #3a3a3e 13%, #3a3a3e 87%, #26262a);
 }
-[data-theme='dark'] .pd-window rect {
-  fill: #59636f;
+[data-theme='dark'] .fs-seat {
+  background: #505056;
+  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.2);
 }
-[data-theme='dark'] .pd-divider {
-  stroke: #4a4a50;
+[data-theme='dark'] .fs-seat:hover:not(:disabled):not(.is-selected) {
+  background: color-mix(in srgb, #0a84ff 25%, #505056);
 }
-[data-theme='dark'] .pd-caption,
-[data-theme='dark'] .pd-row {
-  fill: #7c7c84;
+[data-theme='dark'] .fs-seat.is-selected {
+  background: var(--seat);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--seat) 35%, transparent);
 }
-[data-theme='dark'] .pd-seat .pd-seat-base {
-  fill: #505056;
+[data-theme='dark'] .fs-seat.is-selected svg {
+  color: #111114;
 }
-[data-theme='dark'] .pd-seat .pd-seat-back {
-  fill: #626269;
+[data-theme='dark'] .fs-seat.is-taken {
+  background: #2c2c30;
 }
-[data-theme='dark'] .pd-seat.is-free:hover .pd-seat-base {
-  fill: color-mix(in srgb, var(--seat) 35%, #505056);
+[data-theme='dark'] .fs-letter,
+[data-theme='dark'] .fs-row,
+[data-theme='dark'] .fs-divider {
+  color: #7c7c84;
 }
-[data-theme='dark'] .pd-seat.is-taken .pd-seat-base {
-  fill: #2b2b2f;
-}
-[data-theme='dark'] .pd-seat.is-taken .pd-seat-back {
-  fill: #333338;
+[data-theme='dark'] .fs-divider::before,
+[data-theme='dark'] .fs-divider::after {
+  border-color: #4a4a50;
 }
 
 /* --- Tarjeta de embarque --- */

@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
+import { Check } from 'lucide-react'
+
 import { cx } from './primitives'
 
 export interface MenuItem {
@@ -173,7 +175,7 @@ export function Menu({ trigger, items, label, align = 'end' }: MenuProps) {
                   {item.icon && <span className="shrink-0 text-ink-3">{item.icon}</span>}
                   <span className="truncate flex-1">{item.label}</span>
                   {item.selected && (
-                    <span aria-hidden className="size-1.5 rounded-full bg-accent shrink-0" />
+                    <Check aria-hidden className="size-4 text-accent shrink-0" strokeWidth={2.6} />
                   )}
                 </button>
               </div>

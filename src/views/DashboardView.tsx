@@ -105,7 +105,9 @@ const WIDGETS: Record<
     size: 'sm',
     href: hrefFor('objetivos'),
   },
-  avisos: { label: 'Avisos', icon: BellRing, tint: '#ff9f0a', size: 'lg' },
+  // Ancho completo: los avisos son frases largas y, a media fila, dejaban
+  // un hueco vacío al lado.
+  avisos: { label: 'Avisos', icon: BellRing, tint: '#ff9f0a', size: 'xl' },
   actividad: { label: 'Actividad reciente', icon: History, tint: '#8e8e93', size: 'lg' },
 }
 

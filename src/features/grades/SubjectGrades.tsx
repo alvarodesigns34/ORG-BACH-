@@ -148,7 +148,7 @@ export function SubjectGrades({
           <Progress
             value={result.evaluatedPercent}
             label={`${formatPercent(result.evaluatedPercent)} de la asignatura evaluado`}
-            tone="accent"
+            color={colorVar(subject.color)}
           />
           <p className="text-[0.6875rem] text-ink-3 mt-1.5 tabular-nums">
             Queda un {formatPercent(100 - result.evaluatedPercent)} por evaluar.

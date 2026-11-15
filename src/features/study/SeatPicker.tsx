@@ -16,83 +16,34 @@ export interface SeatChoice {
 }
 
 // ---------------------------------------------------------------------------
-// Distribución de la cabina (coordenadas del dibujo, viewBox 700 × 1120)
+// Distribución de la cabina: 2 + 2 en todas las filas, como un avión
+// regional visto desde arriba. Las tres primeras filas son Preferente.
 // ---------------------------------------------------------------------------
 
 interface SeatSpot {
   label: string
   row: number
   letter: string
-  x: number
-  y: number
-  w: number
-  h: number
   cabin: SeatChoice['cabin']
 }
 
-const CX = 350
-const BUSINESS_ROWS = [1, 2]
-const ECONOMY_ROWS = [3, 4, 5, 6, 7, 8, 9, 10]
-/** Filas junto a las salidas sobre el ala: un poco más de espacio delante. */
-const EXIT_ROW = 8
+const ROWS = Array.from({ length: 14 }, (_, i) => i + 1)
+const LETTERS = ['A', 'C', 'D', 'F'] as const
+const BUSINESS_UNTIL = 3
+/** Fila de la salida de emergencia, sobre el ala. */
+const EXIT_ROW = 9
 
-function rowY(row: number): number {
-  if (row <= 2) return 300 + (row - 1) * 84
-  return 506 + (row - 3) * 64 + (row >= EXIT_ROW ? 16 : 0)
-}
-
-function layout(): SeatSpot[] {
-  const out: SeatSpot[] = []
-  // Preferente: 2 + 2, asientos anchos.
-  for (const row of BUSINESS_ROWS) {
-    const y = rowY(row)
-    const w = 54
-    const h = 60
-    const spots: [string, number][] = [
-      ['A', CX - 30 - 2 * w - 10],
-      ['C', CX - 30 - w],
-      ['D', CX + 30],
-      ['F', CX + 30 + w + 10],
-    ]
-    for (const [letter, x] of spots) {
-      out.push({ label: `0${row}${letter}`, row, letter, x, y, w, h, cabin: 'Preferente' })
-    }
-  }
-  // Turista: 3 + 3.
-  for (const row of ECONOMY_ROWS) {
-    const y = rowY(row)
-    const w = 38
-    const h = 44
-    const xs = [
-      CX - 26 - 3 * w - 8,
-      CX - 26 - 2 * w - 4,
-      CX - 26 - w,
-      CX + 26,
-      CX + 26 + w + 4,
-      CX + 26 + 2 * w + 8,
-    ]
-    ;['A', 'B', 'C', 'D', 'E', 'F'].forEach((letter, k) => {
-      out.push({
-        label: `${String(row).padStart(2, '0')}${letter}`,
-        row,
-        letter,
-        x: xs[k],
-        y,
-        w,
-        h,
-        cabin: 'Turista',
-      })
-    })
-  }
-  return out
-}
-
-const SEATS = layout()
+const SEATS: SeatSpot[] = ROWS.flatMap((row) =>
+  LETTERS.map((letter) => ({
+    label: `${String(row).padStart(2, '0')}${letter}`,
+    row,
+    letter,
+    cabin: row <= BUSINESS_UNTIL ? ('Preferente' as const) : ('Turista' as const),
+  })),
+)
 
 function seatKind(letter: string): string {
-  if (letter === 'A' || letter === 'F') return 'Ventanilla'
-  if (letter === 'B' || letter === 'E') return 'Centro'
-  return 'Pasillo'
+  return letter === 'A' || letter === 'F' ? 'Ventanilla' : 'Pasillo'
 }
 
 /** Algunos asientos ocupados, siempre los mismos para un mismo vuelo. */
@@ -102,7 +53,7 @@ function occupied(seed: string): Set<string> {
   const out = new Set<string>()
   for (const s of SEATS) {
     h = (h * 1664525 + 1013904223) >>> 0
-    if ((h >>> 24) % 100 < (s.cabin === 'Preferente' ? 25 : 38)) out.add(s.label)
+    if ((h >>> 24) % 100 < 22) out.add(s.label)
   }
   return out
 }
@@ -147,25 +98,27 @@ export function SeatPicker({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: 0.22 } }}
-      className="study-veil absolute inset-0 z-20 flex items-center justify-center gap-[clamp(1.5rem,4vw,4rem)] px-6"
+      className="study-veil absolute inset-0 z-20 flex items-center justify-center gap-[clamp(0.5rem,3vw,3rem)] pr-6"
     >
-      {/* --- El avión --- */}
+      {/* --- El avión: sube desde abajo y se desplaza para ver más filas --- */}
       <motion.div
-        initial={{ y: 60, opacity: 0, scale: 0.97 }}
-        animate={{ y: 0, opacity: 1, scale: 1 }}
-        transition={spring.smooth}
-        className="relative shrink-0"
-        style={{ height: 'min(calc(100dvh - 3rem), calc((100vw - 30rem) * 1.6), 900px)' }}
+        initial={{ y: '70%', opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: '40%', opacity: 0, transition: { duration: 0.25 } }}
+        transition={{ type: 'spring', visualDuration: 0.55, bounce: 0.14 }}
+        className="relative h-full shrink-0 plane-scroll"
       >
-        <PlaneDrawing
-          taken={taken}
-          selected={seat?.label ?? null}
-          color={color}
-          onPick={(spot) => {
-            haptic()
-            setSeat(spot)
-          }}
-        />
+        <div className="h-full overflow-y-auto no-scrollbar px-14 pt-8 pb-24">
+          <Fuselage
+            taken={taken}
+            selected={seat?.label ?? null}
+            color={color}
+            onPick={(spot) => {
+              haptic()
+              setSeat(spot)
+            }}
+          />
+        </div>
       </motion.div>
 
       {/* --- Panel --- */}
@@ -210,7 +163,7 @@ export function SeatPicker({
                 <motion.div key="nada" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                   <p className="display text-[1.75rem] leading-tight">Elige tu asiento</p>
                   <p className="text-[0.875rem] text-ink-3 mt-1.5 leading-snug">
-                    Preferente delante, Turista detrás. Los asientos oscuros ya están ocupados.
+                    Desliza el avión para ver todas las filas. Las tres primeras son Preferente; los asientos oscuros ya están ocupados.
                   </p>
                 </motion.div>
               )}
@@ -359,15 +312,18 @@ function ChoiceRow({
 }
 
 // ---------------------------------------------------------------------------
-// El dibujo
+// El avión
 // ---------------------------------------------------------------------------
 
 /**
- * Avión visto desde arriba: morro con parabrisas, ventanillas, alas con
- * motores y la cabina con sus asientos. Los colores salen del tema (clases en
- * study.css), así que sirve igual en claro que en oscuro.
+ * Fuselaje visto desde arriba: morro ojival con dos parabrisas curvos y la
+ * cabina debajo, ancha, con asientos grandes en 2 + 2 y el número de fila en
+ * el pasillo. El cuerpo sigue por debajo de la pantalla y se desplaza.
+ *
+ * El morro es un SVG que se estira al ancho del cuerpo; el cuerpo es HTML
+ * (una rejilla), así los asientos son botones de verdad y escalan con él.
  */
-function PlaneDrawing({
+function Fuselage({
   taken,
   selected,
   color,
@@ -378,138 +334,127 @@ function PlaneDrawing({
   color: string
   onPick: (spot: SeatSpot) => void
 }) {
-  const windowsY = Array.from({ length: 14 }, (_, i) => 318 + i * 54)
-  const exitY = rowY(EXIT_ROW) - 12
   return (
-    <svg
-      viewBox="0 0 700 1120"
-      className="plane-drawing h-full w-auto"
-      role="group"
-      aria-label="Plano de asientos"
-    >
-      <defs>
-        <linearGradient id="pd-fuselaje" x1="0" x2="1">
-          <stop offset="0" className="pd-edge" />
-          <stop offset="0.12" className="pd-body" />
-          <stop offset="0.88" className="pd-body" />
-          <stop offset="1" className="pd-edge" />
-        </linearGradient>
-        <linearGradient id="pd-ala" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" className="pd-body" />
-          <stop offset="1" className="pd-edge" />
-        </linearGradient>
-        <linearGradient id="pd-fundido" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0.8" stopColor="#fff" />
-          <stop offset="1" stopColor="#fff" stopOpacity="0" />
-        </linearGradient>
-        <mask id="pd-mascara">
-          <rect width="700" height="1120" fill="url(#pd-fundido)" />
-        </mask>
-      </defs>
+    <div className="fuselage-v3 relative" role="group" aria-label="Plano de asientos">
+      {/* Morro */}
+      <svg viewBox="0 0 400 330" className="block w-full h-auto" aria-hidden>
+        <defs>
+          <linearGradient id="fs-cuerpo" x1="0" x2="1">
+            <stop offset="0" className="fs-edge" />
+            <stop offset="0.13" className="fs-mid" />
+            <stop offset="0.87" className="fs-mid" />
+            <stop offset="1" className="fs-edge" />
+          </linearGradient>
+          <radialGradient id="fs-brillo" cx="0.5" cy="0.18" r="0.55">
+            <stop offset="0" stopColor="#fff" stopOpacity="0.55" />
+            <stop offset="1" stopColor="#fff" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        <path d="M0 330 C0 168 84 16 200 3 C316 16 400 168 400 330 Z" fill="url(#fs-cuerpo)" />
+        <path d="M0 330 C0 168 84 16 200 3 C316 16 400 168 400 330 Z" fill="url(#fs-brillo)" className="fs-shine" />
+        {/* Parabrisas: dos paneles curvos, más altos junto al centro */}
+        <path d="M124 146 C140 126 162 114 192 109 L192 138 C166 141 145 149 127 160 Z" className="fs-glass" />
+        <path d="M276 146 C260 126 238 114 208 109 L208 138 C234 141 255 149 273 160 Z" className="fs-glass" />
+      </svg>
 
-      <g mask="url(#pd-mascara)">
-        {/* Alas en flecha y motores, por detrás del fuselaje */}
-        <path d="M188 740 L18 940 Q8 958 26 962 L70 964 L188 880 Z" fill="url(#pd-ala)" className="pd-line" />
-        <path d="M512 740 L682 940 Q692 958 674 962 L630 964 L512 880 Z" fill="url(#pd-ala)" className="pd-line" />
-        <rect x="88" y="826" width="40" height="88" rx="18" className="pd-engine" />
-        <rect x="572" y="826" width="40" height="88" rx="18" className="pd-engine" />
+      {/* Cabina */}
+      <div className="fs-body -mt-px pb-10">
+        <div className="fs-grid px-[13%]">
+          {['A', 'C', '', 'D', 'F'].map((l, i) => (
+            <span key={i} className="fs-letter">
+              {l}
+            </span>
+          ))}
+        </div>
 
-        {/* Fuselaje */}
-        <path
-          d="M186 1120 L186 340 C186 170 262 56 350 32 C438 56 514 170 514 340 L514 1120 Z"
-          fill="url(#pd-fuselaje)"
-          className="pd-line"
-        />
-
-        {/* Parabrisas */}
-        <g className="pd-glass">
-          <path d="M306 150 Q328 128 346 122 L346 160 L310 168 Z" />
-          <path d="M394 150 Q372 128 354 122 L354 160 L390 168 Z" />
-          <path d="M292 177 L306 171 L304 199 L288 204 Z" />
-          <path d="M408 177 L394 171 L396 199 L412 204 Z" />
-        </g>
-
-        {/* Ventanillas */}
-        {windowsY.map((y) => (
-          <g key={y} className="pd-window">
-            <rect x="190" y={y} width="5" height="16" rx="2.5" />
-            <rect x="505" y={y} width="5" height="16" rx="2.5" />
-          </g>
-        ))}
-
-        {/* Cabinas */}
-        <text x={CX} y="278" textAnchor="middle" className="pd-caption">
-          PREFERENTE
-        </text>
-        <line x1="214" x2="486" y1="474" y2="474" className="pd-divider" />
-        <text x={CX} y="494" textAnchor="middle" className="pd-caption">
-          TURISTA
-        </text>
-
-        {/* Salidas de emergencia sobre el ala */}
-        <g className="pd-exit">
-          <path d={`M180 ${exitY} l-12 7 l12 7 Z`} />
-          <path d={`M520 ${exitY} l12 7 l-12 7 Z`} />
-        </g>
-
-        {/* Asientos */}
-        {SEATS.map((s) => {
-          const isTaken = taken.has(s.label)
-          const isSelected = selected === s.label
-          const big = s.cabin === 'Preferente'
-          return (
-            <g
-              key={s.label}
-              role="button"
-              tabIndex={isTaken ? -1 : 0}
-              aria-label={`Asiento ${s.label}, ${s.cabin}, ${seatKind(s.letter)}${isTaken ? ', ocupado' : ''}`}
-              aria-pressed={isSelected}
-              aria-disabled={isTaken}
-              onClick={() => !isTaken && onPick(s)}
-              onKeyDown={(e) => {
-                if (!isTaken && (e.key === 'Enter' || e.key === ' ')) {
-                  e.preventDefault()
-                  onPick(s)
-                }
-              }}
-              className={cx('pd-seat', isTaken ? 'is-taken' : 'is-free', isSelected && 'is-selected')}
-              style={
-                {
-                  '--seat': color,
-                  transformOrigin: `${s.x + s.w / 2}px ${s.y + s.h / 2}px`,
-                } as React.CSSProperties
-              }
+        {ROWS.map((row, i) => (
+          <div key={row}>
+            {row === BUSINESS_UNTIL + 1 && (
+              <div className="fs-divider" aria-hidden>
+                <span>Turista</span>
+              </div>
+            )}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ ...spring.smooth, delay: 0.25 + i * 0.03 }}
+              className={cx('fs-grid px-[13%] relative', row <= BUSINESS_UNTIL ? 'mb-4' : 'mb-3', row === EXIT_ROW && 'is-exit')}
             >
-              <rect x={s.x} y={s.y} width={s.w} height={s.h} rx={big ? 15 : 10} className="pd-seat-base" />
-              <rect
-                x={s.x + 4}
-                y={s.y + 4}
-                width={s.w - 8}
-                height={big ? 15 : 11}
-                rx={big ? 7 : 5}
-                className="pd-seat-back"
-              />
-              <path
-                d={`M${s.x + s.w / 2 - 7} ${s.y + s.h / 2 + 5} l5 5 l10 -11`}
-                className="pd-seat-check"
-              />
-            </g>
-          )
-        })}
-
-        {/* Números de fila, en el pasillo */}
-        {[...BUSINESS_ROWS, ...ECONOMY_ROWS].map((row) => (
-          <text
-            key={row}
-            x={CX}
-            y={rowY(row) + (row <= 2 ? 37 : 28)}
-            textAnchor="middle"
-            className="pd-row"
-          >
-            {row}
-          </text>
+              {LETTERS.slice(0, 2).map((letter) => (
+                <Seat
+                  key={letter}
+                  spot={SEATS.find((s) => s.row === row && s.letter === letter)!}
+                  taken={taken}
+                  selected={selected}
+                  color={color}
+                  onPick={onPick}
+                />
+              ))}
+              <span className="fs-row">{String(row).padStart(2, '0')}</span>
+              {LETTERS.slice(2).map((letter) => (
+                <Seat
+                  key={letter}
+                  spot={SEATS.find((s) => s.row === row && s.letter === letter)!}
+                  taken={taken}
+                  selected={selected}
+                  color={color}
+                  onPick={onPick}
+                />
+              ))}
+            </motion.div>
+          </div>
         ))}
-      </g>
-    </svg>
+      </div>
+    </div>
+  )
+}
+
+function Seat({
+  spot,
+  taken,
+  selected,
+  color,
+  onPick,
+}: {
+  spot: SeatSpot
+  taken: Set<string>
+  selected: string | null
+  color: string
+  onPick: (spot: SeatSpot) => void
+}) {
+  const isTaken = taken.has(spot.label)
+  const isSelected = selected === spot.label
+  return (
+    <motion.button
+      type="button"
+      disabled={isTaken}
+      aria-pressed={isSelected}
+      aria-label={`Asiento ${spot.label}, ${spot.cabin}, ${seatKind(spot.letter)}${isTaken ? ', ocupado' : ''}`}
+      onClick={() => onPick(spot)}
+      whileTap={isTaken ? undefined : { scale: 0.9 }}
+      animate={{ scale: isSelected ? 1.06 : 1 }}
+      transition={spring.bouncy}
+      className={cx(
+        'fs-seat',
+        spot.cabin === 'Preferente' && 'is-business',
+        isTaken && 'is-taken',
+        isSelected && 'is-selected',
+      )}
+      style={isSelected ? ({ '--seat': color } as React.CSSProperties) : undefined}
+    >
+      <AnimatePresence>
+        {isSelected && (
+          <motion.span
+            initial={{ scale: 0, rotate: -30 }}
+            animate={{ scale: 1, rotate: 0 }}
+            exit={{ scale: 0 }}
+            transition={spring.bouncy}
+            className="absolute inset-0 grid place-items-center"
+          >
+            <Check className="size-[42%] text-white" strokeWidth={3.2} />
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </motion.button>
   )
 }
