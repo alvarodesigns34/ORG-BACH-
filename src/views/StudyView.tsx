@@ -41,6 +41,7 @@ import {
   chime,
   duck,
   playSound,
+  preloadSound,
   playingSound,
   setVolume,
   stopSound,
@@ -182,6 +183,12 @@ export default function StudyView() {
   const layoverLeft = active ? layoverRemainingMs(active, now) : 0
 
   useWakeLock(prefs.keepAwake && stage === 'vuelo' && !!active)
+
+  // El ambiente elegido se descarga mientras se elige asiento: así suena
+  // justo al despegar, sin esperar a la red.
+  useEffect(() => {
+    if (stage === 'asiento' || stage === 'tarjeta' || stage === 'vuelo') preloadSound(prefs.sound)
+  }, [stage, prefs.sound])
 
   // --- Sonido ---
   const startAmbient = useCallback(

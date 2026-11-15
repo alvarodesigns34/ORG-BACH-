@@ -59,6 +59,19 @@ export default defineConfig({
         // navegador es siempre la misma URL de documento, así que basta con
         // que esa página se sirva desde el caché cuando no hay red.
         navigateFallback: `${base}index.html`,
+        // Los ambientes del modo estudio (2–3 MB cada uno) no se precargan:
+        // se guardan la primera vez que suenan y después funcionan sin red.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.includes('/sounds/') && url.pathname.endsWith('.m4a'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'orbita-sonidos-v1',
+              expiration: { maxEntries: 12 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
     }),
   ],

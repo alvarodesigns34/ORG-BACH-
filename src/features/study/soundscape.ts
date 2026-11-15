@@ -1,14 +1,15 @@
 /**
- * Ambientes sonoros del modo estudio, generados en el navegador.
+ * Ambientes sonoros del modo estudio.
  *
- * Nada se descarga: cada ambiente se construye con ruido y filtros, con la
- * estructura del sonido real —el rumor grave del avión con su zumbido de
- * motor; la lluvia como un siseo continuo más miles de gotas sueltas; las
- * olas como ruido que sube y baja con un ciclo lento y que se vuelve más
- * brillante en la cresta—. Las partes con estructura temporal (gotas, olas,
- * chasquidos) se «hornean» una vez en un búfer en bucle; el resto son nodos
- * en vivo con osciladores muy lentos que lo mantienen vivo y sin repetición
- * evidente.
+ * Son grabaciones reales (de dominio público; autores en `SOUND_CREDITS`),
+ * preparadas para sonar bien en los altavoces del iPad: tramos limpios de
+ * voces y ruidos ajenos, bucles sin costura de 2 a 3 minutos, el mismo
+ * volumen percibido en todos y los graves reforzados con armónicos para que
+ * el trueno o el motor se oigan aunque el altavoz no llegue a esas
+ * frecuencias. Se descargan la primera vez que se usan (2–3 MB cada uno) y
+ * quedan en caché para usarlos sin conexión.
+ *
+ * El ruido marrón sí se genera aquí: es ruido puro, no hay nada que grabar.
  *
  * Cambiar de ambiente funde uno en otro. Safari solo permite arrancar el
  * audio dentro de un toque: `unlockAudio()` en el gesto.
@@ -36,8 +37,9 @@ export const SOUNDS: { id: SoundId; label: string }[] = [
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
 let current: { id: SoundId; gain: GainNode; stop: () => void } | null = null
+/** Ambiente pedido (puede estar aún descargándose). */
+let wanted: SoundId | null = null
 let volume = 0.7
-const cache = new Map<string, AudioBuffer>()
 
 function context(): AudioContext | null {
   if (ctx) return ctx
@@ -143,46 +145,104 @@ export function audioRunning(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Materia prima: ruido y utilidades de síntesis «horneada»
+// Grabaciones
 // ---------------------------------------------------------------------------
 
-const rnd = (a: number, b: number) => a + Math.random() * (b - a)
-
-function cached(key: string, make: () => AudioBuffer): AudioBuffer {
-  let b = cache.get(key)
-  if (!b) {
-    b = make()
-    cache.set(key, b)
-  }
-  return b
-}
+type Recorded = Exclude<SoundId, 'marron'>
 
 /**
- * Búfer estéreo que se rellena a mano. Los sucesos (una gota, una ola) se
- * escriben con `addAt`, que da la vuelta al final: el bucle no tiene costura.
+ * Cada archivo lleva medio segundo de margen a cada lado copiado del otro
+ * extremo del bucle: aunque el decodificador AAC añada o quite su retardo
+ * inicial, `loopStart`/`loopEnd` caen sobre audio continuo y no hay salto.
  */
-function stereo(
-  c: BaseAudioContext,
-  seconds: number,
-  fill: (L: Float32Array, R: Float32Array, rate: number) => void,
-): AudioBuffer {
-  const n = Math.floor(c.sampleRate * seconds)
-  const b = c.createBuffer(2, n, c.sampleRate)
-  fill(b.getChannelData(0), b.getChannelData(1), c.sampleRate)
-  return b
+const PAD = 0.5
+const LOOP: Record<Recorded, number> = {
+  cabina: 108.75,
+  lluvia: 113.5,
+  tormenta: 180.75,
+  olas: 162.75,
+  viento: 135.75,
+  chimenea: 140.65,
 }
 
-/** Suma `src` en `dst` desde `start`, dando la vuelta al llegar al final. */
-function addAt(dst: Float32Array, src: Float32Array, start: number, gain: number) {
-  const n = dst.length
-  for (let i = 0; i < src.length; i++) dst[(start + i) % n] += src[i] * gain
+export const SOUND_CREDITS: { id: Recorded; what: string; author: string }[] = [
+  { id: 'cabina', what: 'Cabina de un Airbus A319 en vuelo', author: 'svenx' },
+  { id: 'lluvia', what: 'Lluvia en el bosque de Sherwood', author: 'rcarlberg' },
+  { id: 'tormenta', what: 'Tormenta de verano en el sur de Francia', author: 'Felix Blume' },
+  { id: 'olas', what: 'Olas en Caleta Portales (Chile)', author: 'Felix Blume' },
+  { id: 'viento', what: 'Viento fuerte entre árboles en Abbotsbury', author: 'Diva Contemporary' },
+  { id: 'chimenea', what: 'Fuego crepitando en Dartington', author: 'TonyW' },
+]
+
+const decoded = new Map<Recorded, AudioBuffer>()
+const pending = new Map<Recorded, Promise<AudioBuffer | null>>()
+
+function soundUrl(id: Recorded) {
+  return `${import.meta.env.BASE_URL}sounds/${id}.m4a`
 }
 
-/** Paneo de potencia constante: p en −1…1 → ganancias izquierda/derecha. */
-function pan(p: number): [number, number] {
-  const a = ((p + 1) * Math.PI) / 4
-  return [Math.cos(a), Math.sin(a)]
+function load(c: BaseAudioContext, id: Recorded): Promise<AudioBuffer | null> {
+  const ready = decoded.get(id)
+  if (ready) return Promise.resolve(ready)
+  let p = pending.get(id)
+  if (!p) {
+    p = fetch(soundUrl(id))
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status))
+        return r.arrayBuffer()
+      })
+      .then(
+        (data) =>
+          // Forma con callbacks: la de promesa no existe en Safari antiguo.
+          new Promise<AudioBuffer>((resolve, reject) => c.decodeAudioData(data, resolve, reject)),
+      )
+      .then((b) => {
+        // Solo se guarda el decodificado de un contexto real (los de prueba
+        // offline pueden tener otra frecuencia de muestreo).
+        if (c === ctx) {
+          // Un ambiente decodificado ocupa ~70 MB: se guardan como mucho dos.
+          if (decoded.size >= 2) {
+            for (const k of decoded.keys()) {
+              if (k !== current?.id && k !== wanted) {
+                decoded.delete(k)
+                break
+              }
+            }
+          }
+          decoded.set(id, b)
+        }
+        return b
+      })
+      .catch(() => null)
+      .finally(() => pending.delete(id))
+    pending.set(id, p)
+  }
+  return p
 }
+
+/** Descarga y decodifica por adelantado (al elegir asiento) para que el ambiente entre a la vez que el despegue. */
+export function preloadSound(id: SoundId | 'ninguno'): void {
+  if (id === 'ninguno' || id === 'marron') return
+  const c = context()
+  if (c) void load(c, id)
+}
+
+function playRecording(c: BaseAudioContext, b: AudioBuffer, id: Recorded, out: AudioNode) {
+  const src = c.createBufferSource()
+  src.buffer = b
+  src.loop = true
+  const len = Math.min(LOOP[id], b.duration - 2 * PAD)
+  src.loopStart = PAD
+  src.loopEnd = PAD + len
+  src.connect(out)
+  // Cada vez desde un punto distinto: nunca se oye «el mismo principio».
+  src.start(0, PAD + Math.random() * len)
+  return () => stopNode(src)
+}
+
+// ---------------------------------------------------------------------------
+// Ruido marrón (generado)
+// ---------------------------------------------------------------------------
 
 function brownInto(data: Float32Array, gain = 3.5) {
   let last = 0
@@ -192,563 +252,40 @@ function brownInto(data: Float32Array, gain = 3.5) {
   }
 }
 
-function pinkInto(data: Float32Array, gain = 0.11) {
-  let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0
-  for (let i = 0; i < data.length; i++) {
-    const w = Math.random() * 2 - 1
-    b0 = 0.99886 * b0 + w * 0.0555179
-    b1 = 0.99332 * b1 + w * 0.0750759
-    b2 = 0.969 * b2 + w * 0.153852
-    b3 = 0.8665 * b3 + w * 0.3104856
-    b4 = 0.55 * b4 + w * 0.5329522
-    b5 = -0.7616 * b5 - w * 0.016898
-    data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * gain
-    b6 = w * 0.115926
-  }
-}
+let brownBuffer: AudioBuffer | null = null
 
-/** Filtro biquad (RBJ) aplicado sobre un array, en el sitio. */
-function biquad(x: Float32Array, type: 'lp' | 'hp' | 'bp', f0: number, q: number, rate: number) {
-  const w = (2 * Math.PI * f0) / rate
-  const cos = Math.cos(w)
-  const alpha = Math.sin(w) / (2 * q)
-  let b0: number, b1: number, b2: number
-  if (type === 'lp') {
-    b0 = (1 - cos) / 2
-    b1 = 1 - cos
-    b2 = b0
-  } else if (type === 'hp') {
-    b0 = (1 + cos) / 2
-    b1 = -(1 + cos)
-    b2 = b0
-  } else {
-    b0 = alpha
-    b1 = 0
-    b2 = -alpha
-  }
-  const a0 = 1 + alpha
-  const a1 = -2 * cos
-  const a2 = 1 - alpha
-  let x1 = 0, x2 = 0, y1 = 0, y2 = 0
-  for (let i = 0; i < x.length; i++) {
-    const y = (b0 * x[i] + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0
-    x2 = x1
-    x1 = x[i]
-    y2 = y1
-    y1 = y
-    x[i] = y
-  }
-}
-
-/** Fundido en los bordes de un búfer de ruido continuo (sin «clic» al repetir). */
-function seam(data: Float32Array, rate: number, seconds = 0.08) {
-  const n = Math.floor(rate * seconds)
-  for (let i = 0; i < n; i++) {
-    const k = i / n
-    data[i] *= k
-    data[data.length - 1 - i] *= k
-  }
-}
-
-/**
- * Ruido continuo que se repite sin costura: se genera un poco más largo y la
- * cola se funde (a potencia constante) con el principio. Antes los bordes se
- * apagaban a cero y quedaba un microcorte en cada vuelta del bucle.
- */
-function seamless(
-  c: BaseAudioContext,
-  seconds: number,
-  make: (data: Float32Array) => void,
-): AudioBuffer {
+/** Ruido continuo que se repite sin costura: la cola se funde con el principio. */
+function brown(c: BaseAudioContext, seconds = 9): AudioBuffer {
+  if (brownBuffer && brownBuffer.sampleRate === c.sampleRate) return brownBuffer
   const rate = c.sampleRate
   const n = Math.floor(rate * seconds)
   const fade = Math.floor(rate * 0.5)
-  return stereo(c, seconds, (L, R) => {
-    for (const ch of [L, R]) {
-      const raw = new Float32Array(n + fade)
-      make(raw)
-      for (let i = 0; i < n; i++) ch[i] = raw[i]
-      for (let i = 0; i < fade; i++) {
-        const k = i / fade
-        ch[i] = raw[n + i] * Math.cos((k * Math.PI) / 2) + raw[i] * Math.sin((k * Math.PI) / 2)
-      }
+  const b = c.createBuffer(2, n, rate)
+  for (let ch = 0; ch < 2; ch++) {
+    const out = b.getChannelData(ch)
+    const raw = new Float32Array(n + fade)
+    brownInto(raw)
+    for (let i = 0; i < n; i++) out[i] = raw[i]
+    for (let i = 0; i < fade; i++) {
+      const k = i / fade
+      out[i] = raw[n + i] * Math.cos((k * Math.PI) / 2) + raw[i] * Math.sin((k * Math.PI) / 2)
     }
-  })
+  }
+  if (c === ctx) brownBuffer = b
+  return b
 }
 
-const brown = (c: BaseAudioContext, s = 9) =>
-  cached(`brown${s}`, () => seamless(c, s, (d) => brownInto(d)))
-const pink = (c: BaseAudioContext, s = 7) =>
-  cached(`pink${s}`, () => seamless(c, s, (d) => pinkInto(d)))
-
-// ---------------------------------------------------------------------------
-// Sucesos: lo que hace reconocible cada ambiente
-// ---------------------------------------------------------------------------
-
-/**
- * Gotas de lluvia: impactos muy cortos (1–4 ms) de ruido filtrado en banda,
- * cada una con su tono, fuerza y posición. Miles por segundo hacen «lluvia»;
- * el oído distingue gotas sueltas, no un siseo plano.
- */
-function drops(c: BaseAudioContext, key: string, seconds: number, perSecond: number, lo: number, hi: number) {
-  return cached(key, () =>
-    stereo(c, seconds, (L, R, rate) => {
-      const total = Math.floor(seconds * perSecond)
-      for (let k = 0; k < total; k++) {
-        const len = Math.floor(rate * rnd(0.0012, 0.004))
-        const snip = new Float32Array(len)
-        for (let i = 0; i < len; i++) snip[i] = (Math.random() * 2 - 1) * Math.exp(-i / (len / 4))
-        biquad(snip, 'bp', rnd(lo, hi), 1.4, rate)
-        const amp = 0.06 + Math.pow(Math.random(), 4) * 0.9
-        const [gl, gr] = pan(rnd(-0.9, 0.9))
-        const at = Math.floor(Math.random() * L.length)
-        addAt(L, snip, at, amp * gl)
-        addAt(R, snip, at, amp * gr)
-      }
-    }),
-  )
-}
-
-/**
- * «Plic»: una gota grande cayendo en un charco o una canaleta. Es una burbuja
- * que resuena con el tono subiendo deprisa (el sonido que el oído asocia sin
- * dudar al agua).
- */
-function plinks(c: BaseAudioContext, key: string, seconds: number, perSecond: number) {
-  return cached(key, () =>
-    stereo(c, seconds, (L, R, rate) => {
-      const total = Math.floor(seconds * perSecond)
-      for (let k = 0; k < total; k++) {
-        const len = Math.floor(rate * 0.09)
-        const snip = new Float32Array(len)
-        const f0 = rnd(700, 1900)
-        const rise = rnd(1.25, 1.8)
-        const tau = rnd(0.012, 0.03)
-        let phase = 0
-        for (let i = 0; i < len; i++) {
-          const t = i / rate
-          const f = f0 * (1 + (rise - 1) * Math.min(1, t / 0.03))
-          phase += (2 * Math.PI * f) / rate
-          const env = Math.min(1, t / 0.0015) * Math.exp(-t / tau)
-          snip[i] = Math.sin(phase) * env
-        }
-        const amp = rnd(0.08, 0.32)
-        const [gl, gr] = pan(rnd(-0.8, 0.8))
-        const at = Math.floor(Math.random() * L.length)
-        addAt(L, snip, at, amp * gl)
-        addAt(R, snip, at, amp * gr)
-      }
-    }),
-  )
-}
-
-/**
- * Olas: cada una crece (el agua que se levanta), rompe con un golpe brillante
- * y se retira en un siseo de espuma que burbujea y se apaga. Entre olas,
- * el fondo grave del mar.
- */
-function sea(c: BaseAudioContext, key: string, seconds: number, gap: [number, number], size: number) {
-  return cached(key, () =>
-    stereo(c, seconds, (L, R, rate) => {
-      const n = L.length
-      for (const [ch, side] of [[L, -1], [R, 1]] as const) {
-        const low = new Float32Array(n)
-        const mid = new Float32Array(n)
-        const high = new Float32Array(n)
-        brownInto(low, 3)
-        pinkInto(mid, 0.2)
-        for (let i = 0; i < n; i++) high[i] = Math.random() * 2 - 1
-        biquad(high, 'hp', 1800, 0.7, rate)
-        const envLow = new Float32Array(n)
-        const envMid = new Float32Array(n)
-        const envHigh = new Float32Array(n)
-        let t = rnd(0, 2)
-        let w = 0
-        while (t < seconds) {
-          const build = rnd(1.6, 2.6)
-          const recede = rnd(3.5, 6)
-          const amp = size * rnd(0.6, 1)
-          const lean = side * rnd(-0.4, 0.4) // cada ola cae a un lado distinto
-          const g = 1 + lean * 0.5
-          const start = Math.floor(t * rate)
-          const len = Math.floor((build + recede) * rate)
-          for (let i = 0; i < len; i++) {
-            const s = i / rate
-            const idx = (start + i) % n
-            if (s < build) {
-              const k = s / build
-              envLow[idx] += amp * g * k * k * 0.9
-              envMid[idx] += amp * g * Math.pow(k, 3) * 0.6
-            } else {
-              const d = s - build
-              const crash = Math.min(1, d / 0.12)
-              envLow[idx] += amp * g * (0.9 * Math.exp(-d / (recede * 0.35)))
-              envMid[idx] += amp * g * crash * Math.exp(-d / (recede * 0.3))
-              envHigh[idx] += amp * g * crash * Math.exp(-d / (recede * 0.42))
-            }
-          }
-          t += rnd(gap[0], gap[1])
-          w++
-        }
-        for (let i = 0; i < n; i++) {
-          // La espuma burbujea: chispas sueltas, más cuanto más espuma hay.
-          const fizz = Math.random() < envHigh[i] * 0.012 ? (Math.random() * 2 - 1) * 0.6 : 0
-          ch[i] = low[i] * (0.18 + envLow[i] * 0.45) + mid[i] * envMid[i] * 0.9 + high[i] * envHigh[i] * 0.35 + fizz * envHigh[i]
-        }
-        biquad(ch, 'lp', 7000, 0.7, rate)
-      }
-    }),
-  )
-}
-
-/**
- * Fuego: chasquidos diminutos que llegan a ráfagas, algún «pop» más grande
- * con su resonancia de madera, y el siseo breve de la savia.
- */
-function crackles(c: BaseAudioContext, key: string, seconds: number, popsPerSecond: number) {
-  return cached(key, () =>
-    stereo(c, seconds, (L, R, rate) => {
-      let t = 0
-      while (t < seconds) {
-        // Ráfaga de chasquidos pequeños.
-        const burst = Math.floor(rnd(2, 9))
-        const [gl, gr] = pan(rnd(-0.5, 0.5))
-        for (let k = 0; k < burst; k++) {
-          const len = Math.floor(rate * rnd(0.0006, 0.0025))
-          const snip = new Float32Array(len)
-          for (let i = 0; i < len; i++) snip[i] = (Math.random() * 2 - 1) * Math.exp(-i / (len / 3))
-          biquad(snip, 'hp', rnd(1500, 4000), 0.8, rate)
-          const at = Math.floor((t + k * rnd(0.008, 0.05)) * rate)
-          const amp = rnd(0.15, 0.6)
-          addAt(L, snip, at, amp * gl)
-          addAt(R, snip, at, amp * gr)
-        }
-        t += Math.random() < 0.6 ? rnd(0.06, 0.25) : rnd(0.4, 1.4)
-      }
-      // Pops grandes: madera que se raja, con un cuerpo que resuena.
-      for (let k = 0; k < seconds * popsPerSecond; k++) {
-        const len = Math.floor(rate * 0.06)
-        const snip = new Float32Array(len)
-        for (let i = 0; i < len; i++) snip[i] = (Math.random() * 2 - 1) * Math.exp(-i / (rate * rnd(0.004, 0.012)))
-        biquad(snip, 'bp', rnd(900, 2600), 2.5, rate)
-        const at = Math.floor(Math.random() * L.length)
-        const [gl, gr] = pan(rnd(-0.6, 0.6))
-        const amp = rnd(0.9, 1.8)
-        addAt(L, snip, at, amp * gl)
-        addAt(R, snip, at, amp * gr)
-      }
-      // Siseo de savia: medio segundo de ruido agudo que entra y sale.
-      for (let k = 0; k < seconds / 7; k++) {
-        const len = Math.floor(rate * rnd(0.4, 1.1))
-        const snip = new Float32Array(len)
-        for (let i = 0; i < len; i++) snip[i] = (Math.random() * 2 - 1) * Math.sin((Math.PI * i) / len) ** 2
-        biquad(snip, 'bp', rnd(3500, 6000), 3, rate)
-        const at = Math.floor(Math.random() * L.length)
-        addAt(L, snip, at, 0.09)
-        addAt(R, snip, at, 0.07)
-      }
-    }),
-  )
-}
-
-/** Grillos de noche, lejos: trenes de 3–5 pulsos a ~4,5 kHz, con silencios. */
-function crickets(c: BaseAudioContext) {
-  return cached('crickets', () =>
-    stereo(c, 17, (L, R, rate) => {
-      const voices = [
-        { f: 4650, period: 0.82, pulses: 3, side: -0.6 },
-        { f: 4180, period: 1.13, pulses: 4, side: 0.65 },
-      ]
-      for (const v of voices) {
-        const [gl, gr] = pan(v.side)
-        let t = rnd(0, 1)
-        while (t < 17) {
-          // De vez en cuando, el grillo calla un rato.
-          if (Math.random() < 0.08) {
-            t += rnd(2, 4)
-            continue
-          }
-          for (let p = 0; p < v.pulses; p++) {
-            const len = Math.floor(rate * 0.014)
-            const snip = new Float32Array(len)
-            for (let i = 0; i < len; i++) {
-              snip[i] = Math.sin((2 * Math.PI * v.f * i) / rate) * Math.sin((Math.PI * i) / len) ** 2
-            }
-            const at = Math.floor((t + p * 0.03) * rate)
-            addAt(L, snip, at, 0.05 * gl)
-            addAt(R, snip, at, 0.05 * gr)
-          }
-          t += v.period * rnd(0.92, 1.08)
-        }
-      }
-    }),
-  )
-}
-
-/**
- * Trueno. Tres capas, como uno de verdad:
- * - Chasquido (solo los cercanos): un desgarro seco de ruido en medios y
- *   agudos, con varias réplicas rápidas, que es lo que asusta.
- * - Rodadura: golpes de ruido en 150–1500 Hz que se encadenan y vibran
- *   (el trueno «rueda» por el cielo). Es la parte que se oye en un altavoz
- *   pequeño; antes faltaba y el trueno solo era graves que el iPad no da.
- * - Retumbo: el grave largo de fondo, para los cascos.
- * Los lejanos no tienen chasquido y son más sordos y largos.
- */
-function thunder(c: BaseAudioContext): { buffer: AudioBuffer; near: boolean } {
-  const near = Math.random() < 0.5
-  const seconds = near ? rnd(7, 10) : rnd(9, 13)
-  const buffer = stereo(c, seconds, (L, R, rate) => {
-    const n = L.length
-    // Envolvente de la rodadura: golpes que llegan y se apagan, con un
-    // temblor rápido encima.
-    const env = new Float32Array(n)
-    let t = near ? 0.18 : rnd(0.3, 0.9)
-    const lumps = Math.floor(near ? rnd(8, 13) : rnd(6, 10))
-    for (let k = 0; k < lumps; k++) {
-      const amp = (k === 0 ? 1 : rnd(0.35, 0.95)) * Math.exp(-k * (near ? 0.14 : 0.1))
-      const attack = rnd(0.03, near ? 0.15 : 0.35)
-      const tau = rnd(0.35, near ? 1.1 : 1.8)
-      const start = Math.floor(t * rate)
-      for (let i = start; i < n; i++) {
-        const s = (i - start) / rate
-        env[i] += amp * Math.min(1, s / attack) * Math.exp(-s / tau)
-      }
-      t += rnd(0.12, near ? 0.7 : 1.1)
-    }
-    const flutterHz = rnd(5, 11)
-    for (const [ch, side] of [[L, 0], [R, 1]] as const) {
-      // Rodadura (medios).
-      const roll = new Float32Array(n)
-      for (let i = 0; i < n; i++) roll[i] = Math.random() * 2 - 1
-      biquad(roll, 'bp', near ? 520 : 320, 0.55, rate)
-      biquad(roll, 'lp', near ? 1600 : 800, 0.7, rate)
-      // Retumbo (graves).
-      const body = new Float32Array(n)
-      brownInto(body, 5)
-      biquad(body, 'lp', near ? 220 : 140, 0.7, rate)
-      for (let i = 0; i < n; i++) {
-        const s = i / rate
-        const flutter = 0.72 + 0.28 * Math.sin(2 * Math.PI * flutterHz * s + side * 1.3)
-        ch[i] = (roll[i] * (near ? 1.4 : 1) * flutter + body[i] * 0.9) * env[i]
-      }
-      if (near) {
-        // El chasquido inicial y sus réplicas.
-        for (let k = 0; k < 4; k++) {
-          const len = Math.floor(rate * rnd(0.12, 0.35))
-          const crack = new Float32Array(len)
-          const tau = rnd(0.03, 0.08)
-          for (let i = 0; i < len; i++) crack[i] = (Math.random() * 2 - 1) * Math.exp(-i / rate / tau)
-          biquad(crack, 'hp', rnd(500, 900), 0.6, rate)
-          biquad(crack, 'lp', rnd(4500, 7000), 0.6, rate)
-          const at = Math.floor(rate * (0.04 + k * rnd(0.04, 0.12)))
-          addAt(ch, crack, at, k === 0 ? 2.2 : rnd(0.7, 1.3))
-        }
-      }
-      let peak = 0
-      for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(ch[i]))
-      const scale = peak > 0 ? 0.95 / peak : 1
-      for (let i = 0; i < n; i++) ch[i] *= scale
-      seam(ch, rate, 0.4)
-    }
-  })
-  return { buffer, near }
-}
-
-// ---------------------------------------------------------------------------
-// Ambientes
-// ---------------------------------------------------------------------------
-
-type Build = (c: AudioContext, out: AudioNode) => () => void
-
-function loop(c: BaseAudioContext, b: AudioBuffer, offset = Math.random() * b.duration) {
+function playBrown(c: BaseAudioContext, out: AudioNode) {
   const src = c.createBufferSource()
-  src.buffer = b
+  src.buffer = brown(c)
   src.loop = true
-  src.start(0, offset)
-  return src
-}
-
-function filter(c: BaseAudioContext, type: BiquadFilterType, freq: number, q = 0.7) {
-  const f = c.createBiquadFilter()
-  f.type = type
-  f.frequency.value = freq
-  f.Q.value = q
-  return f
-}
-
-function gain(c: BaseAudioContext, value: number) {
-  const g = c.createGain()
-  g.gain.value = value
-  return g
-}
-
-/** Oscilador lento que mueve un parámetro: `base ± depth`. */
-function wobble(c: BaseAudioContext, param: AudioParam, base: number, depth: number, hz: number) {
-  param.value = base
-  const osc = c.createOscillator()
-  osc.frequency.value = hz
-  const g = gain(c, depth)
-  osc.connect(g).connect(param)
-  osc.start()
-  return osc
-}
-
-/** Viento: aullido que sube y baja de tono, roce de fondo y ráfagas irregulares. */
-function windLayer(c: AudioContext, out: AudioNode, level: number) {
-  const howlSrc = loop(c, pink(c))
-  const howl = filter(c, 'bandpass', 700, 5)
-  const howlGain = gain(c, 0.55 * level)
-  const f1 = wobble(c, howl.frequency, 720, 330, 0.043)
-  const g1 = wobble(c, howlGain.gain, 0.55 * level, 0.4 * level, 0.071)
-  const rustleSrc = loop(c, pink(c, 11))
-  const rustle = filter(c, 'bandpass', 420, 0.6)
-  const rustleGain = gain(c, 0.8 * level)
-  const g2 = wobble(c, rustleGain.gain, 0.8 * level, 0.45 * level, 0.113)
-  const f2 = wobble(c, rustle.frequency, 420, 160, 0.029)
-  const low = loop(c, brown(c))
-  const lowLp = filter(c, 'lowpass', 260)
-  const lowGain = gain(c, 0.35 * level)
-  const g3 = wobble(c, lowGain.gain, 0.35 * level, 0.2 * level, 0.057)
-  howlSrc.connect(howl).connect(howlGain).connect(out)
-  rustleSrc.connect(rustle).connect(rustleGain).connect(out)
-  low.connect(lowLp).connect(lowGain).connect(out)
-  return () => [howlSrc, rustleSrc, low, f1, g1, g2, f2, g3].forEach(stopNode)
-}
-
-/** Lluvia con dos capas de gotas de longitudes distintas: no se nota el bucle. */
-function rainLayer(c: AudioContext, out: AudioNode, heavy: boolean) {
-  const wash = loop(c, pink(c))
-  const hp = filter(c, 'highpass', heavy ? 350 : 550)
-  const lp = filter(c, 'lowpass', heavy ? 5200 : 7500)
-  const washGain = gain(c, heavy ? 0.55 : 0.32)
-  const swell = wobble(c, washGain.gain, heavy ? 0.55 : 0.32, heavy ? 0.12 : 0.07, 0.031)
-  const a = loop(c, drops(c, heavy ? 'drops-h1' : 'drops-1', 7.3, heavy ? 700 : 260, 2000, 9000))
-  const b = loop(c, drops(c, heavy ? 'drops-h2' : 'drops-2', 11.1, heavy ? 500 : 180, 1200, 6000))
-  const dropsGain = gain(c, heavy ? 0.55 : 0.75)
-  const p = loop(c, plinks(c, heavy ? 'plinks-h' : 'plinks', 13.7, heavy ? 0.9 : 1.6))
-  const plinkGain = gain(c, heavy ? 0.35 : 0.6)
-  const bed = loop(c, brown(c))
-  const bedLp = filter(c, 'lowpass', heavy ? 600 : 300)
-  const bedGain = gain(c, heavy ? 0.45 : 0.18)
-  wash.connect(hp).connect(lp).connect(washGain).connect(out)
-  a.connect(dropsGain)
-  b.connect(dropsGain)
-  dropsGain.connect(out)
-  p.connect(plinkGain).connect(out)
-  bed.connect(bedLp).connect(bedGain).connect(out)
-  return () => [wash, a, b, p, bed, swell].forEach(stopNode)
-}
-
-const BUILD: Record<SoundId, Build> = {
-  cabina: (c, out) => {
-    // Cuerpo grave del motor + el siseo del aire de cabina, que es lo que
-    // de verdad se oye en un avión y lo que reproduce un altavoz pequeño.
-    const body = loop(c, brown(c))
-    const low = filter(c, 'lowpass', 520, 0.5)
-    const bodyGain = gain(c, 0.85)
-    const air = loop(c, pink(c))
-    const band = filter(c, 'lowpass', 2600, 0.5)
-    const airHp = filter(c, 'highpass', 220, 0.5)
-    const airGain = gain(c, 0.5)
-    // Zumbido de motor: dos tonos graves casi iguales que «laten» despacio.
-    const hum = gain(c, 0.018)
-    const h1 = c.createOscillator()
-    h1.frequency.value = 87
-    const h2 = c.createOscillator()
-    h2.frequency.value = 87.6
-    h1.connect(hum)
-    h2.connect(hum)
-    h1.start()
-    h2.start()
-    const lfo = wobble(c, low.frequency, 520, 70, 0.07)
-    body.connect(low).connect(bodyGain).connect(out)
-    air.connect(airHp).connect(band).connect(airGain).connect(out)
-    hum.connect(out)
-    return () => [body, air, h1, h2, lfo].forEach(stopNode)
-  },
-
-  lluvia: (c, out) => rainLayer(c, out, false),
-
-  tormenta: (c, out) => {
-    // La lluvia y el viento van por su propio canal para poder bajarlos un
-    // momento cuando truena: así el trueno se oye por encima.
-    // La lluvia, de fondo (no a tope): deja margen para que el trueno se
-    // oiga muy por encima sin que el limitador lo aplaste.
-    const BED = 0.45
-    const bed = gain(c, BED)
-    bed.connect(out)
-    const stopRain = rainLayer(c, bed, true)
-    const stopWind = windLayer(c, bed, 0.5)
-    let timer = 0
-    const strike = () => {
-      const { buffer, near } = thunder(c)
-      const src = c.createBufferSource()
-      src.buffer = buffer
-      const g = gain(c, near ? rnd(3, 3.6) : rnd(2.3, 2.7))
-      src.connect(g).connect(out)
-      const t = c.currentTime
-      bed.gain.cancelScheduledValues(t)
-      bed.gain.setValueAtTime(bed.gain.value, t)
-      bed.gain.linearRampToValueAtTime(BED * (near ? 0.55 : 0.75), t + 0.08)
-      bed.gain.setValueAtTime(BED * (near ? 0.55 : 0.75), t + 1.5)
-      bed.gain.linearRampToValueAtTime(BED, t + 5)
-      src.start()
-      // El primero enseguida, para que se sepa qué es; luego cada 10–25 s.
-      timer = window.setTimeout(strike, rnd(10000, 25000))
-    }
-    timer = window.setTimeout(strike, rnd(2000, 4000))
-    return () => {
-      window.clearTimeout(timer)
-      stopRain()
-      stopWind()
-    }
-  },
-
-  olas: (c, out) => {
-    const near = loop(c, sea(c, 'sea-near', 41, [7.5, 11.5], 1), 0)
-    const far = loop(c, sea(c, 'sea-far', 29, [5, 8], 0.45))
-    const farLp = filter(c, 'lowpass', 1400)
-    const nearGain = gain(c, 0.9)
-    const farGain = gain(c, 0.55)
-    near.connect(nearGain).connect(out)
-    far.connect(farLp).connect(farGain).connect(out)
-    return () => [near, far].forEach(stopNode)
-  },
-
-  viento: (c, out) => windLayer(c, out, 1),
-
-  chimenea: (c, out) => {
-    // La llama «respira»: rumor grave con dos oscilaciones lentas cruzadas.
-    const roar = loop(c, brown(c))
-    const lp = filter(c, 'lowpass', 340)
-    const roarGain = gain(c, 0.55)
-    const l1 = wobble(c, roarGain.gain, 0.55, 0.15, 0.17)
-    const flutter = loop(c, pink(c))
-    const flutterBp = filter(c, 'bandpass', 520, 0.8)
-    const flutterGain = gain(c, 0.12)
-    const l2 = wobble(c, flutterGain.gain, 0.12, 0.08, 0.29)
-    const a = loop(c, crackles(c, 'fire-a', 12.7, 0.35))
-    const b = loop(c, crackles(c, 'fire-b', 9.3, 0.2))
-    const crackGain = gain(c, 0.85)
-    const night = loop(c, crickets(c))
-    const nightGain = gain(c, 0.5)
-    roar.connect(lp).connect(roarGain).connect(out)
-    flutter.connect(flutterBp).connect(flutterGain).connect(out)
-    a.connect(crackGain)
-    b.connect(crackGain)
-    crackGain.connect(out)
-    night.connect(nightGain).connect(out)
-    return () => [roar, flutter, a, b, night, l1, l2].forEach(stopNode)
-  },
-
-  marron: (c, out) => {
-    const src = loop(c, brown(c))
-    const lp = filter(c, 'lowpass', 900, 0.5)
-    const g = gain(c, 0.85)
-    src.connect(lp).connect(g).connect(out)
-    return () => stopNode(src)
-  },
+  src.start(0, Math.random() * src.buffer.duration)
+  const lp = c.createBiquadFilter()
+  lp.type = 'lowpass'
+  lp.frequency.value = 900
+  lp.Q.value = 0.5
+  src.connect(lp).connect(out)
+  return () => stopNode(src)
 }
 
 function stopNode(node: AudioScheduledSourceNode) {
@@ -767,34 +304,74 @@ function stopNode(node: AudioScheduledSourceNode) {
 const FADE = 1.6
 
 /**
- * Ajuste de nivel por ambiente, medido: todos quedan a −16 dB contando a la
- * vez cómo suenan con cascos y en un altavoz pequeño (que pierde los graves
- * por debajo de ~250 Hz). Así cambiar de ambiente no da saltos de volumen,
- * y ninguno desaparece en el iPad o el portátil.
+ * Ajuste de nivel por ambiente. Las grabaciones ya vienen igualadas (mitad
+ * sonoridad completa, mitad lo que da un altavoz pequeño, que pierde los
+ * graves por debajo de ~200 Hz); aquí solo se cuadra el conjunto y el ruido
+ * marrón con ellas, para que cambiar de ambiente no dé saltos de volumen.
  */
 const TRIM: Record<SoundId, number> = {
-  cabina: 1.32,
-  lluvia: 2.7,
-  tormenta: 1.51,
-  olas: 1.4,
-  viento: 1.84,
-  chimenea: 2.48,
-  marron: 1.41,
+  cabina: 1.17,
+  lluvia: 2.2,
+  tormenta: 1.4,
+  olas: 1.5,
+  viento: 3.7,
+  // El fuego es casi todo chasquidos: con menos nivel medio ya suena presente.
+  chimenea: 1.5,
+  marron: 0.82,
+}
+
+type Listener = () => void
+const listeners = new Set<Listener>()
+/** Avisa cuando cambia qué ambiente suena o se está cargando. */
+export function subscribeSound(fn: Listener): () => void {
+  listeners.add(fn)
+  return () => listeners.delete(fn)
+}
+const notify = () => listeners.forEach((fn) => fn())
+
+/** El ambiente que se está descargando (para mostrarlo en el panel), o null. */
+export function loadingSound(): SoundId | null {
+  return wanted && current?.id !== wanted ? wanted : null
+}
+
+function start(c: AudioContext, id: SoundId, stop: (out: AudioNode) => () => void) {
+  if (!master) return
+  fadeOutCurrent()
+  const g = c.createGain()
+  g.gain.value = 0
+  g.connect(master)
+  const halt = stop(g)
+  const t = c.currentTime
+  g.gain.setValueAtTime(0, t)
+  g.gain.linearRampToValueAtTime(TRIM[id] * (ducked ? 0.15 : 1), t + FADE)
+  current = { id, gain: g, stop: halt }
+  notify()
 }
 
 export function playSound(id: SoundId): void {
   const c = context()
   if (!c || !master) return
-  if (current?.id === id) return
-  fadeOutCurrent()
-  const g = c.createGain()
-  g.gain.value = 0
-  g.connect(master)
-  const stop = BUILD[id](c, g)
-  const t = c.currentTime
-  g.gain.setValueAtTime(0, t)
-  g.gain.linearRampToValueAtTime(TRIM[id], t + FADE)
-  current = { id, gain: g, stop }
+  if (current?.id === id || wanted === id) return
+  wanted = id
+  if (id === 'marron') {
+    start(c, id, (out) => playBrown(c, out))
+    return
+  }
+  const ready = decoded.get(id)
+  if (ready) {
+    start(c, id, (out) => playRecording(c, ready, id, out))
+    return
+  }
+  notify()
+  void load(c, id).then((b) => {
+    if (wanted !== id) return // Se eligió otro mientras se descargaba.
+    if (!b) {
+      wanted = current?.id ?? null
+      notify()
+      return
+    }
+    start(c, id, (out) => playRecording(c, b, id, out))
+  })
 }
 
 function fadeOutCurrent() {
@@ -812,11 +389,14 @@ function fadeOutCurrent() {
 }
 
 export function stopSound(): void {
+  wanted = null
+  ducked = false
   fadeOutCurrent()
+  notify()
 }
 
 export function playingSound(): SoundId | null {
-  return current?.id ?? null
+  return current?.id ?? wanted
 }
 
 export function setVolume(next: number): void {
@@ -828,8 +408,11 @@ export function setVolume(next: number): void {
   master.gain.linearRampToValueAtTime(volumeGain(volume), t + 0.15)
 }
 
+let ducked = false
+
 /** Atenúa (pausa, escala) o restaura el ambiente sin pararlo. */
 export function duck(on: boolean): void {
+  ducked = on
   if (!ctx || !current) return
   const t = ctx.currentTime
   current.gain.gain.cancelScheduledValues(t)
@@ -841,7 +424,8 @@ export function duck(on: boolean): void {
 export function chime(): void {
   const c = context()
   if (!c) return
-  const out = gain(c, 0.32)
+  const out = c.createGain()
+  out.gain.value = 0.32
   out.connect(c.destination)
   const tone = (freq: number, at: number) => {
     for (const [mult, amp] of [
@@ -876,7 +460,7 @@ export async function renderSound(
   /** Con la cadena completa: ajuste del ambiente, volumen y limitador. */
   atVolume?: number,
 ): Promise<Float32Array> {
-  const c = new OfflineAudioContext(2, Math.floor(44100 * seconds), 44100)
+  const c = new OfflineAudioContext(2, Math.floor(48000 * seconds), 48000)
   const out = c.createGain()
   if (atVolume === undefined) {
     out.connect(c.destination)
@@ -884,16 +468,11 @@ export async function renderSound(
     out.gain.value = TRIM[id] * volumeGain(atVolume)
     out.connect(limiter(c)).connect(c.destination)
   }
-  BUILD[id](c as unknown as AudioContext, out)
-  // Sin reloj real no saltan los temporizadores: el trueno de la tormenta
-  // se programa a mano, a los 4 s, para poder oírlo y medirlo.
-  if (id === 'tormenta') {
-    const src = c.createBufferSource()
-    src.buffer = thunder(c).buffer
-    const g = c.createGain()
-    g.gain.value = 3.3
-    src.connect(g).connect(out)
-    src.start(4)
+  if (id === 'marron') playBrown(c, out)
+  else {
+    const b = await load(c, id)
+    if (!b) throw new Error('No se pudo cargar ' + id)
+    playRecording(c, b, id, out)
   }
   const rendered = await c.startRendering()
   return rendered.getChannelData(0)

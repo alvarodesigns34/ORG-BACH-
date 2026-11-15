@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   AudioWaveform,
@@ -29,7 +29,7 @@ import type { FocusSession, Subject, Task } from '@/domain/types'
 import { haptic, spring } from '@/ui/motion'
 import { Button, cx } from '@/ui/primitives'
 import type { MapKind } from './mapStyle'
-import { SOUNDS, type SoundId } from './soundscape'
+import { SOUNDS, SOUND_CREDITS, loadingSound, subscribeSound, type SoundId } from './soundscape'
 
 // ---------------------------------------------------------------------------
 // Piezas
@@ -187,6 +187,7 @@ function SoundPanel({
   onVolume: (v: number) => void
   onKeepAwake: (on: boolean) => void
 }) {
+  const loading = useSyncExternalStore(subscribeSound, loadingSound, () => null)
   return (
     <>
       <p className="text-[0.9375rem] font-semibold mb-3">Sonido de fondo</p>
@@ -218,8 +219,11 @@ function SoundPanel({
                     : 'bg-[var(--glass-tint)] text-ink-2 group-hover:text-ink',
                 )}
               >
-                <Icon className="size-6" strokeWidth={2} />
-                {active && s.id !== 'ninguno' && (
+                <Icon
+                  className={cx('size-6', loading === s.id && 'animate-[pulse-soft_1.2s_ease-in-out_infinite]')}
+                  strokeWidth={2}
+                />
+                {active && s.id !== 'ninguno' && loading !== s.id && (
                   <span className="absolute top-1.5 right-2">
                     <SoundBars />
                   </span>
@@ -261,6 +265,21 @@ function SoundPanel({
         </span>
         <Switch checked={keepAwake} onChange={onKeepAwake} label="Pantalla siempre encendida" />
       </div>
+
+      <details className="group/cred mt-3 text-[0.6875rem] text-ink-3">
+        <summary className="cursor-pointer list-none select-none hover:text-ink-2 transition-colors">
+          Grabaciones reales de dominio público ·{' '}
+          <span className="underline underline-offset-2">Créditos</span>
+        </summary>
+        <ul className="mt-2 space-y-0.5 leading-snug">
+          {SOUND_CREDITS.map((c) => (
+            <li key={c.id}>
+              {c.what} — <span className="text-ink-2">{c.author}</span>
+            </li>
+          ))}
+          <li className="pt-1">Vía radio aporee y Internet Archive.</li>
+        </ul>
+      </details>
     </>
   )
 }
