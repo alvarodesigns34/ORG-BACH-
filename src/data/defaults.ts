@@ -26,7 +26,7 @@ export function currentAcademicYear(date = new Date()): string {
 
 export const DEFAULT_SETTINGS: Settings = {
   userName: '',
-  course: '1.º de Bachillerato',
+  course: '',
   academicYear: currentAcademicYear(),
   theme: 'system',
   weekStartsOn: 1,
@@ -59,7 +59,8 @@ export function createEmptyData(): AppData {
 }
 
 // ---------------------------------------------------------------------------
-// Catálogo de asignaturas de 1.º de Bachillerato
+// Catálogos de asignaturas por etapa (sugerencias para el alta: siempre se
+// pueden añadir otras a mano)
 // ---------------------------------------------------------------------------
 
 export interface CatalogSubject {
@@ -76,6 +77,7 @@ export interface CatalogGroup {
   subjects: CatalogSubject[]
 }
 
+/** Bachillerato (LOMLOE). */
 export const SUBJECT_CATALOG: CatalogGroup[] = [
   {
     id: 'comunes',
@@ -135,3 +137,94 @@ export const SUBJECT_CATALOG: CatalogGroup[] = [
     ],
   },
 ]
+
+/** «2.º de ESO · 2026/2027», o solo el curso académico si no hay curso puesto. */
+export function courseLine(settings: { course: string; academicYear: string }): string {
+  return [settings.course.trim(), settings.academicYear].filter(Boolean).join(' · ')
+}
+
+const ESO_CATALOG: CatalogGroup[] = [
+  {
+    id: 'eso-comunes',
+    label: 'Materias comunes',
+    hint: 'Las de casi todos los cursos de la ESO.',
+    subjects: [
+      { name: 'Lengua Castellana y Literatura', color: 'terracotta', weight: 4 },
+      { name: 'Matemáticas', color: 'indigo', weight: 4 },
+      { name: 'Inglés', color: 'sky', weight: 3 },
+      { name: 'Geografía e Historia', color: 'clay', weight: 3 },
+      { name: 'Biología y Geología', color: 'sage', weight: 3 },
+      { name: 'Física y Química', color: 'teal', weight: 3 },
+      { name: 'Educación Física', color: 'moss', weight: 2 },
+    ],
+  },
+  {
+    id: 'eso-otras',
+    label: 'Otras y optativas',
+    hint: 'Depende del curso y del centro.',
+    subjects: [
+      { name: 'Tecnología y Digitalización', color: 'slate', weight: 2 },
+      { name: 'Música', color: 'plum', weight: 2 },
+      { name: 'Educación Plástica, Visual y Audiovisual', color: 'amber', weight: 2 },
+      { name: 'Francés', color: 'plum', weight: 2 },
+      { name: 'Latín', color: 'amber', weight: 3 },
+      { name: 'Economía y Emprendimiento', color: 'teal', weight: 3 },
+      { name: 'Religión', color: 'slate', weight: 1 },
+    ],
+  },
+]
+
+export type StudyLevel = 'eso' | 'bachillerato' | 'fp' | 'universidad' | 'otro'
+
+export interface LevelInfo {
+  id: StudyLevel
+  label: string
+  /** Ejemplo para el campo «Curso». */
+  example: string
+  /** Sugerencias; vacío = cada cual escribe las suyas. */
+  catalog: CatalogGroup[]
+  /** Qué escribir cuando no hay catálogo. */
+  customHint: string
+}
+
+export const LEVELS: LevelInfo[] = [
+  { id: 'eso', label: 'ESO', example: '3.º de ESO', catalog: ESO_CATALOG, customHint: 'Otra asignatura' },
+  {
+    id: 'bachillerato',
+    label: 'Bachillerato',
+    example: '1.º de Bachillerato',
+    catalog: SUBJECT_CATALOG,
+    customHint: 'Otra asignatura (Religión, segunda lengua…)',
+  },
+  {
+    id: 'fp',
+    label: 'FP',
+    example: '1.º de DAW',
+    catalog: [],
+    customHint: 'Nombre del módulo (p. ej. Programación)',
+  },
+  {
+    id: 'universidad',
+    label: 'Universidad',
+    example: '2.º de Derecho',
+    catalog: [],
+    customHint: 'Nombre de la asignatura (p. ej. Derecho Civil I)',
+  },
+  {
+    id: 'otro',
+    label: 'Otro',
+    example: 'Oposiciones, idiomas…',
+    catalog: [],
+    customHint: 'Materia, tema o bloque',
+  },
+]
+
+/** Etapa que se deduce del texto del curso (para quien ya lo tenía puesto). */
+export function levelOf(course: string): StudyLevel | null {
+  const c = course.toLowerCase()
+  if (/bachiller/.test(c)) return 'bachillerato'
+  if (/\beso\b|secundaria/.test(c)) return 'eso'
+  if (/\bfp\b|ciclo|grado (medio|superior)|daw|dam|asir|smr/.test(c)) return 'fp'
+  if (/universidad|grado en|carrera|máster|master/.test(c)) return 'universidad'
+  return null
+}

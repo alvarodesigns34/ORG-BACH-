@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { BookOpen, ChevronRight, Plus } from 'lucide-react'
 
+import { courseLine } from '@/data/defaults'
 import { daysUntil, formatShort } from '@/domain/dates'
 import { formatGrade, numeralTone } from '@/domain/grades'
 import { colorVar, quietVar } from '@/domain/palette'
@@ -28,7 +29,7 @@ export function SubjectsView() {
         title="Asignaturas"
         subtitle={
           subjects.length > 0
-            ? `${subjects.length} en ${settings.course} · ${settings.academicYear}`
+            ? `${subjects.length} ${subjects.length === 1 ? 'asignatura' : 'asignaturas'} · ${courseLine(settings)}`
             : undefined
         }
         actions={

@@ -1,8 +1,8 @@
-# Bachillerato OS
+# Órbita
 
-Centro de control académico personal para 1.º de Bachillerato. Tareas, exámenes,
-calendario, asignaturas y notas en un solo sitio, pensado para abrirlo cada mañana
-y saber en diez segundos qué hay que hacer hoy y cómo va el curso.
+Tus estudios en un solo sitio, para cualquier curso o etapa (ESO, Bachillerato, FP,
+universidad…): tareas, exámenes, calendario, asignaturas, notas y un modo estudio en
+forma de vuelos. Pensado para abrirlo cada mañana y saber en diez segundos qué hay que hacer hoy y cómo va el curso.
 
 No es una demo: todo lo que aparece en la interfaz funciona y todo lo que
 introduces se guarda. Funciona sin conexión y sin cuenta; con cuenta, el curso

@@ -250,7 +250,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `bachillerato-os-ilegible.json`
+    link.download = `orbita-ilegible.json`
     link.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
   }, [])

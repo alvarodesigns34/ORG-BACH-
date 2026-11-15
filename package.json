@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Centro de control academico personal para 1 de Bachillerato",
+  "description": "Órbita: tus estudios en un solo sitio, para cualquier curso o etapa",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

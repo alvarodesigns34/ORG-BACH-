@@ -1,6 +1,7 @@
 import { motion } from 'motion/react'
 import { Mic, Plus } from 'lucide-react'
 
+import { courseLine } from '@/data/defaults'
 import { useSettings } from '@/state/StoreProvider'
 import { hrefFor, type RouteId } from '@/router'
 import { SyncBadge } from '@/features/account/SyncBadge'
@@ -43,7 +44,7 @@ export function Sidebar({ current, badges }: SidebarProps) {
             <span className="flex flex-col gap-0.5 min-w-0">
               <BrandWordmark />
               <span className="text-[0.6875rem] text-ink-3 tabular-nums truncate">
-                {settings.course} · {settings.academicYear}
+                {courseLine(settings)}
               </span>
             </span>
           </a>

@@ -23,10 +23,10 @@ export default defineConfig({
       includeAssets: ['icono.svg', 'apple-touch-icon.png'],
       manifest: {
         id: base,
-        name: 'Bachillerato OS',
-        short_name: 'Bachillerato',
+        name: 'Órbita',
+        short_name: 'Órbita',
         description:
-          'Centro de control académico personal: tareas, exámenes, horario y notas en un solo sitio.',
+          'Tus estudios en un solo sitio: tareas, exámenes, horario, notas y un modo estudio para concentrarte.',
         lang: 'es',
         start_url: base,
         scope: base,

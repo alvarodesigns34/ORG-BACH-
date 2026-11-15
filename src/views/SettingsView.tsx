@@ -17,6 +17,8 @@ import {
   UserRound,
 } from 'lucide-react'
 
+import { courseLine } from '@/data/defaults'
+import { APP_NAME } from '@/layout/Brand'
 import { createEmptyData } from '@/data/defaults'
 import { today as todayISO } from '@/domain/dates'
 import { TERMS, type AverageMode, type TermId } from '@/domain/types'
@@ -74,7 +76,7 @@ export function SettingsView({ section }: { section?: string | null }) {
     link.href = url
     // Día local, no el `slice` del ISO en UTC: entre medianoche y las dos de
     // la madrugada el archivo salía fechado el día anterior.
-    link.download = `bachillerato-os-${todayISO()}.json`
+    link.download = `orbita-${todayISO()}.json`
     link.click()
     // Liberar el objeto en cuanto el navegador ha tomado la descarga.
     setTimeout(() => URL.revokeObjectURL(url), 1000)
@@ -127,7 +129,7 @@ export function SettingsView({ section }: { section?: string | null }) {
               {settings.userName || 'Sin nombre'}
             </p>
             <p className="text-[0.875rem] text-ink-3 truncate">
-              {sync.email ?? `${settings.course} · ${settings.academicYear}`}
+              {sync.email ?? courseLine(settings)}
             </p>
           </div>
         </div>
@@ -149,6 +151,7 @@ export function SettingsView({ section }: { section?: string | null }) {
             tint="#bf5af2"
             label="Curso"
             value={settings.course}
+            placeholder="2.º de ESO, 1.º de Bachillerato…"
             onChange={(course) => update({ course })}
           />
           <RowInput
@@ -324,7 +327,7 @@ export function SettingsView({ section }: { section?: string | null }) {
         />
 
         <p className="text-center text-[0.75rem] text-ink-3 pb-2">
-          Bachillerato OS · {settings.course} · {settings.academicYear}
+          {APP_NAME} · {courseLine(settings)}
         </p>
       </div>
 

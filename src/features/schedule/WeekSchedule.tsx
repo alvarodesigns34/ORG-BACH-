@@ -4,7 +4,8 @@ import { CalendarClock, Download } from 'lucide-react'
 import { colorVar, quietVar } from '@/domain/palette'
 import { classesOn } from '@/domain/schedule'
 import { hasTimetableChanges, planTimetable } from '@/domain/timetable'
-import { useDispatch, useStore } from '@/state/StoreProvider'
+import { levelOf } from '@/data/defaults'
+import { useDispatch, useSettings, useStore } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
 import { Button, Card, EmptyState, GroupTitle, cx } from '@/ui/primitives'
 import { useToast } from '@/ui/Toast'
@@ -29,6 +30,10 @@ export function WeekSchedule() {
   const dispatch = useDispatch()
   const toast = useToast()
   const subjects = useSubjects()
+  const settings = useSettings()
+  // El horario que trae la app es el de un centro concreto de Bachillerato:
+  // solo se ofrece a quien estudia Bachillerato. El resto lo pone a mano.
+  const canLoad = levelOf(settings.course) === 'bachillerato'
 
   const week = useMemo(
     () =>
@@ -41,7 +46,10 @@ export function WeekSchedule() {
   const hasSchedule = week.some((d) => d.classes.length > 0)
   // Con el horario ya cargado, el botón solo vuelve a aparecer si falta una
   // asignatura o alguna conserva el nombre largo.
-  const outdated = useMemo(() => hasTimetableChanges(planTimetable(data.subjects)), [data.subjects])
+  const outdated = useMemo(
+    () => canLoad && hasTimetableChanges(planTimetable(data.subjects)),
+    [data.subjects, canLoad],
+  )
 
   const load = () => {
     const before = data
@@ -63,12 +71,18 @@ export function WeekSchedule() {
           compact
           icon={<CalendarClock className="size-5" />}
           title="Tu horario semanal"
-          description="Carga el horario del centro: se crean las asignaturas que falten y se rellenan sus clases. Después podrás retocar cualquier franja desde la ficha de cada asignatura."
+          description={
+            canLoad
+              ? 'Carga el horario de tu centro: se crean las asignaturas que falten y se rellenan sus clases. Después podrás retocar cualquier franja desde la ficha de cada asignatura.'
+              : 'Abre una asignatura y añade sus clases (día, hora y aula). Aquí verás la semana entera y en Inicio, qué toca ahora.'
+          }
           action={
-            <Button variant="primary" onClick={load}>
-              <Download className="size-4" />
-              Cargar mi horario
-            </Button>
+            canLoad ? (
+              <Button variant="primary" onClick={load}>
+                <Download className="size-4" />
+                Cargar horario de mi centro
+              </Button>
+            ) : undefined
           }
         />
       </Card>

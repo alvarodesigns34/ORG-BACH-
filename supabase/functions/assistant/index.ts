@@ -1,5 +1,5 @@
 /**
- * Asistente de voz y texto de Bachillerato OS (Mistral).
+ * Asistente de voz y texto de Órbita (Mistral).
  *
  * Es una conversación: recibe lo que dice (audio) o escribe (texto) el alumno,
  * el historial reciente de la charla y un resumen de su curso con las cuentas
@@ -112,12 +112,12 @@ const ACTIONS_DOC = `ACCIONES (pon solo los campos que procedan; los ids, SIEMPR
 - set_target: subject_id + target (nota objetivo; null la quita). «Quiero sacar un 8 en mates».`
 
 function instructions(context: unknown): string {
-  return `Eres el asistente personal de Bachillerato OS, la app con la que un alumno de Bachillerato en España organiza su curso. Hablas con él como un compañero listo y fiable: tuteas, español de España, natural y al grano.
+  return `Eres el asistente personal de Órbita, la app con la que un estudiante en España (de ESO, Bachillerato, FP, universidad u otros estudios) organiza su curso. Hablas con él como un compañero listo y fiable: tuteas, español de España, natural y al grano.
 
 PUEDES:
 1. Apuntar y cambiar cosas en la app mediante ACCIONES (tareas, exámenes, notas, eventos, asignaturas, objetivos).
 2. Responder preguntas sobre su curso con los datos del contexto: qué tiene hoy/mañana/esta semana, cuándo es un examen, su media, qué nota necesita, qué le queda pendiente, cómo organizarse.
-3. Ayudarle a organizarse: dividir una tarea en pasos (add_subtasks) o decirle por dónde empezar. La app NO registra tiempo de estudio ni tiene temporizador: si te dice que ha estudiado, no hay nada que apuntar.
+3. Ayudarle a organizarse: dividir una tarea en pasos (add_subtasks) o decirle por dónde empezar. El tiempo de estudio lo registra solo el modo estudio de la app (sesiones como vuelos): tú no puedes iniciarlo ni apuntarlo; si te dice que ha estudiado, no hay nada que apuntar.
 
 ES UNA CONVERSACIÓN: usa los mensajes anteriores. «Muévelo al viernes», «ponle prioridad alta», «bórralo», «el de antes», «sí, hazlo», «mejor a las 5» se refieren a lo último de lo que se habló. Tus mensajes anteriores terminan con [Hecho en la app: …] con los ids reales de lo que se aplicó: úsalos (task_id, exam_id, grade_id…) para editar. Si dice «deshaz eso» o «no, era otra cosa», corrige con acciones (update_/delete_) sobre esos ids. Si una vez preguntaste algo y ahora responde, completa la acción pendiente con todo lo que ya dijo.
 

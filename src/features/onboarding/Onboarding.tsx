@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, Plus } from 'lucide-react'
 
-import { SUBJECT_CATALOG, type CatalogSubject } from '@/data/defaults'
+import { LEVELS, levelOf, type CatalogSubject, type StudyLevel } from '@/data/defaults'
 import { nextColor } from '@/domain/palette'
 import type { SubjectColor } from '@/domain/types'
 import { useDispatch, useSettings } from '@/state/StoreProvider'
-import { BrandMark } from '@/layout/Brand'
+import { APP_NAME, BrandMark } from '@/layout/Brand'
 import { Field, Input } from '@/ui/fields'
 import { Button, cx } from '@/ui/primitives'
 import { Modal } from '@/ui/Modal'
@@ -28,6 +28,9 @@ export function Onboarding() {
   const [step, setStep] = useState<Step>('perfil')
   const [name, setName] = useState(settings.userName)
   const [course, setCourse] = useState(settings.course)
+  const [level, setLevel] = useState<StudyLevel | null>(() => levelOf(settings.course))
+  const levelInfo = LEVELS.find((l) => l.id === level) ?? null
+  const catalog = levelInfo?.catalog ?? []
   const [error, setError] = useState<string | null>(null)
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [custom, setCustom] = useState<string[]>([])
@@ -36,7 +39,7 @@ export function Onboarding() {
 
   const catalogByName = useMemo(() => {
     const map = new Map<string, CatalogSubject>()
-    for (const group of SUBJECT_CATALOG) {
+    for (const group of LEVELS.flatMap((l) => l.catalog)) {
       for (const subject of group.subjects) map.set(subject.name, subject)
     }
     return map
@@ -89,7 +92,7 @@ export function Onboarding() {
       type: 'settings/update',
       patch: {
         userName: name.trim(),
-        course: course.trim() || '1.º de Bachillerato',
+        course: course.trim(),
         onboarded: true,
       },
     })
@@ -102,7 +105,10 @@ export function Onboarding() {
       <div className="min-h-dvh grid lg:grid-cols-[5fr_7fr] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         {/* --- Columna de presentación --- */}
         <div className="hidden lg:flex flex-col justify-between p-12 xl:p-16 bg-surface border-r border-hairline">
-          <BrandMark size={34} />
+          <div className="flex items-center gap-3">
+            <BrandMark size={34} />
+            <span className="display text-[1.125rem]">{APP_NAME}</span>
+          </div>
 
           <div className="max-w-[30ch]">
             <p className="eyebrow mb-5">Curso {settings.academicYear}</p>
@@ -127,9 +133,7 @@ export function Onboarding() {
           <div className="w-full max-w-[540px] mx-auto lg:mx-0">
             <div className="lg:hidden flex items-center gap-2.5 mb-10">
               <BrandMark size={30} />
-              <span className="display text-[0.9375rem]">
-                Bachillerato&nbsp;<span className="text-ink-3">OS</span>
-              </span>
+              <span className="display text-[0.9375rem]">{APP_NAME}</span>
             </div>
 
             <StepDots step={step} />
@@ -161,9 +165,45 @@ export function Onboarding() {
                     )}
                   </Field>
 
-                  <Field label="Curso">
+                  <div>
+                    <p className="text-[0.875rem] font-medium text-ink-2 mb-2">¿Qué estudias?</p>
+                    <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Etapa">
+                      {LEVELS.map((l) => {
+                        const active = level === l.id
+                        return (
+                          <button
+                            key={l.id}
+                            type="button"
+                            role="radio"
+                            aria-checked={active}
+                            onClick={() => {
+                              setLevel(l.id)
+                              // Las asignaturas marcadas de otra etapa no aplican.
+                              setPicked(new Set())
+                            }}
+                            className={cx(
+                              'pressable inline-flex items-center gap-1.5 h-10 px-4 rounded-full text-[0.875rem] transition-colors',
+                              active
+                                ? 'bg-accent-fill text-white font-semibold'
+                                : 'bg-fill text-ink-2 hover:text-ink',
+                            )}
+                          >
+                            {active && <Check className="size-3.5" strokeWidth={3} />}
+                            {l.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <Field label="Curso (opcional)">
                     {({ id }) => (
-                      <Input id={id} value={course} onChange={(e) => setCourse(e.target.value)} />
+                      <Input
+                        id={id}
+                        value={course}
+                        placeholder={levelInfo ? `p. ej. ${levelInfo.example}` : 'p. ej. 2.º de ESO'}
+                        onChange={(e) => setCourse(e.target.value)}
+                      />
                     )}
                   </Field>
                 </div>
@@ -181,7 +221,7 @@ export function Onboarding() {
                 {SYNC_AVAILABLE && (
                   <div className="mt-10 pt-6 border-t border-hairline">
                     <p className="text-[0.875rem] text-ink-2">
-                      ¿Ya usas Bachillerato OS en otro dispositivo?
+                      ¿Ya usas {APP_NAME} en otro dispositivo?
                     </p>
                     <Button
                       variant="ghost"
@@ -199,11 +239,13 @@ export function Onboarding() {
                   ¿Qué asignaturas tienes?
                 </h2>
                 <p className="text-[0.875rem] text-ink-3 mt-2">
-                  Marca las tuyas. Puedes saltarte este paso y añadirlas después.
+                  {catalog.length > 0
+                    ? 'Marca las tuyas y añade las que falten. Puedes saltarte este paso y hacerlo después.'
+                    : 'Escríbelas una a una: las que quieras, con el nombre que quieras. También puedes añadirlas después.'}
                 </p>
 
                 <div className="flex flex-col gap-6 mt-7 max-h-[46vh] overflow-y-auto pr-1 -mr-1">
-                  {SUBJECT_CATALOG.map((group) => (
+                  {catalog.map((group) => (
                     <div key={group.id}>
                       <p className="eyebrow mb-1">{group.label}</p>
                       <p className="text-[0.75rem] text-ink-3 mb-2.5">{group.hint}</p>
@@ -257,7 +299,7 @@ export function Onboarding() {
                 <div className="flex gap-2 mt-5">
                   <Input
                     value={customDraft}
-                    placeholder="Otra asignatura (Religión, Segunda lengua…)"
+                    placeholder={levelInfo?.customHint ?? 'Nombre de la asignatura'}
                     aria-label="Añadir otra asignatura"
                     onChange={(e) => setCustomDraft(e.target.value)}
                     onKeyDown={(e) => {

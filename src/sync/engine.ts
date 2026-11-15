@@ -274,7 +274,7 @@ class SyncEngine {
 
     downloadBackup(
       exportJSON(store.getData()),
-      `bachillerato-os-antes-de-sincronizar-${today()}.json`,
+      `orbita-antes-de-sincronizar-${today()}.json`,
     )
     saveMeta(createMeta(userId, nodeId()))
     this.set({ phase: 'syncing' })

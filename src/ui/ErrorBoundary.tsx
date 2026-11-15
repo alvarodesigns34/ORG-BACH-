@@ -23,7 +23,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('Bachillerato OS', error, info.componentStack)
+    console.error('Órbita', error, info.componentStack)
   }
 
   private exportCopy = () => {
@@ -33,7 +33,7 @@ export class ErrorBoundary extends Component<Props, State> {
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = 'bachillerato-os-rescate.json'
+      link.download = 'orbita-rescate.json'
       link.click()
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch {

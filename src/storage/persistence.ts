@@ -394,7 +394,7 @@ export function importJSON(text: string): ImportResult {
     return {
       ok: false,
       error:
-        'El archivo no parece una copia de Bachillerato OS, o no trae ningún dato que importar.',
+        'El archivo no parece una copia de Órbita, o no trae ningún dato que importar.',
     }
   }
 
