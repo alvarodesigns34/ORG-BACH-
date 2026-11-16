@@ -16,6 +16,7 @@ import {
   ListTree,
   Mic,
   Pencil,
+  Plane,
   RotateCcw,
   Sparkles,
   SquarePen,
@@ -29,6 +30,7 @@ import {
   applyAssistantActions,
   applyUndo,
   buildContext,
+  flightHref,
   isEmptyPlan,
   planUndo,
   type AppliedKind,
@@ -62,6 +64,7 @@ const SUGGESTIONS: { group: string; items: string[] }[] = [
       'Examen de Biología el jueves, entra el tema 3',
       'He sacado un 8 en Física, valía un 40 %',
       'Ejercicios 4 y 5 de Mates para mañana',
+      'Ponme 45 min de Mates con lluvia',
     ],
   },
   {
@@ -70,6 +73,7 @@ const SUGGESTIONS: { group: string; items: string[] }[] = [
       '¿Qué tengo esta semana?',
       '¿Qué nota necesito en Mates para sacar un 7?',
       'Hazme un plan de repaso para mi próximo examen',
+      '¿Cuánto he estudiado esta semana?',
     ],
   },
 ]
@@ -86,6 +90,7 @@ const ICONS: Record<AppliedKind, typeof ListChecks> = {
   borrada: Trash2,
   subtareas: ListTree,
   objetivo: Target,
+  vuelo: Plane,
 }
 
 const LABELS: Record<AppliedKind, string> = {
@@ -100,6 +105,7 @@ const LABELS: Record<AppliedKind, string> = {
   borrada: 'Borrado',
   subtareas: 'Pasos',
   objetivo: 'Objetivo',
+  vuelo: 'Vuelo',
 }
 
 type Input = { text?: string; audio?: { data: string; mimeType: string } }
@@ -245,6 +251,15 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
           undo: isEmptyPlan(plan) ? null : plan,
         },
       ])
+      // Vuelo preparado: se cierra el asistente y se abre la cabina. Despegar
+      // es un toque del alumno (y Safari lo exige para encender el sonido).
+      if (result.flight) {
+        const href = flightHref(result.flight)
+        window.setTimeout(() => {
+          onClose()
+          window.location.hash = href.slice(1)
+        }, 900)
+      }
     } catch (e) {
       if (controller.signal.aborted) return
       patchMessage(userId, {

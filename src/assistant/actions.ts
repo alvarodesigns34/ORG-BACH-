@@ -15,6 +15,8 @@
 import { normalize } from '../domain/tasks.ts'
 import { addDays, formatDayMonth } from '../domain/dates.ts'
 import { requiredGrade, round, subjectResult } from '../domain/grades.ts'
+import { activeSession, layoverPoints, layoversTaken, remainingMs } from '../domain/flights.ts'
+import { minutesBetween, studyBeforeExams, studyStreak } from '../domain/study.ts'
 import { newId } from '../domain/id.ts'
 import type {
   AppData,
@@ -48,6 +50,7 @@ export const ACTION_TYPES = [
   'delete_event',
   'add_subject',
   'set_target',
+  'start_flight',
 ] as const
 
 export type AssistantActionType = (typeof ACTION_TYPES)[number]
@@ -81,6 +84,8 @@ export interface AssistantAction {
   items?: string[]
   /** Nota objetivo (set_target); `null` la quita. */
   target?: number | null
+  /** Ambiente del vuelo (start_flight). */
+  sound?: string
 }
 
 export type AppliedKind =
@@ -95,6 +100,7 @@ export type AppliedKind =
   | 'borrada'
   | 'subtareas'
   | 'objetivo'
+  | 'vuelo'
 
 export interface AppliedItem {
   kind: AppliedKind
@@ -107,11 +113,45 @@ export interface AppliedItem {
   memo: string
 }
 
+/** Vuelo que el asistente deja preparado (la app no despega sin un toque). */
+export interface FlightRequest {
+  minutes: number
+  subjectId?: string
+  taskId?: string
+  sound?: string
+}
+
 export interface ApplyResult {
   data: AppData
   applied: AppliedItem[]
   /** Acciones descartadas, con el motivo, para enseñárselo al alumno. */
   skipped: string[]
+  /** Un vuelo del modo estudio listo para despegar, si se pidió. */
+  flight?: FlightRequest
+}
+
+/** Ambientes que se pueden pedir por nombre (los de `soundscape.ts`). */
+export const FLIGHT_SOUNDS: Record<string, string> = {
+  cabina: 'Cabina',
+  lluvia: 'Lluvia',
+  tormenta: 'Tormenta',
+  olas: 'Olas',
+  viento: 'Viento',
+  chimenea: 'Chimenea',
+  marron: 'Ruido marrón',
+  ninguno: 'Silencio',
+}
+
+export const FLIGHT_MIN_MINUTES = 15
+export const FLIGHT_MAX_MINUTES = 240
+
+/** El enlace que prepara ese vuelo en el modo estudio. */
+export function flightHref(flight: FlightRequest): string {
+  const params = new URLSearchParams({ despegar: String(flight.minutes) })
+  if (flight.subjectId) params.set('asignatura', flight.subjectId)
+  if (flight.taskId) params.set('tarea', flight.taskId)
+  if (flight.sound) params.set('sonido', flight.sound)
+  return `#/estudio?${params.toString()}`
 }
 
 const PRIORITIES: Priority[] = ['baja', 'media', 'alta', 'urgente']
@@ -189,6 +229,7 @@ export function applyAssistantActions(
   let data = initial
   const applied: AppliedItem[] = []
   const skipped: string[] = []
+  let flight: FlightRequest | undefined
   const subjectName = (id?: string) => data.subjects.find((s) => s.id === id)?.name
 
   for (const action of actions.slice(0, 25)) {
@@ -764,12 +805,59 @@ export function applyAssistantActions(
         break
       }
 
+      // ---------------------------------------------------------- modo estudio
+      case 'start_flight': {
+        if (data.sessions.some((x) => x.status === 'en_vuelo')) {
+          skipped.push('Ya tienes un vuelo en el aire: termínalo o abandónalo antes de empezar otro.')
+          break
+        }
+        if (flight) {
+          skipped.push('Solo se puede preparar un vuelo a la vez.')
+          break
+        }
+        const raw = num(action.minutes)
+        if (raw === undefined || raw < FLIGHT_MIN_MINUTES || raw > FLIGHT_MAX_MINUTES) {
+          skipped.push(
+            `Vuelo: la duración tiene que estar entre ${FLIGHT_MIN_MINUTES} min y ${FLIGHT_MAX_MINUTES / 60} h.`,
+          )
+          break
+        }
+        const s = mentionsSubject ? subject() : undefined
+        if (mentionsSubject && !s) {
+          missingSubject('Vuelo')
+          break
+        }
+        const task = action.task_id ? findTask(data, action, true) : undefined
+        if (action.task_id && (!task || task.status === 'completada')) {
+          skipped.push('Vuelo: no encuentro esa tarea entre las pendientes.')
+          break
+        }
+        const sound = action.sound && action.sound in FLIGHT_SOUNDS ? action.sound : undefined
+        if (action.sound && !sound) {
+          skipped.push(`Vuelo: no hay ningún ambiente «${action.sound}»; se queda el de siempre.`)
+        }
+        const minutes = Math.round(raw)
+        flight = {
+          minutes,
+          subjectId: s?.id ?? task?.subjectId,
+          taskId: task?.id,
+          sound,
+        }
+        const subjectLabel = s?.name ?? (task?.subjectId ? subjectName(task.subjectId) : undefined)
+        applied.push({
+          kind: 'vuelo',
+          text: `${minutes} min${subjectLabel ? ` de ${subjectLabel}` : ''}${sound ? ` · ${FLIGHT_SOUNDS[sound]}` : ''} · listo para despegar`,
+          memo: `vuelo preparado de ${minutes} min${subjectLabel ? ` de ${subjectLabel}` : ''}${task ? ` con la tarea [${task.id}]` : ''}${sound ? `, ambiente ${sound}` : ''} (falta que el alumno pulse Despegar)`,
+        })
+        break
+      }
+
       default:
         skipped.push('Una acción que no sé hacer.')
     }
   }
 
-  return { data, applied, skipped }
+  return { data, applied, skipped, flight }
 }
 
 function cleanItems(items: unknown): string[] {
@@ -1077,6 +1165,8 @@ export function buildContext(data: AppData, today: string, now: Date = new Date(
         date: g.date,
         category_id: g.categoryId ?? undefined,
       })),
+    study: studyContext(data, today, now),
+    sounds: Object.keys(FLIGHT_SOUNDS),
     events: data.events
       .filter((e) => e.date >= weekAgo)
       .sort((a, b) => a.date.localeCompare(b.date))
@@ -1091,3 +1181,63 @@ export function buildContext(data: AppData, today: string, now: Date = new Date(
 }
 
 export type AssistantContext = ReturnType<typeof buildContext>
+
+/**
+ * El modo estudio, resumido para el modelo: cuánto se ha estudiado (con las
+ * cuentas hechas), la racha, el vuelo en el aire y lo estudiado antes de cada
+ * examen con nota. El modelo responde con esto y no calcula nada.
+ */
+function studyContext(data: AppData, today: string, now: Date) {
+  const minutes = (from: string) => {
+    const by = minutesBetween(data.sessions, from, today)
+    const bySubject = [...by]
+      .map(([id, m]) => ({ subject_id: id ?? null, minutes: m }))
+      .sort((a, b) => b.minutes - a.minutes)
+    return { total_minutes: bySubject.reduce((sum, x) => sum + x.minutes, 0), by_subject: bySubject }
+  }
+  // Semana de lunes a domingo, como el resto de la app.
+  const weekday = (new Date(`${today}T12:00:00`).getDay() + 6) % 7
+  const streak = studyStreak(data.sessions, today)
+  const active = activeSession(data.sessions)
+  const scale = data.settings.gradeScale
+  return {
+    today: minutes(today),
+    this_week: { since: addDays(today, -weekday), ...minutes(addDays(today, -weekday)) },
+    last_30_days: minutes(addDays(today, -29)),
+    streak_days: streak.current,
+    studied_today: streak.today,
+    best_streak_days: streak.best,
+    active_flight: active
+      ? {
+          from: active.from,
+          to: active.to,
+          subject_id: active.subjectId ?? null,
+          planned_minutes: active.plannedMinutes,
+          remaining_minutes: Math.ceil(remainingMs(active, now.getTime()) / 60_000),
+          paused: !!active.pausedAt,
+          breaks_left: Math.max(0, layoverPoints(active).length - layoversTaken(active)),
+        }
+      : null,
+    recent_flights: data.sessions
+      .filter((s) => s.status !== 'en_vuelo' && s.endedAt)
+      .sort((a, b) => (b.endedAt ?? '').localeCompare(a.endedAt ?? ''))
+      .slice(0, 8)
+      .map((s) => ({
+        day: s.endedAt!.slice(0, 10),
+        subject_id: s.subjectId ?? null,
+        minutes: s.focusedMinutes ?? 0,
+        route: `${s.from}-${s.to}`,
+        landed: s.status === 'aterrizado',
+      })),
+    before_exams: studyBeforeExams(data.sessions, data.exams, data.grades, scale)
+      .slice(0, 10)
+      .map((r) => ({
+        exam_id: r.exam.id,
+        subject_id: r.exam.subjectId,
+        date: r.exam.date,
+        minutes_studied: r.minutes,
+        window_days: r.windowDays,
+        grade: round(r.score, 2),
+      })),
+  }
+}

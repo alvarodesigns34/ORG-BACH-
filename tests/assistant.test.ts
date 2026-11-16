@@ -15,6 +15,7 @@ import {
   applyAssistantActions,
   applyUndo,
   buildContext,
+  flightHref,
   planUndo,
   resolveSubject,
 } from '../src/assistant/actions.ts'
@@ -450,5 +451,87 @@ describe('contexto que viaja al modelo', () => {
     assert.equal(bio.needed_for_target?.status, 'alcanzable')
     assert.equal(ctx.recent_grades[0].id, 'g1')
     assert.equal(ctx.exams[0].id, 'ex_bio')
+  })
+})
+
+describe('asistente: vuelos del modo estudio', () => {
+  it('prepara un vuelo con asignatura por nombre y ambiente', () => {
+    const r = applyAssistantActions(
+      course(),
+      [{ type: 'start_flight', minutes: 45, subject_name: 'matemáticas', sound: 'lluvia' }],
+      TODAY,
+    )
+    assert.deepEqual(r.flight, { minutes: 45, subjectId: 'mat', taskId: undefined, sound: 'lluvia' })
+    assert.equal(r.applied[0].kind, 'vuelo')
+    // Preparar no toca los datos: despegar es cosa del alumno.
+    assert.equal(r.data.sessions.length, 0)
+  })
+
+  it('el enlace lleva todo lo pedido', () => {
+    assert.equal(
+      flightHref({ minutes: 45, subjectId: 'mat', sound: 'lluvia' }),
+      '#/estudio?despegar=45&asignatura=mat&sonido=lluvia',
+    )
+  })
+
+  it('descarta duraciones imposibles, asignaturas que no existen y un segundo vuelo', () => {
+    assert.equal(applyAssistantActions(course(), [{ type: 'start_flight', minutes: 5 }], TODAY).flight, undefined)
+    assert.equal(applyAssistantActions(course(), [{ type: 'start_flight', minutes: 600 }], TODAY).flight, undefined)
+    const ghost = applyAssistantActions(course(), [{ type: 'start_flight', minutes: 30, subject_name: 'Latín' }], TODAY)
+    assert.equal(ghost.flight, undefined)
+    assert.match(ghost.skipped[0], /Latín/)
+    const two = applyAssistantActions(
+      course(),
+      [
+        { type: 'start_flight', minutes: 30 },
+        { type: 'start_flight', minutes: 60 },
+      ],
+      TODAY,
+    )
+    assert.equal(two.flight?.minutes, 30)
+    assert.equal(two.skipped.length, 1)
+  })
+
+  it('no prepara otro si ya hay uno en el aire', () => {
+    const data = course()
+    data.sessions = [
+      {
+        id: 'v', kind: 'vuelo', from: 'MAD', to: 'BCN', distanceKm: 483, plannedMinutes: 48, seat: '01A',
+        status: 'en_vuelo', startedAt: '2026-11-02T10:00:00.000Z', pausedMs: 0, createdAt: '2026-11-02T10:00:00.000Z',
+      },
+    ]
+    const r = applyAssistantActions(data, [{ type: 'start_flight', minutes: 30 }], TODAY)
+    assert.equal(r.flight, undefined)
+    assert.match(r.skipped[0], /en el aire/)
+  })
+
+  it('un ambiente desconocido se ignora y se avisa, pero el vuelo se prepara', () => {
+    const r = applyAssistantActions(course(), [{ type: 'start_flight', minutes: 25, sound: 'jazz' }], TODAY)
+    assert.equal(r.flight?.sound, undefined)
+    assert.equal(r.flight?.minutes, 25)
+    assert.equal(r.skipped.length, 1)
+  })
+
+  it('el contexto trae el estudio ya sumado', () => {
+    const data = course()
+    const flight = (id: string, endedAt: string, minutes: number, subjectId?: string) => ({
+      id, kind: 'vuelo' as const, from: 'MAD', to: 'BCN', distanceKm: 483, plannedMinutes: minutes, seat: '01A',
+      subjectId, status: 'aterrizado' as const, startedAt: endedAt, pausedMs: 0, endedAt, focusedMinutes: minutes, createdAt: endedAt,
+    })
+    // TODAY es lunes 2 de noviembre.
+    data.sessions = [
+      flight('a', '2026-11-02T09:00:00.000Z', 45, 'mat'),
+      flight('b', '2026-11-01T18:00:00.000Z', 30, 'bio'),
+      flight('c', '2026-10-31T18:00:00.000Z', 20, 'mat'),
+    ]
+    const ctx = buildContext(data, TODAY, new Date('2026-11-02T12:00:00Z'))
+    assert.equal(ctx.study.today.total_minutes, 45)
+    assert.equal(ctx.study.this_week.since, '2026-11-02')
+    assert.equal(ctx.study.this_week.total_minutes, 45)
+    assert.equal(ctx.study.last_30_days.total_minutes, 95)
+    assert.deepEqual(ctx.study.last_30_days.by_subject[0], { subject_id: 'mat', minutes: 65 })
+    assert.equal(ctx.study.streak_days, 3)
+    assert.equal(ctx.study.active_flight, null)
+    assert.ok(ctx.sounds.includes('lluvia'))
   })
 })
