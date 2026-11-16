@@ -68,6 +68,9 @@ export default defineConfig({
             options: {
               cacheName: 'orbita-sonidos-v1',
               expiration: { maxEntries: 12 },
+              // Safari pide el audio por rangos: sin esto, un archivo en
+              // caché no se reproduciría desde el elemento <audio>.
+              rangeRequests: true,
               cacheableResponse: { statuses: [0, 200] },
             },
           },

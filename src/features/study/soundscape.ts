@@ -247,7 +247,14 @@ export function preloadSound(id: SoundId | 'ninguno'): void {
   if (c) void load(c, id)
 }
 
-function playRecording(c: BaseAudioContext, b: AudioBuffer, id: Recorded, out: AudioNode) {
+function playRecording(
+  c: BaseAudioContext,
+  b: AudioBuffer,
+  id: Recorded,
+  out: AudioNode,
+  /** Posición en el archivo (s); por defecto, un punto al azar del bucle. */
+  at?: number,
+) {
   const src = c.createBufferSource()
   src.buffer = b
   src.loop = true
@@ -256,7 +263,8 @@ function playRecording(c: BaseAudioContext, b: AudioBuffer, id: Recorded, out: A
   src.loopEnd = PAD + len
   src.connect(out)
   // Cada vez desde un punto distinto: nunca se oye «el mismo principio».
-  src.start(0, PAD + Math.random() * len)
+  const from = at === undefined ? PAD + Math.random() * len : PAD + ((((at - PAD) % len) + len) % len)
+  src.start(0, from)
   return () => stopNode(src)
 }
 
@@ -321,7 +329,8 @@ function stopNode(node: AudioScheduledSourceNode) {
 // Control
 // ---------------------------------------------------------------------------
 
-const FADE = 1.6
+/** Salida del ambiente anterior al cambiar: se cruza con la entrada del nuevo. */
+const FADE_OUT = 0.8
 
 /**
  * Ajuste de nivel por ambiente. Las grabaciones ya vienen igualadas (mitad
@@ -354,45 +363,120 @@ export function loadingSound(): SoundId | null {
   return wanted && current?.id !== wanted ? wanted : null
 }
 
-function start(c: AudioContext, id: SoundId, stop: (out: AudioNode) => () => void) {
+function start(c: AudioContext, id: SoundId, play: (out: AudioNode) => () => void) {
   if (!master) return
   fadeOutCurrent()
   const g = c.createGain()
   g.gain.value = 0
   g.connect(master)
-  const halt = stop(g)
+  const halt = play(g)
   const t = c.currentTime
-  g.gain.setValueAtTime(0, t)
-  g.gain.linearRampToValueAtTime(TRIM[id] * (ducked ? 0.15 : 1), t + FADE)
+  // Entrada rápida pero suave (~0,7 s): curva exponencial, que el oído
+  // percibe como inmediata, en vez de una rampa lineal larga que empieza
+  // casi en silencio.
+  g.gain.setValueAtTime(0.0001, t)
+  g.gain.setTargetAtTime(TRIM[id] * (ducked ? 0.15 : 1), t, 0.18)
   current = { id, gain: g, stop: halt }
   notify()
+}
+
+/**
+ * Arranque inmediato de una grabación aún no decodificada: se reproduce en
+ * streaming con un `<audio>` conectado al mismo circuito (empieza en cuanto
+ * llegan los primeros datos) y, cuando el búfer completo está listo, se pasa
+ * a él con un fundido corto en el mismo punto. El búfer es el que permite el
+ * bucle sin costura; el `<audio>` solo cubre esos primeros segundos.
+ */
+function playStreaming(c: AudioContext, id: Recorded, out: AudioNode): () => void {
+  const len = LOOP[id]
+  const startAt = PAD + Math.random() * len
+  const el = new Audio()
+  el.preload = 'auto'
+  el.loop = true
+  el.setAttribute('playsinline', '')
+  el.src = `${soundUrl(id)}#t=${startAt.toFixed(2)}`
+  const elGain = c.createGain()
+  let srcNode: MediaElementAudioSourceNode | null = null
+  try {
+    srcNode = c.createMediaElementSource(el)
+    srcNode.connect(elGain).connect(out)
+    void el.play().catch(() => {
+      // Sin gesto (p. ej. al despegar con retardo) Safari no deja: se espera al búfer.
+      upgrade()
+    })
+  } catch {
+    srcNode = null
+  }
+  let stopBuffer: (() => void) | null = null
+  let done = false
+  const release = () => {
+    el.pause()
+    el.removeAttribute('src')
+    el.load()
+    srcNode?.disconnect()
+    elGain.disconnect()
+  }
+  // La descarga completa espera a que el streaming ya suene: si no, las dos
+  // se reparten la conexión y el primer sonido tarda más.
+  let upgrading = false
+  function upgrade() {
+    if (upgrading) return
+    upgrading = true
+    void load(c, id).then(swap)
+  }
+  if (!srcNode) upgrade()
+  else {
+    el.addEventListener('playing', () => window.setTimeout(upgrade, 400), { once: true })
+    window.setTimeout(upgrade, 4000)
+  }
+  function swap(b: AudioBuffer | null) {
+    if (done || !b) return
+    const bufGain = c.createGain()
+    bufGain.gain.value = 0
+    bufGain.connect(out)
+    const playing = srcNode && !el.paused && el.currentTime > 0
+    stopBuffer = playRecording(c, b, id, bufGain, playing ? el.currentTime : undefined)
+    const t = c.currentTime
+    const X = playing ? 0.35 : 0.05
+    bufGain.gain.setValueAtTime(0, t)
+    bufGain.gain.linearRampToValueAtTime(1, t + X)
+    elGain.gain.setValueAtTime(1, t)
+    elGain.gain.linearRampToValueAtTime(0, t + X)
+    window.setTimeout(release, X * 1000 + 80)
+  }
+  return () => {
+    done = true
+    stopBuffer?.()
+    release()
+  }
 }
 
 export function playSound(id: SoundId): void {
   const c = context()
   if (!c || !master) return
-  if (current?.id === id || wanted === id) return
+  if (current?.id === id) return
   wanted = id
   if (id === 'marron') {
     start(c, id, (out) => playBrown(c, out))
     return
   }
   const ready = decoded.get(id)
-  if (ready) {
-    start(c, id, (out) => playRecording(c, ready, id, out))
-    return
-  }
-  notify()
-  void load(c, id).then((b) => {
-    if (wanted !== id) return // Se eligió otro mientras se descargaba.
-    if (!b) {
-      wanted = current?.id ?? null
-      notify()
-      return
-    }
-    start(c, id, (out) => playRecording(c, b, id, out))
-  })
+  if (ready) start(c, id, (out) => playRecording(c, ready, id, out))
+  else start(c, id, (out) => playStreaming(c, id, out))
 }
+
+/**
+ * Descarga (sin decodificar) los ambientes para que cambiar de uno a otro
+ * sea instantáneo: quedan en la caché del navegador / Service Worker.
+ */
+export function prefetchSounds(): void {
+  for (const s of SOUNDS) {
+    if (s.id === 'marron' || fetched.has(s.id)) continue
+    fetched.add(s.id)
+    void fetch(soundUrl(s.id)).then((r) => r.blob()).catch(() => fetched.delete(s.id))
+  }
+}
+const fetched = new Set<SoundId>()
 
 function fadeOutCurrent() {
   if (!ctx || !current) return
@@ -401,11 +485,11 @@ function fadeOutCurrent() {
   const t = ctx.currentTime
   g.gain.cancelScheduledValues(t)
   g.gain.setValueAtTime(g.gain.value, t)
-  g.gain.linearRampToValueAtTime(0, t + FADE * 0.75)
+  g.gain.linearRampToValueAtTime(0, t + FADE_OUT)
   window.setTimeout(() => {
     stop()
     g.disconnect()
-  }, FADE * 750 + 100)
+  }, FADE_OUT * 1000 + 100)
 }
 
 export function stopSound(): void {

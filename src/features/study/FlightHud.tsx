@@ -29,7 +29,7 @@ import type { FocusSession, Subject, Task } from '@/domain/types'
 import { haptic, spring } from '@/ui/motion'
 import { Button, cx } from '@/ui/primitives'
 import type { MapKind } from './mapStyle'
-import { SOUNDS, SOUND_CREDITS, loadingSound, subscribeSound, type SoundId } from './soundscape'
+import { SOUNDS, SOUND_CREDITS, loadingSound, prefetchSounds, subscribeSound, type SoundId } from './soundscape'
 
 // ---------------------------------------------------------------------------
 // Piezas
@@ -188,6 +188,8 @@ function SoundPanel({
   onKeepAwake: (on: boolean) => void
 }) {
   const loading = useSyncExternalStore(subscribeSound, loadingSound, () => null)
+  // Con el panel abierto se descargan todos: cambiar de ambiente es inmediato.
+  useEffect(() => prefetchSounds(), [])
   return (
     <>
       <p className="text-[0.9375rem] font-semibold mb-3">Sonido de fondo</p>
