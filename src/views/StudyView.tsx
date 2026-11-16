@@ -29,6 +29,7 @@ import type { FocusSession } from '@/domain/types'
 import { useDispatch, useStore, useToday } from '@/state/StoreProvider'
 import { useSubjectMap, useSubjects } from '@/state/selectors'
 import { useRoute } from '@/router'
+import { typing } from '@/layout/shortcuts'
 import { haptic } from '@/ui/motion'
 import { useToast } from '@/ui/Toast'
 import { AIRPORTS, AIRPORT_BY_IATA } from '@/features/study/airports'
@@ -324,6 +325,22 @@ export default function StudyView() {
     }
     if (following) map.follow(here, FlightMap.heading(flightFrom, flightTo, prog))
   }, [stage, mapReady, flightFrom, flightTo, prog, following])
+
+  // Espacio pausa y reanuda el vuelo (iPad con teclado, ordenador).
+  useEffect(() => {
+    if (stage !== 'vuelo' || !active) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== ' ' || event.metaKey || event.ctrlKey || event.altKey || event.repeat) return
+      if (typing(event.target) || document.querySelector('[aria-modal="true"]')) return
+      // Un botón enfocado ya reacciona al espacio por su cuenta.
+      if ((event.target as HTMLElement | null)?.closest('button, a, [role="switch"]')) return
+      event.preventDefault()
+      haptic()
+      dispatch({ type: active.pausedAt ? 'session/resume' : 'session/pause', id: active.id })
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [stage, active, dispatch])
 
   // --- Acciones ---
 

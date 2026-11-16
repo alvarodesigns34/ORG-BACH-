@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CalendarPlus, ChevronLeft, ChevronRight, ListPlus, Plus } from 'lucide-react'
+import { CalendarPlus, ChevronLeft, ChevronRight, GripVertical, ListPlus, Plus } from 'lucide-react'
 
 import {
   MONTHS_LONG,
@@ -17,7 +17,10 @@ import {
 } from '@/domain/dates'
 import { colorVar } from '@/domain/palette'
 import type { CalendarEvent, Exam, Subject, Task } from '@/domain/types'
-import { useStore, useSettings, useToday } from '@/state/StoreProvider'
+import { useDispatch, useStore, useSettings, useToday } from '@/state/StoreProvider'
+import { DragGhost, useDragToDay, type DragState } from '@/features/tasks/dragToDay'
+import { useToast } from '@/ui/Toast'
+import { bucketOf } from '@/domain/tasks'
 import { useCalendarIndex, useSubjectMap, type DayItem } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
 import { TaskEditor } from '@/features/tasks/TaskEditor'
@@ -48,6 +51,42 @@ export function CalendarView() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [editingExam, setEditingExam] = useState<Exam | null>(null)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
+  const dispatch = useDispatch()
+  const toast = useToast()
+
+  // Arrastrar una tarea (de «Por planificar» o del día) a otro día le pone
+  // esa fecha. Se puede deshacer.
+  const dnd = useDragToDay((taskId, day) => {
+    const task = data.tasks.find((t) => t.id === taskId)
+    if (!task || task.dueDate === day) return
+    dispatch({ type: 'task/update', id: taskId, patch: { dueDate: day } })
+    setSelected(day)
+    toast({
+      text: `«${task.title}» para el ${formatDayMonth(day)}`,
+      action: {
+        label: 'Deshacer',
+        run: () =>
+          dispatch({
+            type: 'task/update',
+            id: taskId,
+            patch: { dueDate: task.dueDate, dueTime: task.dueTime },
+          }),
+      },
+    })
+  })
+  const colorOf = (subjectId?: string) => {
+    const subject = subjectId ? subjects.get(subjectId) : undefined
+    return subject ? colorVar(subject.color) : 'var(--c-ink-3)'
+  }
+  /** Lo que aún no tiene día, y lo atrasado, para colocarlo arrastrando. */
+  const unplanned = useMemo(
+    () =>
+      data.tasks
+        .filter((t) => t.status !== 'completada' && (!t.dueDate || bucketOf(t, today) === 'atrasada'))
+        .sort((a, b) => (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999'))
+        .slice(0, 12),
+    [data.tasks, today],
+  )
 
   /**
    * Abre lo que se ha pulsado en el panel del día.
@@ -56,6 +95,7 @@ export function CalendarView() {
    * que hay que recuperar la entidad real antes de editarla.
    */
   const openItem = (item: DayItem) => {
+    if (dnd.suppressClick.current) return
     if (item.kind === 'tarea') {
       const task = data.tasks.find((t) => t.id === item.id)
       if (task) setEditingTask(task)
@@ -160,6 +200,7 @@ export function CalendarView() {
               subjects={subjects}
               weekStartsOn={settings.weekStartsOn}
               onSelect={setSelected}
+              drag={dnd.drag}
             />
           )}
           {mode === 'semana' && (
@@ -171,6 +212,7 @@ export function CalendarView() {
               subjects={subjects}
               weekStartsOn={settings.weekStartsOn}
               onSelect={setSelected}
+              drag={dnd.drag}
             />
           )}
           {mode === 'dia' && (
@@ -181,13 +223,16 @@ export function CalendarView() {
               subjects={subjects}
               onCreate={setCreating}
               onOpen={openItem}
+              onDragStart={dnd.start}
+              colorOf={colorOf}
+              drag={dnd.drag}
               expanded
             />
           )}
         </div>
 
-        {mode !== 'dia' && (
-          <div className="lg:col-span-4">
+        <div className={cx('flex flex-col gap-6', mode === 'dia' ? 'lg:col-span-12' : 'lg:col-span-4')}>
+          {mode !== 'dia' && (
             <DayPanel
               day={selected}
               today={today}
@@ -195,10 +240,58 @@ export function CalendarView() {
               subjects={subjects}
               onCreate={setCreating}
               onOpen={openItem}
+              onDragStart={dnd.start}
+              colorOf={colorOf}
+              drag={dnd.drag}
             />
-          </div>
-        )}
+          )}
+          {unplanned.length > 0 && (
+            <section aria-label="Por planificar">
+              <div className="flex items-baseline justify-between px-1 mb-2.5">
+                <h2 className="text-[1.125rem] font-bold tracking-[-0.02em]">Por planificar</h2>
+                <span className="text-[0.75rem] text-ink-3">Arrastra a un día</span>
+              </div>
+              <ul className="card overflow-hidden">
+                {unplanned.map((task, i) => {
+                  const overdue = !!task.dueDate
+                  return (
+                    <li key={task.id} className={cx(i > 0 && 'inset-separator')}>
+                      <div
+                        onPointerDown={dnd.start(task, colorOf(task.subjectId))}
+                        className={cx(
+                          'flex items-center gap-2 pl-1.5 pr-4 py-2 select-none transition-opacity',
+                          dnd.drag?.taskId === task.id && 'opacity-40',
+                        )}
+                      >
+                        <span
+                          data-drag-handle
+                          aria-hidden
+                          className="grid place-items-center size-9 shrink-0 text-ink-3 touch-none cursor-grab active:cursor-grabbing"
+                        >
+                          <GripVertical className="size-4" strokeWidth={2.2} />
+                        </span>
+                        <span className="size-2 rounded-full shrink-0" style={{ background: colorOf(task.subjectId) }} />
+                        <button
+                          type="button"
+                          onClick={() => !dnd.suppressClick.current && setEditingTask(task)}
+                          className="min-w-0 flex-1 text-left text-[0.9375rem] truncate"
+                        >
+                          {task.title}
+                        </button>
+                        {overdue && (
+                          <span className="text-[0.75rem] font-semibold text-danger shrink-0">Atrasada</span>
+                        )}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          )}
+        </div>
       </div>
+
+      <DragGhost drag={dnd.drag} />
 
       <TaskEditor
         open={creating === 'tarea'}
@@ -241,6 +334,8 @@ interface GridProps {
   subjects: Map<string, Subject>
   weekStartsOn: 0 | 1
   onSelect: (day: string) => void
+  /** Arrastre en curso: el día bajo el dedo se resalta. */
+  drag: DragState | null
 }
 
 function MonthGrid({
@@ -251,6 +346,7 @@ function MonthGrid({
   subjects,
   weekStartsOn,
   onSelect,
+  drag,
 }: GridProps) {
   const days = useMemo(() => monthGrid(cursor, weekStartsOn), [cursor, weekStartsOn])
   const headers = useMemo(
@@ -293,11 +389,13 @@ function MonthGrid({
               aria-label={`${formatDayMonth(day)}${items.length ? `, ${items.length} elementos` : ', sin nada'}`}
               aria-current={isToday ? 'date' : undefined}
               aria-pressed={isSelected}
+              data-drop-day={day}
               className={cx(
                 'group relative flex flex-col items-center gap-1 pt-1.5 pb-1 rounded-[12px]',
                 'min-h-[3.375rem] lg:min-h-[6.5rem] lg:items-stretch lg:px-1.5',
                 'transition-colors duration-150 lg:hover:bg-fill/60',
                 isSelected && 'lg:bg-accent-quiet',
+                drag?.over === day && 'bg-accent-quiet ring-2 ring-accent ring-inset',
               )}
             >
               <span
@@ -403,6 +501,7 @@ function WeekColumns({
   subjects,
   weekStartsOn,
   onSelect,
+  drag,
 }: GridProps) {
   const start = startOfWeek(cursor, weekStartsOn)
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i))
@@ -423,11 +522,13 @@ function WeekColumns({
               aria-label={`${formatDayMonth(day)}${items.length ? `, ${items.length} elementos` : ', sin nada'}`}
               aria-current={isToday ? 'date' : undefined}
               aria-pressed={day === selected}
+              data-drop-day={day}
               className={cx(
                 'flex flex-col text-left p-3 min-h-[9rem]',
                 'border-b border-r border-hairline last:border-r-0',
                 'transition-colors duration-150',
                 day === selected ? 'bg-accent-quiet' : 'hover:bg-fill/60',
+                drag?.over === day && 'ring-2 ring-accent ring-inset',
               )}
             >
               <span className="flex items-baseline gap-1.5 mb-2">
@@ -474,6 +575,9 @@ function DayPanel({
   subjects,
   onCreate,
   onOpen,
+  onDragStart,
+  colorOf,
+  drag,
   expanded,
 }: {
   day: string
@@ -482,6 +586,9 @@ function DayPanel({
   subjects: Map<string, Subject>
   onCreate: (kind: 'tarea' | 'examen' | 'evento') => void
   onOpen: (item: DayItem) => void
+  onDragStart: ReturnType<typeof useDragToDay>['start']
+  colorOf: (subjectId?: string) => string
+  drag: DragState | null
   expanded?: boolean
 }) {
   const { data } = useStore()
@@ -553,7 +660,20 @@ function DayPanel({
               )
 
               return (
-                <li key={item.id} className={cx(i > 0 && 'inset-separator')}>
+                <li
+                  key={item.id}
+                  className={cx(
+                    i > 0 && 'inset-separator',
+                    'relative',
+                    drag?.taskId === item.id && 'opacity-40',
+                  )}
+                  // Las tareas se pueden llevar a otro día arrastrando.
+                  onPointerDown={
+                    item.kind === 'tarea' && !item.done
+                      ? onDragStart({ id: item.id, title: item.title }, colorOf(item.subjectId))
+                      : undefined
+                  }
+                >
                   {editable ? (
                     <button
                       type="button"

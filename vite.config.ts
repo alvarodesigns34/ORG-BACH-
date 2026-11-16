@@ -36,6 +36,29 @@ export default defineConfig({
         background_color: '#f2f2f7',
         display: 'standalone',
         orientation: 'any',
+        // Accesos directos del icono (clic derecho / pulsación larga). Los
+        // muestran Chrome y Edge (Android, Windows, macOS) y Safari en macOS;
+        // iPadOS e iOS todavía no los admiten. En el iPad, lo equivalente es
+        // la tecla D o guardar el enlace `#/estudio?despegar=25`.
+        shortcuts: [
+          {
+            name: 'Despegar 25 minutos',
+            short_name: 'Despegar 25 min',
+            url: `${base}#/estudio?despegar=25`,
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'Despegar 50 minutos',
+            short_name: 'Despegar 50 min',
+            url: `${base}#/estudio?despegar=50`,
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'Nueva tarea',
+            url: `${base}#/tareas?crear=tarea`,
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
+          },
+        ],
         icons: [
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

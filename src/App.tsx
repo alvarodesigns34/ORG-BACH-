@@ -32,6 +32,7 @@ import { ToastProvider } from '@/ui/Toast'
 import { ChromeProvider, type CreateKind } from '@/layout/chrome'
 import { AssistantSheet } from '@/features/assistant/AssistantSheet'
 import { FlightController } from '@/features/study/FlightController'
+import { ShortcutsSheet, useKeyboardShortcuts } from '@/layout/shortcuts'
 
 export function App() {
   return (
@@ -73,31 +74,24 @@ function Shell() {
   // almacén. Sin cuenta configurada no hace nada.
   useEffect(() => syncEngine.start(), [])
 
-  // Atajo global: «c» crea una tarea desde cualquier sección, salvo mientras
-  // se está escribiendo en un campo.
+  // Atajos de teclado (iPad con teclado y ordenador) y su hoja de ayuda.
+  const flightActive = data.sessions.some((s) => s.status === 'en_vuelo')
+  const shortcuts = useKeyboardShortcuts({ openCreate, openAssistant, flightActive })
+
+  // `?crear=tarea|examen|nota|evento` en cualquier ruta abre el editor: lo
+  // usan los accesos directos de la app instalada.
+  const { navigate } = useRoute()
+  const createParam = route.params.get('crear')
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return
-      if (event.isComposing) return
-      const target = event.target as HTMLElement | null
-      if (target?.isContentEditable) return
-      if (
-        target?.closest(
-          'input, textarea, select, [contenteditable], [role="textbox"], [role="combobox"], [role="tab"], [role="radio"]',
-        )
-      ) {
-        return
-      }
-      // Con un diálogo abierto, «c» abría OTRO editor encima.
-      if (document.querySelector('[aria-modal="true"]')) return
-      if (event.key === 'c' || event.key === 'C') {
-        event.preventDefault()
-        setCreating('tarea')
-      }
+    if (!createParam) return
+    if (['tarea', 'examen', 'nota', 'evento'].includes(createParam)) {
+      setCreating(createParam as CreateKind)
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+    const params = Object.fromEntries([...route.params].filter(([k]) => k !== 'crear'))
+    navigate(route.id, Object.keys(params).length ? params : undefined)
+    // Solo reacciona al parámetro.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createParam])
 
   // Datos ilegibles: el alta parece un primer arranque y terminar el alta
   // escribiría encima de la única copia. Primero hay que bajarla o confirmar.
@@ -159,6 +153,7 @@ function Shell() {
       {/* El vuelo sigue (escalas, aterrizaje, sonido, pantalla de bloqueo)
           aunque se salga del modo estudio. */}
       <FlightController />
+      <ShortcutsSheet open={shortcuts.helpOpen} onClose={() => shortcuts.setHelpOpen(false)} />
       <LinkChoiceDialog />
       <RecoveryDialog />
     </>
