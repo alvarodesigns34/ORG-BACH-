@@ -368,7 +368,9 @@ export type ImportResult =
 export function importJSON(text: string): ImportResult {
   let parsed: unknown
   try {
-    parsed = JSON.parse(text)
+    // Algunos editores (el Bloc de notas de Windows) guardan con BOM, y
+    // `JSON.parse` lo rechaza como si el archivo estuviera roto.
+    parsed = JSON.parse(text.replace(/^\uFEFF/, '').trim())
   } catch {
     return { ok: false, error: 'El archivo no contiene JSON válido.' }
   }

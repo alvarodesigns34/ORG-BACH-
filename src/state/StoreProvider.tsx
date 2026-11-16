@@ -14,6 +14,7 @@ import { STORAGE_KEY } from '@/data/defaults'
 import { today as todayISO } from '@/domain/dates'
 import type { AppData, DateISO, ThemePreference } from '@/domain/types'
 import * as storage from '@/storage/persistence'
+import { dailySnapshot, requestPersistence } from '@/storage/snapshots'
 import { registerStore } from '@/sync/bridge'
 import { trackLocalChange } from '@/sync/metaStore'
 import { reducer, type Action } from './reducer'
@@ -106,6 +107,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // falla, el siguiente intento vuelve a comparar desde el mismo punto.
       trackLocalChange(lastPersisted.current, snapshot)
       lastPersisted.current = snapshot
+      if (snapshotTimer.current) clearTimeout(snapshotTimer.current)
+      snapshotTimer.current = setTimeout(() => void dailySnapshot(latest.current), 4000)
       pendingWrite.current = false
       setStorageNotice(null)
       return true
@@ -116,6 +119,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     pendingWrite.current = true
     setStorageNotice({ level: 'error', text: result.error })
     return false
+  }, [])
+
+  // Copia automática del día (en IndexedDB, aparte) un rato después de
+  // guardar, y la petición de almacenamiento persistente, una vez.
+  const snapshotTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    void requestPersistence()
+    snapshotTimer.current = setTimeout(() => void dailySnapshot(latest.current), 4000)
+    return () => {
+      if (snapshotTimer.current) clearTimeout(snapshotTimer.current)
+    }
   }, [])
 
   useEffect(() => {

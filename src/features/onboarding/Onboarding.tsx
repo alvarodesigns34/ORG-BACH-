@@ -1,10 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, Plus } from 'lucide-react'
 
 import { LEVELS, levelOf, type CatalogSubject, type StudyLevel } from '@/data/defaults'
 import { nextColor } from '@/domain/palette'
 import type { SubjectColor } from '@/domain/types'
-import { useDispatch, useSettings } from '@/state/StoreProvider'
+import { useDispatch, useSettings, useStore } from '@/state/StoreProvider'
+import { SnapshotsSheet } from '@/features/backup/Backups'
+import { listSnapshots } from '@/storage/snapshots'
+import { importJSON } from '@/storage/persistence'
 import { APP_NAME, BrandMark } from '@/layout/Brand'
 import { Field, Input } from '@/ui/fields'
 import { Button, cx } from '@/ui/primitives'
@@ -218,6 +221,8 @@ export function Onboarding() {
                   <ArrowRight className="size-4" />
                 </Button>
 
+                <RestoreLinks />
+
                 {SYNC_AVAILABLE && (
                   <div className="mt-10 pt-6 border-t border-hairline">
                     <p className="text-[0.875rem] text-ink-2">
@@ -368,6 +373,53 @@ function StepDots({ step }: { step: Step }) {
         />
       ))}
       <span className="text-[0.75rem] text-ink-3 ml-1.5 tabular-nums">Paso {index + 1} de 2</span>
+    </div>
+  )
+}
+
+/**
+ * Recuperar un curso sin cuenta: una copia automática de este dispositivo
+ * (si la hay; por ejemplo, tras «Empezar de cero») o un archivo exportado.
+ */
+function RestoreLinks() {
+  const { replaceAndSave } = useStore()
+  const [snapshots, setSnapshots] = useState(0)
+  const [open, setOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const file = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    void listSnapshots().then((list) => setSnapshots(list.length))
+  }, [])
+
+  return (
+    <div className="mt-8 flex flex-wrap items-center gap-x-1 gap-y-1 -ml-3.5">
+      {snapshots > 0 && (
+        <Button variant="ghost" onClick={() => setOpen(true)}>
+          Restaurar una copia automática
+        </Button>
+      )}
+      <Button variant="ghost" onClick={() => file.current?.click()}>
+        Importar una copia
+      </Button>
+      {error && <p className="w-full pl-3.5 text-[0.8125rem] text-danger">{error}</p>}
+      <input
+        ref={file}
+        type="file"
+        accept="application/json,.json"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+        onChange={async (e) => {
+          const picked = e.target.files?.[0]
+          e.target.value = ''
+          if (!picked) return
+          const result = importJSON(await picked.text())
+          if (!result.ok) setError(result.error)
+          else replaceAndSave(result.data)
+        }}
+      />
+      <SnapshotsSheet open={open} onClose={() => setOpen(false)} />
     </div>
   )
 }

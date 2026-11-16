@@ -9,6 +9,7 @@ import {
   Download,
   GraduationCap,
   Hash,
+  History,
   Layers,
   Sigma,
   SunMoon,
@@ -20,7 +21,6 @@ import {
 import { courseLine } from '@/data/defaults'
 import { APP_NAME } from '@/layout/Brand'
 import { createEmptyData } from '@/data/defaults'
-import { today as todayISO } from '@/domain/dates'
 import { TERMS, type AverageMode, type TermId } from '@/domain/types'
 import { useDispatch, useSettings, useStore } from '@/state/StoreProvider'
 import * as storage from '@/storage/persistence'
@@ -30,6 +30,9 @@ import { ThemeToggle } from '@/layout/ThemeToggle'
 import { AccountSection } from '@/features/account/Account'
 import { DigestSection } from '@/features/notifications/DigestCard'
 import { useSync } from '@/sync/useSync'
+import { SnapshotsSheet } from '@/features/backup/Backups'
+import { exportBackup } from '@/storage/backup'
+import { saveSnapshot } from '@/storage/snapshots'
 import { ListGroup, ListRow, RowInput, RowNumber, RowSelect, RowSwitch } from '@/ui/list'
 import { ConfirmDialog } from '@/ui/Modal'
 import { cx } from '@/ui/primitives'
@@ -69,19 +72,12 @@ export function SettingsView({ section }: { section?: string | null }) {
   ) => dispatch({ type: 'settings/update', patch })
 
   // --- Exportar ---
-  const exportData = () => {
-    const blob = new Blob([storage.exportJSON(data)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    // Día local, no el `slice` del ISO en UTC: entre medianoche y las dos de
-    // la madrugada el archivo salía fechado el día anterior.
-    link.download = `orbita-${todayISO()}.json`
-    link.click()
-    // Liberar el objeto en cuanto el navegador ha tomado la descarga.
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-    setNotice({ tone: 'ok', text: 'Copia descargada correctamente.' })
+  // En iPad abre la hoja de compartir («Guardar en Archivos»); en el resto,
+  // descarga el archivo (ver `exportBackup`).
+  const exportData = async () => {
+    if (await exportBackup(data)) setNotice({ tone: 'ok', text: 'Copia guardada correctamente.' })
   }
+  const [snapshotsOpen, setSnapshotsOpen] = useState(false)
 
   // --- Importar ---
   // Se lee y se valida el archivo, pero NO se aplica todavía: importar borra
@@ -99,8 +95,10 @@ export function SettingsView({ section }: { section?: string | null }) {
     setPendingImport(result)
   }
 
-  const applyImport = () => {
+  const applyImport = async () => {
     if (!pendingImport) return
+    // Lo de ahora se guarda como copia automática: importar se puede deshacer.
+    await saveSnapshot(data, 'antes-importar')
     replaceAndSave(pendingImport.data)
     setNotice(
       pendingImport.warning
@@ -303,7 +301,14 @@ export function SettingsView({ section }: { section?: string | null }) {
           }
         >
           <ListRow icon={Database} tint="#8e8e93" label="Contenido" value={counts} />
-          <ListRow icon={Download} tint="#0a84ff" label="Exportar copia" onClick={exportData} />
+          <ListRow icon={Download} tint="#0a84ff" label="Exportar copia" onClick={() => void exportData()} />
+          <ListRow
+            icon={History}
+            tint="#30b158"
+            label="Copias automáticas"
+            detail="Una al día, y antes de importar o borrar"
+            onClick={() => setSnapshotsOpen(true)}
+          />
           <ListRow
             icon={Upload}
             tint="#0a84ff"
@@ -331,10 +336,12 @@ export function SettingsView({ section }: { section?: string | null }) {
         </p>
       </div>
 
+      <SnapshotsSheet open={snapshotsOpen} onClose={() => setSnapshotsOpen(false)} />
+
       <ConfirmDialog
         open={!!pendingImport}
         onCancel={() => setPendingImport(null)}
-        onConfirm={applyImport}
+        onConfirm={() => void applyImport()}
         title="Importar esta copia"
         message={
           pendingImport
@@ -344,7 +351,7 @@ export function SettingsView({ section }: { section?: string | null }) {
               `${pendingImport.data.tasks.length} tareas y ` +
               `${pendingImport.data.exams.length} exámenes.` +
               (pendingImport.warning ? ` ${pendingImport.warning}` : '') +
-              ' Esta acción no se puede deshacer.'
+              ' Lo que tienes ahora queda guardado en «Copias automáticas».'
             : ''
         }
         confirmLabel="Importar y sustituir"
@@ -354,16 +361,18 @@ export function SettingsView({ section }: { section?: string | null }) {
       <ConfirmDialog
         open={confirmReset}
         onCancel={() => setConfirmReset(false)}
-        onConfirm={() => {
+        onConfirm={async () => {
+          setConfirmReset(false)
+          // Por si era un error: queda en «Copias automáticas».
+          await saveSnapshot(data, 'antes-borrar')
           storage.resetAll()
           replaceAndSave(createEmptyData())
-          setConfirmReset(false)
         }}
         title="Borrar todos los datos"
         message={
           synced
-            ? 'Se eliminarán asignaturas, tareas, exámenes y notas en este dispositivo y en tu cuenta, así que desaparecerán también de tus otros dispositivos. Si quieres conservarlos, exporta antes una copia. Esta acción no se puede deshacer.'
-            : 'Se eliminarán asignaturas, tareas, exámenes y notas, y volverás a la pantalla de bienvenida. Si quieres conservarlos, exporta antes una copia. Esta acción no se puede deshacer.'
+            ? 'Se eliminarán asignaturas, tareas, exámenes y notas en este dispositivo y en tu cuenta, así que desaparecerán también de tus otros dispositivos. En este dispositivo quedará una copia en «Copias automáticas» por si te arrepientes.'
+            : 'Se eliminarán asignaturas, tareas, exámenes y notas, y volverás a la pantalla de bienvenida. En este dispositivo quedará una copia en «Copias automáticas» por si te arrepientes.'
         }
         confirmLabel="Borrar todo"
         destructive

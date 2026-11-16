@@ -65,6 +65,7 @@ import { ExamCard } from '@/features/exams/ExamCard'
 import { Ring, Sparkline } from '@/ui/charts'
 import { exitFast, haptic, spring } from '@/ui/motion'
 import { Button, CountUp, cx } from '@/ui/primitives'
+import { BackupNudge } from '@/features/backup/Backups'
 import { FlightBanner } from '@/features/study/FlightBanner'
 
 // ---------------------------------------------------------------------------
@@ -288,6 +289,9 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
 
       {/* --- Vuelo en curso del modo estudio --- */}
       <FlightBanner />
+
+      {/* --- Recordatorio de copia, solo sin cuenta y de tarde en tarde --- */}
+      <BackupNudge />
 
       {/* --- Tablero --- */}
       <div className="grid grid-cols-2 md:grid-cols-4 grid-flow-dense gap-3 sm:gap-4">
