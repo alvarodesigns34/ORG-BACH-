@@ -48,6 +48,27 @@
 .study-map {
   transition: filter 700ms var(--ease-std);
 }
+
+/* El espacio alrededor del globo: noche con estrellas. MapLibre deja el
+   lienzo transparente fuera de la esfera, así que se ve este fondo. Las
+   estrellas son puntos de degradado repetidos en dos capas de distinto
+   tamaño, para que no se note la cuadrícula. */
+.study-map .is-globe {
+  background-color: #03050c;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgb(255 255 255 / 0.7), transparent 60%),
+    radial-gradient(1px 1px at 68% 34%, rgb(255 255 255 / 0.55), transparent 60%),
+    radial-gradient(1.5px 1.5px at 38% 72%, rgb(255 255 255 / 0.6), transparent 60%),
+    radial-gradient(1px 1px at 86% 82%, rgb(255 255 255 / 0.45), transparent 60%),
+    radial-gradient(1px 1px at 24% 52%, rgb(200 220 255 / 0.5), transparent 60%),
+    radial-gradient(1.5px 1.5px at 52% 8%, rgb(255 255 255 / 0.5), transparent 60%),
+    radial-gradient(1px 1px at 4% 88%, rgb(255 255 255 / 0.4), transparent 60%),
+    radial-gradient(1px 1px at 94% 12%, rgb(255 255 255 / 0.55), transparent 60%),
+    radial-gradient(120% 90% at 50% 110%, #0d1f45 0%, #050a1a 55%, #03050c 100%);
+  background-size:
+    211px 197px, 263px 241px, 307px 283px, 173px 229px, 241px 167px, 331px 313px,
+    193px 271px, 287px 199px, 100% 100%;
+}
 .study-map.is-paused {
   filter: saturate(0.55) brightness(0.92);
 }

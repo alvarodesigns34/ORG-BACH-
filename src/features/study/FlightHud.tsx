@@ -130,17 +130,47 @@ function Popover({ children, className }: { children: ReactNode; className?: str
 function MapStylePanel({
   map,
   labels,
+  globe,
   onMap,
   onLabels,
+  onGlobe,
 }: {
   map: MapKind
   labels: boolean
+  globe: boolean
   onMap: (kind: MapKind) => void
   onLabels: (on: boolean) => void
+  onGlobe: (on: boolean) => void
 }) {
   return (
     <>
-      <p className="text-[0.9375rem] font-semibold mb-3">Mapa</p>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[0.9375rem] font-semibold">Mapa</p>
+        <div role="radiogroup" aria-label="Vista del mapa" className="flex p-0.5 rounded-full bg-[var(--glass-tint)]">
+          {[
+            { on: true, label: '3D' },
+            { on: false, label: '2D' },
+          ].map((o) => (
+            <button
+              key={o.label}
+              type="button"
+              role="radio"
+              aria-checked={globe === o.on}
+              title={o.on ? 'Globo terráqueo' : 'Mapa plano (más ligero)'}
+              onClick={() => {
+                haptic()
+                onGlobe(o.on)
+              }}
+              className={cx(
+                'h-7 px-3 rounded-full text-[0.75rem] font-semibold transition-colors',
+                globe === o.on ? 'bg-surface text-ink shadow-[0_1px_3px_rgb(0_0_0/0.15)]' : 'text-ink-3',
+              )}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="grid grid-cols-3 gap-2.5">
         {MAP_OPTIONS.map((o) => {
           const active = map === o.id
@@ -346,11 +376,13 @@ function SoundBars() {
 export function MapToolbar({
   map,
   labels,
+  globe,
   sound,
   volume,
   keepAwake,
   onMap,
   onLabels,
+  onGlobe,
   onSound,
   onVolume,
   onKeepAwake,
@@ -360,11 +392,13 @@ export function MapToolbar({
 }: {
   map: MapKind
   labels: boolean
+  globe: boolean
   sound: SoundId | 'ninguno'
   volume: number
   keepAwake: boolean
   onMap: (kind: MapKind) => void
   onLabels: (on: boolean) => void
+  onGlobe: (on: boolean) => void
   onSound: (id: SoundId | 'ninguno') => void
   onVolume: (v: number) => void
   onKeepAwake: (on: boolean) => void
@@ -402,7 +436,14 @@ export function MapToolbar({
         <AnimatePresence>
           {open === 'mapa' && (
             <Popover key="mapa" className="w-[300px]">
-              <MapStylePanel map={map} labels={labels} onMap={onMap} onLabels={onLabels} />
+              <MapStylePanel
+                map={map}
+                labels={labels}
+                globe={globe}
+                onMap={onMap}
+                onLabels={onLabels}
+                onGlobe={onGlobe}
+              />
             </Popover>
           )}
           {open === 'sonido' && (

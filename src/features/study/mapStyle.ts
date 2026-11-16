@@ -11,6 +11,10 @@
  * - Minimalista: vectorial, claro u oscuro.
  * - Relieve: el sombreado de Natural Earth (montañas y mares con volumen).
  * - Satélite: Sentinel-2 sin nubes (EOX), uso no comercial con atribución.
+ *
+ * Los tres se pueden ver como esfera (proyección «globe» de MapLibre) o
+ * planos. En la esfera, el cielo lleva atmósfera y el espacio de alrededor
+ * es noche estrellada (lo pinta el CSS del contenedor: `.study-map.is-globe`).
  */
 
 import type { ExpressionSpecification, StyleSpecification } from 'maplibre-gl'
@@ -22,6 +26,8 @@ export interface MapLookOptions {
   kind: MapKind
   tone: MapTone
   labels: boolean
+  /** Esfera (3D) en vez de plano. */
+  globe: boolean
 }
 
 const NAME: ExpressionSpecification = [
@@ -74,7 +80,7 @@ const PALETTE: Record<MapTone, Palette> = {
 const ATTRIBUTION_OSM =
   '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
 
-export function buildStyle({ kind, tone, labels }: MapLookOptions): StyleSpecification {
+export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): StyleSpecification {
   const p = PALETTE[tone]
   const onImagery = kind === 'satelite'
 
@@ -262,7 +268,42 @@ export function buildStyle({ kind, tone, labels }: MapLookOptions): StyleSpecifi
     glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
     sources,
     layers,
+    ...(globe
+      ? {
+          projection: { type: 'globe' },
+          sky: SKY[tone],
+        }
+      : {}),
   }
+}
+
+/**
+ * Cielo de la esfera. Desde lejos solo se ve la atmósfera (el halo que la
+ * rodea); al inclinar la cámara en vuelo, el horizonte y el cielo de arriba.
+ * La atmósfera se apaga al acercarse: a ras de suelo sería una neblina.
+ */
+/** El fondo del espacio alrededor de la esfera (ver `.is-globe` en study.css). */
+export const SPACE_COLOR = '#03050c'
+
+const SKY: Record<MapTone, NonNullable<StyleSpecification['sky']>> = {
+  light: {
+    'sky-color': '#6fa6e6',
+    'horizon-color': '#dde9f6',
+    'fog-color': '#e6e3dc',
+    'sky-horizon-blend': 0.6,
+    'horizon-fog-blend': 0.4,
+    'fog-ground-blend': 0.85,
+    'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 9, 0.35],
+  },
+  dark: {
+    'sky-color': '#081631',
+    'horizon-color': '#2b4f8c',
+    'fog-color': '#121f33',
+    'sky-horizon-blend': 0.55,
+    'horizon-fog-blend': 0.35,
+    'fog-ground-blend': 0.85,
+    'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 9, 0.35],
+  },
 }
 
 /**
@@ -270,7 +311,16 @@ export function buildStyle({ kind, tone, labels }: MapLookOptions): StyleSpecifi
  * iPadOS/iOS tiñen el borde superior de las apps web con el «theme-color»;
  * con el gris claro de la interfaz salía una mancha blanca sobre el mapa.
  */
-export function mapEdgeColor({ kind, tone }: Pick<MapLookOptions, 'kind' | 'tone'>): string {
+export function mapEdgeColor(
+  { kind, tone, globe }: Pick<MapLookOptions, 'kind' | 'tone' | 'globe'>,
+  /**
+   * Qué hay en el borde de arriba: el suelo, el cielo (cámara inclinada en
+   * vuelo) o el espacio (la esfera entera, desde lejos).
+   */
+  edge: 'suelo' | 'cielo' | 'espacio' = 'suelo',
+): string {
+  if (globe && edge === 'espacio') return SPACE_COLOR
+  if (globe && edge === 'cielo') return SKY[tone]['sky-color'] as string
   if (kind === 'satelite') return '#1d2a33'
   return PALETTE[tone].land
 }

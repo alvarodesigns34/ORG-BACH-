@@ -116,8 +116,13 @@ export default function StudyView() {
   // --- Mapa ---
   const inCabin = stage === 'vuelo' || stage === 'despegue' || stage === 'aterrizado'
   const look = useMemo(
-    () => ({ kind: prefs.map, tone: inCabin ? ('dark' as const) : theme, labels: prefs.labels }),
-    [prefs.map, prefs.labels, inCabin, theme],
+    () => ({
+      kind: prefs.map,
+      tone: inCabin ? ('dark' as const) : theme,
+      labels: prefs.labels,
+      globe: prefs.globe,
+    }),
+    [prefs.map, prefs.labels, prefs.globe, inCabin, theme],
   )
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<FlightMap | null>(null)
@@ -151,7 +156,15 @@ export default function StudyView() {
   useEffect(() => {
     const metas = [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')]
     const before = metas.map((m) => m.getAttribute('content'))
-    const color = mapEdgeColor(look)
+    // En vuelo sobre la esfera la cámara va inclinada: arriba está el cielo.
+    const color = mapEdgeColor(
+      look,
+      stage === 'vuelo' || stage === 'aterrizado'
+        ? 'cielo'
+        : stage === 'inicio' && tab === 'resumen'
+          ? 'espacio'
+          : 'suelo',
+    )
     for (const m of metas) m.setAttribute('content', color)
     const html = document.documentElement
     const bg = html.style.backgroundColor
@@ -160,7 +173,7 @@ export default function StudyView() {
       metas.forEach((m, i) => before[i] !== null && m.setAttribute('content', before[i]!))
       html.style.backgroundColor = bg
     }
-  }, [look])
+  }, [look, stage, tab])
 
   // --- Sesión en el aire (también si despegó en otro dispositivo) ---
   // Las escalas y el aterrizaje los aplica el controlador del vuelo, que vive
@@ -248,7 +261,8 @@ export default function StudyView() {
       map.setRoute(null, null)
       if (tab === 'resumen') {
         map.setHistory([])
-        map.showPlace(origin, 5.2, panelPadding())
+        // Sobre la esfera, el planeta entero con tu ciudad: el punto de partida.
+        map.showPlace(origin, prefs.globe ? 2.7 : 5.2, panelPadding())
       } else {
         map.setHistory(history)
         const points = history.flatMap((r) => [r.from, r.to])
@@ -281,7 +295,7 @@ export default function StudyView() {
       map.setRoute(origin, selected.airport, 0)
       map.fitRoute(origin, selected.airport, CENTER_PADDING)
     }
-  }, [stage, tab, mapReady, origin, minutes, candidates, selected, history])
+  }, [stage, tab, mapReady, origin, minutes, candidates, selected, history, prefs.globe])
 
   // Vuelo: el avión avanza cada segundo; la cámara le sigue si se lo pides.
   useEffect(() => {
@@ -298,16 +312,17 @@ export default function StudyView() {
     if (stage === 'aterrizado') {
       if (!tookOff.current) return
       tookOff.current = false
-      map.showPlace(flightTo, 7, { ...HUD_PADDING, bottom: 420 })
+      map.landing(flightTo, FlightMap.heading(flightFrom, flightTo, 0.99), { ...HUD_PADDING, bottom: 420 })
       return
     }
     if (!tookOff.current) {
       tookOff.current = true
-      if (prog < 0.02) map.takeoff(here, zoom)
-      else map.showPlace(here, zoom, HUD_PADDING)
+      const heading = FlightMap.heading(flightFrom, flightTo, prog)
+      if (prog < 0.02) map.takeoff(here, zoom, heading)
+      else map.rejoin(here, heading, zoom, HUD_PADDING)
       return
     }
-    if (following) map.follow(here)
+    if (following) map.follow(here, FlightMap.heading(flightFrom, flightTo, prog))
   }, [stage, mapReady, flightFrom, flightTo, prog, following])
 
   // --- Acciones ---
@@ -580,6 +595,8 @@ export default function StudyView() {
             keepAwake={prefs.keepAwake}
             onMap={(m) => setPrefs({ map: m })}
             onLabels={(on) => setPrefs({ labels: on })}
+            globe={prefs.globe}
+            onGlobe={(on) => setPrefs({ globe: on })}
             onSound={(id) => {
               setPrefs({ sound: id })
               // En vuelo, el cambio suena ya (y ajusta la tarjeta de bloqueo).
@@ -608,7 +625,7 @@ export default function StudyView() {
                           8,
                           Math.max(4.2, map.routeZoom(flightFrom, flightTo, HUD_PADDING) + 1.4),
                         )
-                        map.showPlace(here, zoom, HUD_PADDING)
+                        map.rejoin(here, FlightMap.heading(flightFrom, flightTo, prog), zoom, HUD_PADDING)
                       }
                     },
                     onOverview: () => {

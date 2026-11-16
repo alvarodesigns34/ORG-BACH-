@@ -47,7 +47,12 @@ function inkFor(look: MapLookOptions) {
 }
 
 const sameLook = (a: MapLookOptions, b: MapLookOptions) =>
-  a.kind === b.kind && a.tone === b.tone && a.labels === b.labels
+  a.kind === b.kind && a.tone === b.tone && a.labels === b.labels && a.globe === b.globe
+
+/** Inclinación de la cámara en vuelo sobre la esfera: se ve el horizonte. */
+const FLIGHT_PITCH = 42
+/** Al despegar y aterrizar, más inclinada: como mirar por la ventanilla. */
+const LOW_PITCH = 58
 
 export interface Padding {
   top: number
@@ -104,6 +109,7 @@ export class FlightMap {
 
   constructor(container: HTMLElement, look: MapLookOptions, center: LatLon) {
     this.look = look
+    container.classList.toggle('is-globe', look.globe)
     // El mapa aparece con un fundido cuando ya tiene teselas, no como un
     // lienzo gris que se va rellenando a trozos.
     container.style.opacity = '0'
@@ -119,8 +125,11 @@ export class FlightMap {
       pitchWithRotate: false,
       touchPitch: false,
       fadeDuration: 150,
+      maxPitch: 65,
     })
     this.map.touchZoomRotate.disableRotation()
+    // Para inspeccionar la cámara desde las pruebas del navegador.
+    if (import.meta.env.DEV) (window as unknown as { __flightMap?: FlightMap }).__flightMap = this
     const reveal = () => {
       container.style.opacity = '1'
     }
@@ -151,9 +160,13 @@ export class FlightMap {
 
   setLook(look: MapLookOptions): void {
     if (sameLook(look, this.look)) return
+    const flat = !look.globe && this.look.globe
     this.look = look
     this.ready = false
+    this.map.getContainer().classList.toggle('is-globe', look.globe)
     this.map.setStyle(buildStyle(look), { diff: false })
+    // En plano no se inclina la cámara: se endereza si venía de la esfera.
+    if (flat) this.map.jumpTo({ pitch: 0, bearing: 0 })
   }
 
   private whenReady(run: () => void) {
@@ -242,7 +255,7 @@ export class FlightMap {
       return
     }
     const camera = this.map.cameraForBounds(boundsOf(points.map(ll)), { padding, maxZoom: 6.5 })
-    if (camera) this.move({ ...camera, duration: 1200 }, true)
+    if (camera) this.move({ ...camera, pitch: 0, bearing: 0, duration: 1200 }, true)
   }
 
   private rangeData(): FeatureCollection {
@@ -393,7 +406,7 @@ export class FlightMap {
       const el = document.createElement('div')
       el.className = 'fm-plane'
       el.innerHTML = PLANE_SVG
-      this.planeMarker = new Marker({ element: el, rotationAlignment: 'map' })
+      this.planeMarker = new Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map' })
         .setLngLat(ll(here))
         .addTo(this.map)
     } else {
@@ -407,6 +420,15 @@ export class FlightMap {
   // Cámara
   // -------------------------------------------------------------------------
 
+  get globe(): boolean {
+    return this.look.globe
+  }
+
+  /** La cámara está inclinada (en vuelo sobre la esfera). */
+  get tilted(): boolean {
+    return this.map.getPitch() > 5
+  }
+
   private move(options: EaseToOptions | FlyToOptions, fly = false) {
     if (reduced()) {
       this.map.jumpTo(options as Parameters<MapLibreMap['jumpTo']>[0])
@@ -415,6 +437,9 @@ export class FlightMap {
     if (fly) this.map.flyTo({ ...options, essential: true })
     else this.map.easeTo({ ...options, essential: true })
   }
+
+  /** Fuera del vuelo, la cámara mira de frente y con el norte arriba. */
+  private static readonly LEVEL = { pitch: 0, bearing: 0 }
 
   /**
    * Centrar un punto dentro del hueco libre. Con `offset` y no con `padding`:
@@ -425,14 +450,14 @@ export class FlightMap {
     const offset: [number, number] = padding
       ? [(padding.left - padding.right) / 2, (padding.top - padding.bottom) / 2]
       : [0, 0]
-    this.move({ center: ll(place), zoom, offset, duration: 1600 }, true)
+    this.move({ center: ll(place), zoom, offset, duration: 1600, ...FlightMap.LEVEL }, true)
   }
 
   fitRange(origin: LatLon, km: number, padding: Padding, duration = 700): void {
     const ring = circle(origin, Math.max(km, 120), 48)
     const camera = this.map.cameraForBounds(boundsOf(ring), { padding, maxZoom: 7.5 })
     if (!camera) return
-    this.move({ ...camera, duration, easing: (t: number) => 1 - Math.pow(1 - t, 3) })
+    this.move({ ...camera, ...FlightMap.LEVEL, duration, easing: (t: number) => 1 - Math.pow(1 - t, 3) })
   }
 
   fitRoute(origin: LatLon, dest: LatLon, padding: Padding, duration = 1400): void {
@@ -441,31 +466,91 @@ export class FlightMap {
       maxZoom: 8,
     })
     if (!camera) return
-    this.move({ ...camera, duration }, duration > 1000)
+    this.move({ ...camera, ...FlightMap.LEVEL, duration }, duration > 1000)
   }
 
-  /** Seguir al avión (sin animar si ya está cerca: evita encadenar curvas). */
-  follow(place: LatLon, zoom?: number, duration = 950): void {
+  /** Rumbo del avión en `progress`, para que la cámara mire hacia donde va. */
+  static heading(origin: LatLon, dest: LatLon, progress: number): number {
+    const p = Math.min(0.995, Math.max(0, progress))
+    return bearing(interpolate(origin, dest, p), interpolate(origin, dest, p + 0.005))
+  }
+
+  /**
+   * Seguir al avión (sin animar si ya está cerca: evita encadenar curvas).
+   * Sobre la esfera la cámara va inclinada y orientada con la ruta, como
+   * siguiendo al avión desde detrás; en plano, cenital y con el norte arriba.
+   */
+  follow(place: LatLon, heading = 0, zoom?: number, duration = 950): void {
     // Mientras dura la subida del despegue, seguir al avión la cortaría.
     if (Date.now() < this.climbUntil) return
-    this.move({ center: ll(place), zoom: zoom ?? this.map.getZoom(), duration, easing: (t: number) => t })
+    const tilt = this.look.globe ? { pitch: FLIGHT_PITCH, bearing: heading } : FlightMap.LEVEL
+    this.move({
+      center: ll(place),
+      zoom: zoom ?? this.map.getZoom(),
+      ...tilt,
+      duration,
+      easing: (t: number) => t,
+    })
   }
 
-  /** Despegue: la cámara empieza pegada al avión y sube mientras se aleja. */
-  takeoff(place: LatLon, finalZoom: number): void {
-    if (reduced()) {
-      this.map.jumpTo({ center: ll(place), zoom: finalZoom })
+  /** «Seguir al avión» tras mirar otra cosa: vuelve con un vuelo de cámara. */
+  rejoin(place: LatLon, heading: number, zoom: number, padding: Padding): void {
+    if (!this.look.globe) {
+      this.showPlace(place, zoom, padding)
       return
     }
-    this.climbUntil = Date.now() + 7200
-    this.map.jumpTo({ center: ll(place), zoom: Math.min(11, finalZoom + 4.5) })
-    this.map.easeTo({
+    this.move(
+      { center: ll(place), zoom, pitch: FLIGHT_PITCH, bearing: heading, duration: 1800 },
+      true,
+    )
+  }
+
+  /**
+   * Despegue: la cámara empieza pegada al avión, baja y mirando hacia
+   * delante, y sube mientras se aleja. Sobre la esfera, además, se va
+   * levantando el horizonte hasta ver la curvatura.
+   */
+  takeoff(place: LatLon, finalZoom: number, heading = 0): void {
+    const globe = this.look.globe
+    const end = globe
+      ? { center: ll(place), zoom: finalZoom, pitch: FLIGHT_PITCH, bearing: heading }
+      : { center: ll(place), zoom: finalZoom, ...FlightMap.LEVEL }
+    if (reduced()) {
+      this.map.jumpTo(end)
+      return
+    }
+    this.climbUntil = Date.now() + 7600
+    this.map.jumpTo({
       center: ll(place),
-      zoom: finalZoom,
-      duration: 7000,
+      zoom: Math.min(globe ? 12 : 11, finalZoom + (globe ? 5.2 : 4.5)),
+      ...(globe ? { pitch: LOW_PITCH + 4, bearing: heading - 18 } : FlightMap.LEVEL),
+    })
+    this.map.easeTo({
+      ...end,
+      duration: 7400,
       easing: (t: number) => 1 - Math.pow(1 - t, 2.4),
       essential: true,
     })
+  }
+
+  /**
+   * Aterrizaje: la cámara baja sobre el destino. Sobre la esfera, inclinada
+   * y girando un poco alrededor del aeropuerto mientras se acerca.
+   */
+  landing(dest: LatLon, heading: number, padding: Padding): void {
+    if (!this.look.globe) {
+      this.showPlace(dest, 7, padding)
+      return
+    }
+    const offset: [number, number] = [
+      (padding.left - padding.right) / 2,
+      (padding.top - padding.bottom) / 2,
+    ]
+    this.climbUntil = 0
+    this.move(
+      { center: ll(dest), zoom: 9.2, pitch: LOW_PITCH, bearing: heading + 25, offset, duration: 3600 },
+      true,
+    )
   }
 
   /** Zoom que deja ver la ruta entera, para «Ver ruta». */
