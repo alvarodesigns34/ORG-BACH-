@@ -1,0 +1,14 @@
+{
+  "appId": "es.orbita.estudios",
+  "appName": "Órbita",
+  "webDir": "../dist",
+  "ios": {
+    "contentInset": "never",
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "iconColor": "#0A84FF"
+    }
+  }
+}

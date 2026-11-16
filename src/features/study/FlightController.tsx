@@ -20,6 +20,7 @@ import { haptic } from '@/ui/motion'
 import { useToast } from '@/ui/Toast'
 import { beginFlightAudio, endFlightAudio, wantsLockCard } from './flightAudio'
 import { useFlightAlerts } from './flightAlerts'
+import { endNativeFlight, isNativeApp, useNativeFlight } from '@/native/liveActivity'
 import { useNow } from './hooks'
 import { clearFlightCard, flightArtwork, setFlightActions, showFlightCard } from './mediaSession'
 import { useStudyPrefs } from './prefs'
@@ -123,6 +124,7 @@ export function FlightController() {
       const ended = data.sessions.find((s) => s.id === before.id)
       const landed = ended?.status === 'aterrizado' && ended.endedAt
       const fresh = landed && Date.now() - Date.parse(ended.endedAt!) < 15_000
+      endNativeFlight(!!landed)
       if (fresh && audioRunning()) chime('megafonia')
       if (fresh) haptic('success')
       if (landed && !live.current.onStudy) {
@@ -225,8 +227,16 @@ export function FlightController() {
     // `now` entra para refrescar los minutos y corregir la barra cada 10 s.
   }, [active, showCard, from, to, subject, airports, now])
 
-  // --- Avisos programados en el servidor ---------------------------------
-  useFlightAlerts(active, { city: to?.city, enabled: prefs.alerts })
+  // --- Avisos ------------------------------------------------------------
+  // En la web, programados en el servidor (Web Push); dentro de la app
+  // nativa, como notificaciones locales, junto con la Live Activity.
+  const native = isNativeApp()
+  useFlightAlerts(native ? undefined : active, { city: to?.city, enabled: prefs.alerts && !native })
+  useNativeFlight(active, {
+    city: to?.city,
+    subject: subject?.name,
+    alerts: prefs.alerts,
+  })
 
   return null
 }

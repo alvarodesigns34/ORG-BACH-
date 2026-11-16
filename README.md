@@ -91,9 +91,10 @@ una app del sistema.
 - Con «reducir movimiento» no hay recorridos; con «reducir transparencia», el
   cristal es opaco.
 
-No hay registro de tiempo de estudio ni temporizador: se retiró porque no se
-usaba. Los datos de versiones anteriores que lo tenían se cargan sin avisos;
-las sesiones simplemente se ignoran.
+El antiguo temporizador de estudio se retiró; su sustituto es el **modo
+estudio** (sesiones como vuelos, ver más abajo). Los datos de versiones
+anteriores con sesiones del temporizador se cargan sin avisos: esas sesiones
+simplemente se ignoran.
 
 ## Arquitectura
 
@@ -327,6 +328,88 @@ navegador.
 - Las claves VAPID y el secreto del cron se generan dentro de la base de datos
   (esquema `private`, no expuesto por la API): no pasan por el repositorio.
 
+## Modo estudio fuera de la app
+
+Un vuelo sigue en el aire aunque salgas del modo estudio, cambies de app o
+bloquees el iPad. Lo gestiona `FlightController` (montado en el armazón, sin
+interfaz):
+
+- **Línea de tiempo determinista** (`advance()`/`timeline()` en
+  `src/domain/flights.ts`). Las escalas empiezan y terminan, y el avión
+  aterriza, *en su instante exacto*, se mire cuando se mire: si el iPad estuvo
+  bloqueado media hora, al volver la escala ya pasó y el aterrizaje lleva su
+  hora real.
+- **Escalas**: ninguna, una a mitad (vuelos de 40 min o más) o **tipo
+  Pomodoro** (cada 25 o 50 min de estudio, descansos de 5/10/15). Además, un
+  descanso manual desde el HUD que no gasta las programadas.
+- **Pantalla de bloqueo y Centro de control** (`mediaSession.ts`). Mientras
+  suena el ambiente, la tarjeta «Ahora suena» muestra la ruta, la asignatura,
+  lo que queda, la barra de progreso del vuelo (o de la escala), una carátula
+  dibujada con la ruta y un botón de pausa que pausa el vuelo. Un `<audio>`
+  mudo en bucle ancla la tarjeta (el ambiente sale por Web Audio, que no
+  cuenta). Con «Silencio» la tarjeta es opcional (*Vuelo en la pantalla de
+  bloqueo*, en el panel de sonido): mantenerla obliga a la sesión de audio
+  `playback`, que **pausa la música de otras apps**; sin ella, la app pasa a
+  `ambient` y los avisos se mezclan con tu música.
+- **Avisos push** de aterrizaje y de inicio/fin de escala
+  (`flightAlerts.ts`): al despegar se manda al servidor la línea de tiempo
+  (`schedule_flight_alerts`); pausar la cancela, reanudar la reprograma,
+  abandonar la borra, y con la app a la vista no se envía lo que ya se ve. Un
+  cron por minuto (que solo llama a la función si hay algo para el minuto
+  siguiente) los envía al segundo exacto con las mismas claves VAPID que el
+  resumen diario. Requiere cuenta, la app instalada (en iPad/iPhone) y el
+  interruptor *Ajustes → Notificaciones → Avisos de vuelo*.
+- **Megafonía real**: el «ding-dong» de dos notas de una cabina de Boeing 737
+  (Poznań, *maciej janasik*, dominio público vía radio aporee / Internet
+  Archive), limpiado del ruido de fondo. La nota sola marca las escalas.
+- **Despegue rápido**: `#/estudio?despegar=25` (tecla `D`, accesos directos del
+  manifiesto, asistente) deja la cabina lista; despegar exige un toque, que es
+  también lo que Safari pide para poder encender el sonido.
+
+**Lo que no es posible en una web.** Las *Live Activities* (y la Dynamic
+Island) son de ActivityKit, solo para apps nativas; una PWA no puede crearlas.
+La carpeta [`native/`](native/README.md) prepara la alternativa nativa
+(Capacitor + extensión de widget) con instrucciones para compilarla en un Mac.
+En iPad, además, las Live Activities de otras apps solo se muestran desde
+iPadOS 26. Los accesos directos del manifiesto tampoco existen todavía en
+iPadOS (sí en Chrome/Edge y Safari de macOS).
+
+### El mapa: globo terráqueo
+
+Proyección `globe` de MapLibre con atmósfera y espacio estrellado. El despegue
+arranca con la cámara baja e inclinada y sube hasta ver la curvatura; en vuelo
+la cámara va inclinada y orientada con la ruta; al aterrizar baja girando
+sobre el destino. Minimalista, Relieve y Satélite funcionan en claro y oscuro.
+Hay un conmutador **3D/2D** en el panel del mapa por si algún iPad va justo.
+
+## Estadísticas del estudio
+
+- **Constancia**: días seguidos con estudio (hoy sin estudiar aún no rompe la
+  racha) y los últimos 14 días. Sin trofeos ni avisos de «vas a perderla».
+- **Estudio y notas**: para cada examen con nota, el tiempo estudiado de esa
+  asignatura desde el examen anterior (como mucho 3 semanas; lo del mismo día
+  solo cuenta si el examen tiene hora y fue antes) frente a la nota. Con 4
+  exámenes o más, la media de los que se prepararon más que la mediana frente
+  a los de menos.
+- **A tiempo** ya no cuenta como tarde una tarea apuntada cuando ya había
+  vencido, y dice sobre cuántas se calcula.
+
+## Copias de seguridad
+
+Sin cuenta, el curso solo está en el dispositivo.
+
+- **Copias automáticas** (`src/storage/snapshots.ts`): una al día (las 7
+  últimas) y otra antes de importar, empezar de cero o restaurar (las 5
+  últimas), en IndexedDB, aparte del `localStorage` del curso. Se restauran o
+  descargan desde *Ajustes → Copias automáticas* o desde la bienvenida (tras
+  «Empezar de cero»). No protegen de perder o restablecer el iPad ni de borrar
+  los datos de la web: para eso, exportar o tener cuenta.
+- **Recordatorio** en Inicio, solo sin cuenta: nunca el primer día; cuando la
+  última copia tiene más de 14 días y hay cosas nuevas, o tras 25 cambios.
+  «Más tarde» lo calla una semana.
+- **Exportar** en iPad abre la hoja de compartir (*Guardar en Archivos*). Hay
+  una prueba de ida y vuelta completa de exportar e importar.
+
 ## Asistente (IA): conversación por voz o texto
 
 Es un chat: le dices lo que quieres apuntar y la app lo hace, o le preguntas
@@ -342,8 +425,12 @@ apuntar…» de Inicio y en el menú lateral.
 - **Qué sabe hacer**: crear, cambiar, completar, reabrir y borrar tareas
   (también dividirlas en pasos); crear, mover y borrar exámenes; apuntar,
   corregir y borrar notas (con peso y evaluación); eventos; objetivos por
-  asignatura; dividir tareas en pasos; y responder preguntas
-  («¿qué tengo esta semana?», «¿cuál es mi media?», «¿qué necesito para un 7?»).
+  asignatura; dividir tareas en pasos; **preparar un vuelo del modo estudio**
+  («ponme 45 min de Mates con lluvia»: deja la cabina lista y tú pulsas
+  Despegar); y responder preguntas («¿qué tengo esta semana?», «¿cuál es mi
+  media?», «¿qué necesito para un 7?», «¿cuánto he estudiado esta semana?»,
+  «¿cuánto preparé el examen de Física?»). Lo que no está en tus datos lo dice
+  en vez de estimarlo.
 - **Memoria de la conversación**: se reenvían al modelo los últimos 16
   mensajes. Cada respuesta suya va acompañada de lo que la app aplicó DE
   VERDAD, con los ids, así «bórralo» o «era un 7,5» actúan sobre eso y no
@@ -377,7 +464,17 @@ apuntar…» de Inicio y en el menú lateral.
   `MISTRAL_API_KEY` de Supabase, nunca en la app ni en el repositorio.
 - **Qué viaja al modelo**: la conversación reciente y un resumen del curso
   (asignaturas con sus medias, tareas abiertas y recién completadas, exámenes,
-  notas recientes, y eventos próximos).
+  notas recientes, y eventos próximos) y el estudio del modo estudio ya
+  sumado (hoy, semana, 30 días por asignatura, racha, vuelo en curso, últimos
+  vuelos y estudio antes de cada examen con nota).
+- **Defensas**: alcance cerrado (solo la app, organizar estudios y dudas
+  académicas), los datos del alumno nunca son órdenes, nadie cambia las reglas
+  desde el chat («soy el dueño», «tengo permiso», «modo depuración»), un
+  clasificador independiente decide por su cuenta y el servidor sustituye por
+  una respuesta fija todo lo de fuera o lo que deje ver las instrucciones.
+  Probado contra la función desplegada con intentos de saltárselas (falso
+  desarrollador, revelar o traducir las instrucciones, órdenes en el título
+  de una tarea, petición mixta, falso mensaje de sistema).
 
 ## Aplicación instalable (PWA)
 
@@ -437,8 +534,20 @@ Inspirado en las apps de Apple: claro, tranquilo y con el contenido delante.
 
 ## Atajos
 
+Teclas sueltas, como en Mail o Calendario de Apple (no se disparan mientras se
+escribe en un campo ni con un diálogo abierto). `?` o **mantener ⌘** enseña la
+lista. Viven en `src/layout/shortcuts.tsx`.
+
 | Tecla | Acción |
 |---|---|
-| `C` | Crear tarea desde cualquier sección |
+| `N` o `C` | Nueva tarea |
+| `E` · `G` · `V` | Nuevo examen · nota · evento |
+| `1`–`9` | Inicio, Tareas, Calendario, Estudio, Asignaturas, Notas, Exámenes, Estadísticas, Objetivos |
+| `⌘ ,` | Ajustes |
+| `/` o `⌘ K` | Buscar tareas |
+| `D` | Despegar 25 min (o volver al vuelo en curso) |
+| `Espacio` | Pausar o reanudar el vuelo (en el modo estudio) |
+| `A` | Asistente |
+| `?` | Lista de atajos |
 | `Esc` | Cerrar el diálogo abierto |
 | `↑` `↓` | Recorrer un menú contextual |

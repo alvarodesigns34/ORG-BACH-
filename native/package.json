@@ -1,0 +1,20 @@
+{
+  "name": "orbita-nativa",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Envoltorio nativo de Órbita para iPad/iPhone (Capacitor) con Live Activity del modo estudio. Se compila en un Mac con Xcode.",
+  "type": "module",
+  "scripts": {
+    "web": "npm --prefix .. run build",
+    "sync": "npm run web && npx cap sync ios",
+    "open": "npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/ios": "^7.0.0",
+    "@capacitor/local-notifications": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.0.0"
+  }
+}

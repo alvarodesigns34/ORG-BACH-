@@ -1,0 +1,3 @@
+node_modules
+# Lo genera «npx cap add ios» en el Mac.
+ios/
