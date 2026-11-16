@@ -58,7 +58,15 @@ export function StudyStatsCard() {
           compact
           icon={<Plane className="size-5 rotate-45" />}
           title="Sin vuelos esta semana"
-          description="Cada sesión del modo estudio se suma aquí al aterrizar."
+          description="Cada sesión del modo estudio se suma aquí."
+          action={
+            <a
+              href={hrefFor('estudio', { despegar: '25' })}
+              className="pressable inline-flex items-center h-8 px-3.5 rounded-full bg-accent-fill text-white text-[0.8125rem] font-semibold"
+            >
+              Despegar 25 min
+            </a>
+          }
         />
       ) : (
         <RankedBars

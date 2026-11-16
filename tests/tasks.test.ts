@@ -178,6 +178,20 @@ describe('taskStats', () => {
     assert.equal(taskStats(tasks, TODAY).onTimeRate, 50)
   })
 
+  it('no juzga las tareas apuntadas cuando ya habían vencido', () => {
+    // Los deberes de ayer, apuntados hoy para marcarlos hechos: no es
+    // entregar tarde. Antes dejaban «A tiempo: 0 %».
+    const late = makeTask({
+      dueDate: '2026-10-13',
+      status: 'completada',
+      createdAt: new Date(2026, 9, 14, 17, 0).toISOString(),
+      completedAt: new Date(2026, 9, 14, 17, 1).toISOString(),
+    })
+    const stats = taskStats([late], TODAY)
+    assert.equal(stats.onTimeRate, null)
+    assert.equal(stats.judged, 0)
+  })
+
   it('sin nada que juzgar devuelve null en vez de 0 %', () => {
     // Un 0 % daría a entender que siempre se entrega tarde.
     assert.equal(taskStats([makeTask()], TODAY).onTimeRate, null)

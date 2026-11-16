@@ -395,6 +395,11 @@ interface EmptyStateProps {
 /**
  * Un hueco sin datos tiene que explicar qué falta y ofrecer el primer paso.
  * Una pantalla en blanco es un callejón sin salida.
+ *
+ * - Normal: centrado, para una pantalla entera vacía.
+ * - `compact`: una fila (icono, dos líneas y la acción a la derecha) para un
+ *   hueco dentro de una pantalla que ya tiene otras cosas. Ocupa lo que una
+ *   fila de lista, no media pantalla.
  */
 export function EmptyState({
   icon,
@@ -404,36 +409,38 @@ export function EmptyState({
   className,
   compact,
 }: EmptyStateProps) {
-  return (
-    <div
-      className={cx(
-        'flex flex-col items-center text-center',
-        compact ? 'py-8 px-4' : 'py-16 px-6',
-        className,
-      )}
-    >
-      {icon && (
-        <div
-          className={cx(
-            'flex items-center justify-center rounded-full mb-4',
-            'bg-accent-quiet text-accent',
-            compact ? 'size-10' : 'size-14',
+  if (compact) {
+    return (
+      <div
+        className={cx(
+          'flex flex-wrap items-center gap-x-4 gap-y-3 px-4 sm:px-5 py-4',
+          className,
+        )}
+      >
+        <div className="flex items-center gap-3.5 min-w-0 flex-1 basis-[16rem]">
+          {icon && (
+            <div className="grid place-items-center size-10 rounded-[12px] shrink-0 bg-accent-quiet text-accent">
+              {icon}
+            </div>
           )}
-        >
+          <div className="min-w-0">
+            <p className="text-[0.9375rem] font-semibold text-ink leading-snug">{title}</p>
+            <p className="text-[0.8125rem] text-ink-3 mt-0.5 leading-snug text-pretty">{description}</p>
+          </div>
+        </div>
+        {action && <div className="shrink-0 flex flex-wrap gap-2">{action}</div>}
+      </div>
+    )
+  }
+  return (
+    <div className={cx('flex flex-col items-center text-center py-12 px-6', className)}>
+      {icon && (
+        <div className="flex items-center justify-center rounded-full mb-4 bg-accent-quiet text-accent size-14">
           {icon}
         </div>
       )}
-      <p className={cx('font-semibold text-ink', compact ? 'text-[0.875rem]' : 'text-base')}>
-        {title}
-      </p>
-      <p
-        className={cx(
-          'text-ink-3 mt-1.5 text-balance',
-          compact ? 'text-[0.8125rem] max-w-[34ch]' : 'text-[0.875rem] max-w-[46ch]',
-        )}
-      >
-        {description}
-      </p>
+      <p className="font-semibold text-ink text-base">{title}</p>
+      <p className="text-ink-3 mt-1.5 text-balance text-[0.875rem] max-w-[46ch]">{description}</p>
       {action && <div className="mt-5">{action}</div>}
     </div>
   )

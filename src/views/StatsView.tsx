@@ -16,6 +16,7 @@ import { useGlobalAverage, useSubjectResults, useSubjects } from '@/state/select
 import { Page, PageHeader } from '@/layout/AppShell'
 import { LineChart, RankedBars, type RankedBar } from '@/ui/charts'
 import { StudyStatsCard } from '@/features/study/StudyStatsCard'
+import { PrepCard, StreakCard } from '@/features/study/StudyInsights'
 import { Button, Card, EmptyState, Numeral, SectionHeader, Segmented, cx } from '@/ui/primitives'
 
 type Scope = TermId | 'todas'
@@ -57,7 +58,8 @@ export function StatsView() {
       max: Math.min(scale.max, Math.max(Math.ceil(Math.max(...values)) + 1, scale.pass + 1)),
     }
   }, [timeline, scale])
-  const hasAnything = data.grades.length > 0 || data.tasks.length > 0
+  const hasFlights = data.sessions.some((s) => s.status !== 'en_vuelo')
+  const hasAnything = data.grades.length > 0 || data.tasks.length > 0 || hasFlights
 
   if (!hasAnything) {
     return (
@@ -67,20 +69,17 @@ export function StatsView() {
           <EmptyState
             icon={<TrendingUp className="size-5" />}
             title="Todavía no hay nada que analizar"
-            description="En cuanto registres notas o completes tareas, esta sección mostrará cómo evoluciona el curso."
+            description="Con tus notas, tareas o sesiones del modo estudio verás aquí cómo va el curso."
             action={
-              <Button variant="primary" onClick={() => (window.location.hash = '/notas')}>
-                Empezar por las notas
-              </Button>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button variant="primary" onClick={() => (window.location.hash = '/notas')}>
+                  Apuntar una nota
+                </Button>
+                <Button onClick={() => (window.location.hash = '/estudio')}>Estudiar ahora</Button>
+              </div>
             }
           />
         </Card>
-        {/* Los vuelos del modo estudio no dependen de notas ni tareas. */}
-        {data.sessions.length > 0 && (
-          <div className="mt-5">
-            <StudyStatsCard />
-          </div>
-        )}
       </Page>
     )
   }
@@ -138,6 +137,7 @@ export function StatsView() {
           <Stat
             label="A tiempo"
             value={tasks.onTimeRate === null ? '—' : `${tasks.onTimeRate} %`}
+            hint={tasks.judged > 0 ? `de ${tasks.judged}` : undefined}
           />
         </dl>
       </div>
@@ -160,6 +160,11 @@ export function StatsView() {
                 compact
                 title="Aún no hay recorrido"
                 description="Con la segunda nota empezará a verse la curva."
+                action={
+                  <Button size="sm" onClick={() => (window.location.hash = '/notas')}>
+                    Añadir nota
+                  </Button>
+                }
               />
             ) : (
               <LineChart
@@ -186,7 +191,16 @@ export function StatsView() {
           <Card>
             <SectionHeader title="Tareas" className="mb-5" />
             {tasks.total === 0 ? (
-              <EmptyState compact title="Sin tareas" description="Todavía no has creado ninguna." />
+              <EmptyState
+                compact
+                title="Sin tareas"
+                description="Todavía no has creado ninguna."
+                action={
+                  <Button size="sm" onClick={() => (window.location.hash = '/tareas')}>
+                    Ir a Tareas
+                  </Button>
+                }
+              />
             ) : (
               <div className="flex flex-col gap-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -218,7 +232,8 @@ export function StatsView() {
                       />
                     </div>
                     <p className="text-[0.75rem] text-ink-3 mt-1.5 text-balance">
-                      De las tareas con fecha que ya has completado.
+                      De {tasks.judged} {tasks.judged === 1 ? 'tarea' : 'tareas'} con fecha ya
+                      completadas (no cuentan las que apuntaste cuando ya habían vencido).
                     </p>
                   </div>
                 )}
@@ -227,8 +242,8 @@ export function StatsView() {
           </Card>
         </div>
 
-        {/* --- Comparativa entre asignaturas --- */}
-        <div className="lg:col-span-7">
+        {/* --- Comparativa entre asignaturas y estudio frente a notas --- */}
+        <div className="lg:col-span-7 flex flex-col gap-5 lg:gap-6">
           <Card>
             <SectionHeader
               title="Media por asignatura"
@@ -244,15 +259,19 @@ export function StatsView() {
               emptyLabel="Ninguna asignatura tiene notas todavía."
             />
           </Card>
+          <PrepCard />
         </div>
 
         {/* --- Modo estudio --- */}
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-5 flex flex-col gap-5 lg:gap-6">
           <StudyStatsCard />
+          <StreakCard />
         </div>
 
-        {/* --- Mejores y peores --- */}
-        {ranked.length >= 2 && (
+        {/* --- Mejores y peores ---
+            Sin solaparse: con pocas notas, las dos listas enseñaban las
+            mismas (la mejor nota salía también como «donde hay margen»). */}
+        {ranked.length >= 4 && (
           <>
             <div className="lg:col-span-6">
               <Card flush>
@@ -260,7 +279,7 @@ export function StatsView() {
                   title="Tus mejores notas"
                   className="px-5 sm:px-6 pt-5 pb-4 border-b border-hairline"
                 />
-                <GradeList entries={ranked.slice(0, 4)} scale={scale} />
+                <GradeList entries={ranked.slice(0, Math.min(4, Math.floor(ranked.length / 2)))} scale={scale} />
               </Card>
             </div>
             <div className="lg:col-span-6">
@@ -269,7 +288,10 @@ export function StatsView() {
                   title="Donde hay más margen"
                   className="px-5 sm:px-6 pt-5 pb-4 border-b border-hairline"
                 />
-                <GradeList entries={[...ranked].reverse().slice(0, 4)} scale={scale} />
+                <GradeList
+                  entries={[...ranked].reverse().slice(0, Math.min(4, Math.floor(ranked.length / 2)))}
+                  scale={scale}
+                />
               </Card>
             </div>
           </>

@@ -176,13 +176,7 @@ export function SubjectGrades({
         <EmptyState
           compact
           title="Aún no hay notas"
-          description="En cuanto apuntes la primera verás aquí la media y cuánto llevas evaluado."
-          action={
-            <Button size="sm" variant="secondary" onClick={() => onAddGrade(null)}>
-              <Plus className="size-3.5" />
-              Añadir nota
-            </Button>
-          }
+          description="Con la primera verás la media y cuánto llevas evaluado."
         />
       ) : (
         <div className="border-t border-hairline">

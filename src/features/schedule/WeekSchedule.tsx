@@ -9,6 +9,7 @@ import { useDispatch, useSettings, useStore } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
 import { Button, Card, EmptyState, GroupTitle, cx } from '@/ui/primitives'
 import { useToast } from '@/ui/Toast'
+import { hrefFor } from '@/router'
 
 const DAYS: { day: number; label: string }[] = [
   { day: 1, label: 'Lunes' },
@@ -73,14 +74,24 @@ export function WeekSchedule() {
           title="Tu horario semanal"
           description={
             canLoad
-              ? 'Carga el horario de tu centro: se crean las asignaturas que falten y se rellenan sus clases. Después podrás retocar cualquier franja desde la ficha de cada asignatura.'
-              : 'Abre una asignatura y añade sus clases (día, hora y aula). Aquí verás la semana entera y en Inicio, qué toca ahora.'
+              ? 'Carga el de tu centro; luego puedes retocar cada clase.'
+              : 'Añade las clases de cada asignatura y verás aquí la semana.'
           }
           action={
             canLoad ? (
-              <Button variant="primary" onClick={load}>
+              <Button variant="primary" size="sm" onClick={load}>
                 <Download className="size-4" />
-                Cargar horario de mi centro
+                Cargar horario
+              </Button>
+            ) : subjects[0] ? (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() =>
+                  (window.location.hash = hrefFor('asignaturas', { id: subjects[0].id }).slice(1))
+                }
+              >
+                Añadir clases
               </Button>
             ) : undefined
           }

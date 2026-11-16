@@ -204,10 +204,19 @@ export function ExamsView() {
       {blocks.length === 0 ? (
         <Card>
           <EmptyState
-            compact={upcoming.length > 0}
+            compact
             icon={<ClipboardList className="size-5" />}
             title="Aún no hay exámenes hechos"
-            description={`Cuando pase la fecha de un examen de la ${termName(scope === 'todas' ? 'T1' : scope).toLowerCase()} aparecerá aquí, con su nota si ya la has apuntado.`}
+            description={
+              scope === 'todas'
+                ? 'Aparecen aquí al pasar su fecha, con su nota.'
+                : `Los de la ${termName(scope).toLowerCase()} aparecen aquí al pasar su fecha, con su nota.`
+            }
+            action={
+              <Button size="sm" onClick={() => setCreating(true)}>
+                Apuntar uno pasado
+              </Button>
+            }
           />
         </Card>
       ) : (

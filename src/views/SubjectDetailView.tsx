@@ -174,8 +174,9 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
             {exams.length === 0 ? (
               <EmptyState
                 compact
+                icon={<CalendarPlus className="size-4" />}
                 title="Ninguno apuntado"
-                description="Apunta el próximo y verás aquí la cuenta atrás."
+                description="Apunta el próximo y verás la cuenta atrás."
               />
             ) : (
               <ul className="pb-1">
