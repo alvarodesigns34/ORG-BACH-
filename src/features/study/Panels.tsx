@@ -9,6 +9,7 @@ import {
   distanceKm,
   formatFlightTime,
   kmFor,
+  layoverPoints,
   minutesBySubject,
   minutesFor,
   passport,
@@ -22,6 +23,7 @@ import { haptic, spring } from '@/ui/motion'
 import { Button, IconButton, Segmented, cx } from '@/ui/primitives'
 import { AIRPORT_BY_IATA, searchAirports } from './airports'
 import { DurationRuler } from './DurationRuler'
+import type { LayoverMode, StudyPrefs } from './prefs'
 
 export const PANEL_WIDTH = 380
 
@@ -511,7 +513,8 @@ function PassportView({
 // ---------------------------------------------------------------------------
 
 const PRESETS = [25, 45, 60, 90, 120]
-const LAYOVERS = [0, 5, 10, 15]
+const BREAKS = [5, 10, 15]
+const FOCUS = [25, 50]
 
 export function BookingPanel({
   origin,
@@ -533,8 +536,8 @@ export function BookingPanel({
   selected: Destination | null
   onSelect: (iata: string, minutes: number) => void
   onRandom: () => void
-  layover: number
-  onLayover: (minutes: number) => void
+  layover: { mode: LayoverMode; minutes: number; focus: number }
+  onLayover: (patch: Partial<Pick<StudyPrefs, 'layoverMode' | 'layover' | 'focus'>>) => void
   onBack: () => void
   onBook: () => void
 }) {
@@ -553,7 +556,13 @@ export function BookingPanel({
   )
 
   const flightMinutes = selected?.minutes ?? minutes
-  const canLayover = flightMinutes >= 40
+  const plan =
+    layover.mode === 'pomodoro'
+      ? { layoverMinutes: layover.minutes, layoverEvery: layover.focus }
+      : layover.mode === 'mitad' && flightMinutes >= 40
+        ? { layoverMinutes: layover.minutes }
+        : {}
+  const stops = layoverPoints({ plannedMinutes: flightMinutes, ...plan }).length
 
   return (
     <>
@@ -712,28 +721,48 @@ export function BookingPanel({
       </div>
 
       <div className="px-4 pt-3 pb-4 border-t border-[var(--glass-edge)]">
-        <div className={cx('flex items-center gap-3 mb-3 px-1 transition-opacity', !canLayover && 'opacity-40')}>
-          <Coffee className="size-4 text-ink-3 shrink-0" strokeWidth={2.2} />
-          <span className="flex-1 text-[0.8125rem] font-medium text-ink-2">Escala para descansar</span>
-          <div className="flex gap-1">
-            {LAYOVERS.map((m) => (
-              <button
-                key={m}
-                type="button"
-                disabled={!canLayover}
-                onClick={() => {
-                  haptic()
-                  onLayover(m)
-                }}
-                className={cx(
-                  'h-7 min-w-9 px-2 rounded-full text-[0.75rem] font-semibold tabular-nums transition-colors',
-                  (canLayover ? layover : 0) === m ? 'bg-ink text-canvas' : 'bg-[var(--glass-tint)] text-ink-2',
-                )}
-              >
-                {m === 0 ? 'No' : `${m}′`}
-              </button>
-            ))}
+        <div className="mb-3 px-1">
+          <div className="flex items-center gap-3">
+            <Coffee className="size-4 text-ink-3 shrink-0" strokeWidth={2.2} />
+            <span className="flex-1 text-[0.8125rem] font-medium text-ink-2">Escalas</span>
+            <div className="flex gap-1" role="radiogroup" aria-label="Escalas">
+              {(
+                [
+                  ['no', 'No'],
+                  ['mitad', 'A mitad'],
+                  ['pomodoro', 'Pomodoro'],
+                ] as const
+              ).map(([mode, label]) => (
+                <Chip
+                  key={mode}
+                  active={layover.mode === mode}
+                  onClick={() => onLayover({ layoverMode: mode })}
+                >
+                  {label}
+                </Chip>
+              ))}
+            </div>
           </div>
+          {layover.mode !== 'no' && (
+            <div className="flex items-center gap-2 mt-2 pl-7 text-[0.75rem] text-ink-3">
+              {layover.mode === 'pomodoro' && (
+                <>
+                  <span>Cada</span>
+                  {FOCUS.map((m) => (
+                    <Chip key={m} active={layover.focus === m} onClick={() => onLayover({ focus: m })}>
+                      {m}′
+                    </Chip>
+                  ))}
+                </>
+              )}
+              <span>{layover.mode === 'pomodoro' ? 'descansa' : 'De'}</span>
+              {BREAKS.map((m) => (
+                <Chip key={m} active={layover.minutes === m} onClick={() => onLayover({ layover: m })}>
+                  {m}′
+                </Chip>
+              ))}
+            </div>
+          )}
         </div>
         <Button variant="primary" size="lg" block disabled={!selected} onClick={onBook}>
           {selected ? <span className="truncate">Reservar · {selected.airport.city}</span> : 'Elige un destino'}
@@ -741,11 +770,43 @@ export function BookingPanel({
         <p className="text-center text-[0.75rem] text-ink-3 mt-2 tabular-nums">
           {selected
             ? `${Math.round(selected.km).toLocaleString('es')} km · ${formatFlightTime(selected.minutes)}${
-                canLayover && layover ? ` + ${layover} min de escala` : ''
+                stops === 0
+                  ? layover.mode !== 'no'
+                    ? ' · demasiado corto para escala'
+                    : ''
+                  : ` + ${stops === 1 ? '' : `${stops} × `}${layover.minutes} min de escala`
               }`
             : `${kmFor(minutes).toLocaleString('es')} km de alcance`}
         </p>
       </div>
     </>
+  )
+}
+
+function Chip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      onClick={() => {
+        haptic()
+        onClick()
+      }}
+      className={cx(
+        'h-7 min-w-9 px-2.5 rounded-full text-[0.75rem] font-semibold tabular-nums transition-colors',
+        active ? 'bg-ink text-canvas' : 'bg-[var(--glass-tint)] text-ink-2',
+      )}
+    >
+      {children}
+    </button>
   )
 }

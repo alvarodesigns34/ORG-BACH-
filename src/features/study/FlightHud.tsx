@@ -29,7 +29,15 @@ import type { FocusSession, Subject, Task } from '@/domain/types'
 import { haptic, spring } from '@/ui/motion'
 import { Button, cx } from '@/ui/primitives'
 import type { MapKind } from './mapStyle'
-import { SOUNDS, SOUND_CREDITS, loadingSound, prefetchSounds, subscribeSound, type SoundId } from './soundscape'
+import {
+  CHIME_CREDIT,
+  SOUNDS,
+  SOUND_CREDITS,
+  loadingSound,
+  prefetchSounds,
+  subscribeSound,
+  type SoundId,
+} from './soundscape'
 
 // ---------------------------------------------------------------------------
 // Piezas
@@ -176,16 +184,20 @@ function SoundPanel({
   sound,
   volume,
   keepAwake,
+  lockCard,
   onSound,
   onVolume,
   onKeepAwake,
+  onLockCard,
 }: {
   sound: SoundId | 'ninguno'
   volume: number
   keepAwake: boolean
+  lockCard: boolean
   onSound: (id: SoundId | 'ninguno') => void
   onVolume: (v: number) => void
   onKeepAwake: (on: boolean) => void
+  onLockCard: (on: boolean) => void
 }) {
   const loading = useSyncExternalStore(subscribeSound, loadingSound, () => null)
   // Con el panel abierto se descargan todos: cambiar de ambiente es inmediato.
@@ -268,6 +280,18 @@ function SoundPanel({
         <Switch checked={keepAwake} onChange={onKeepAwake} label="Pantalla siempre encendida" />
       </div>
 
+      {sound === 'ninguno' && (
+        <div className="flex items-center justify-between gap-3 mt-3 pt-3.5 border-t border-[var(--glass-edge)]">
+          <span className="min-w-0">
+            <span className="block text-[0.875rem] font-medium">Vuelo en la pantalla de bloqueo</span>
+            <span className="block text-[0.75rem] text-ink-3 leading-snug">
+              Reproduce un audio mudo: pausa la música de otras apps
+            </span>
+          </span>
+          <Switch checked={lockCard} onChange={onLockCard} label="Vuelo en la pantalla de bloqueo" />
+        </div>
+      )}
+
       <details className="group/cred mt-3 text-[0.6875rem] text-ink-3">
         <summary className="cursor-pointer list-none select-none hover:text-ink-2 transition-colors">
           Grabaciones reales de dominio público ·{' '}
@@ -279,6 +303,9 @@ function SoundPanel({
               {c.what} — <span className="text-ink-2">{c.author}</span>
             </li>
           ))}
+          <li>
+            Megafonía: {CHIME_CREDIT.what} — <span className="text-ink-2">{CHIME_CREDIT.author}</span>
+          </li>
           <li className="pt-1">Vía radio aporee y Internet Archive.</li>
         </ul>
       </details>
@@ -327,6 +354,8 @@ export function MapToolbar({
   onSound,
   onVolume,
   onKeepAwake,
+  lockCard,
+  onLockCard,
   flight,
 }: {
   map: MapKind
@@ -339,6 +368,8 @@ export function MapToolbar({
   onSound: (id: SoundId | 'ninguno') => void
   onVolume: (v: number) => void
   onKeepAwake: (on: boolean) => void
+  lockCard: boolean
+  onLockCard: (on: boolean) => void
   flight?: { following: boolean; onFollow: () => void; onOverview: () => void }
 }) {
   const [open, setOpen] = useState<'mapa' | 'sonido' | null>(null)
@@ -380,9 +411,11 @@ export function MapToolbar({
                 sound={sound}
                 volume={volume}
                 keepAwake={keepAwake}
+                lockCard={lockCard}
                 onSound={onSound}
                 onVolume={onVolume}
                 onKeepAwake={onKeepAwake}
+                onLockCard={onLockCard}
               />
             </Popover>
           )}
@@ -465,11 +498,14 @@ export function FlightHud({
   subject,
   task,
   layoverCity,
+  layoverMarks,
+  breakMinutes,
   remainingMs,
   remainingKm,
   progress,
   onExit,
   onPause,
+  onBreak,
   onAbandon,
 }: {
   session: FocusSession
@@ -478,15 +514,20 @@ export function FlightHud({
   subject?: Subject
   task?: Task
   layoverCity?: string
+  /** Escalas programadas que quedan, como fracción del vuelo. */
+  layoverMarks: number[]
+  /** Minutos del descanso que se pide a mano. */
+  breakMinutes: number
   remainingMs: number
   remainingKm: number
   progress: number
   onExit: () => void
   onPause: () => void
+  onBreak: () => void
   onAbandon: () => void
 }) {
   const paused = !!session.pausedAt
-  const layoverPending = !!session.layoverMinutes && !session.layoverAt
+  const layoverPending = layoverMarks.length > 0
 
   return (
     <>
@@ -544,12 +585,14 @@ export function FlightHud({
               animate={{ width: `${progress * 100}%` }}
               transition={{ duration: 1, ease: 'linear' }}
             />
-            {layoverPending && (
+            {layoverMarks.map((at) => (
               <span
+                key={at}
                 aria-hidden
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-1/2 size-2 rounded-full bg-[#ff9f0a] ring-2 ring-[var(--c-surface)]"
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 size-2 rounded-full bg-[#ff9f0a] ring-2 ring-[var(--c-surface)]"
+                style={{ left: `${at * 100}%` }}
               />
-            )}
+            ))}
           </div>
           <div className="relative z-[2] grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-7 py-4">
             <div>
@@ -576,12 +619,24 @@ export function FlightHud({
                   <Pause className="size-6" fill="currentColor" strokeWidth={0} />
                 )}
               </button>
+              <button
+                type="button"
+                aria-label={`Descanso de ${breakMinutes} minutos ahora`}
+                title={`Descanso de ${breakMinutes} min ahora`}
+                onClick={onBreak}
+                disabled={paused}
+                className="pressable grid place-items-center size-12 rounded-full bg-[var(--glass-tint)] text-ink-2 disabled:opacity-35"
+              >
+                <Coffee className="size-5" strokeWidth={2.2} />
+              </button>
               <HoldToAbandon onConfirm={onAbandon} />
             </div>
 
             <div className="text-right">
               <p className="text-[0.75rem] font-medium text-ink-3 mb-1.5">
-                {layoverPending && layoverCity ? `Escala en ${layoverCity}` : 'Distancia restante'}
+                {layoverPending && layoverCity
+                  ? `${layoverMarks.length > 1 ? `${layoverMarks.length} escalas · ` : ''}próxima en ${layoverCity}`
+                  : 'Distancia restante'}
               </p>
               <span className="numeral text-[2.5rem]">
                 {Math.round(remainingKm).toLocaleString('es')}
@@ -709,7 +764,7 @@ export function LayoverCard({
             {mm}:{ss}
           </p>
           <p className="text-[0.9375rem] text-ink-2 mt-2 leading-relaxed max-w-[18rem]">
-            Levántate, estira las piernas y bebe agua. El vuelo sigue solo al terminar.
+            Levántate, estira las piernas y bebe agua. El vuelo sigue solo al terminar, y te aviso aunque bloquees la pantalla.
           </p>
           <Button className="mt-6" onClick={onResume}>
             Seguir volando ya

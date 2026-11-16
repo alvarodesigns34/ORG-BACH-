@@ -31,6 +31,7 @@ import { syncEngine } from '@/sync/engine'
 import { ToastProvider } from '@/ui/Toast'
 import { ChromeProvider, type CreateKind } from '@/layout/chrome'
 import { AssistantSheet } from '@/features/assistant/AssistantSheet'
+import { FlightController } from '@/features/study/FlightController'
 
 export function App() {
   return (
@@ -155,6 +156,9 @@ function Shell() {
       <GradeEditor open={creating === 'nota'} onClose={closeCreate} />
       <EventEditor open={creating === 'evento'} onClose={closeCreate} />
       <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} />
+      {/* El vuelo sigue (escalas, aterrizaje, sonido, pantalla de bloqueo)
+          aunque se salga del modo estudio. */}
+      <FlightController />
       <LinkChoiceDialog />
       <RecoveryDialog />
     </>

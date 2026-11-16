@@ -12,12 +12,15 @@ import {
   inLayover,
   interpolate,
   kmFor,
-  layoverDue,
+  layoverPoints,
   layoverRemainingMs,
+  layoversTaken,
   minutesFor,
   nearestAirport,
   progress as flightProgress,
   remainingMs as flightRemaining,
+  MAX_MINUTES,
+  MIN_MINUTES,
   type Airport,
   type Destination,
 } from '@/domain/flights'
@@ -35,17 +38,15 @@ import { BookingPanel, HomePanel, PANEL_WIDTH, SidePanel, type HomeTab } from '@
 import { SeatPicker, type SeatChoice } from '@/features/study/SeatPicker'
 import { BoardingPass, Takeoff } from '@/features/study/BoardingPass'
 import { FlightHud, LandedCard, LayoverCard, MapToolbar } from '@/features/study/FlightHud'
+import { beginFlightAudio } from '@/features/study/flightAudio'
 import { useNow, useResolvedTheme, useWakeLock } from '@/features/study/hooks'
-import { useStudyPrefs } from '@/features/study/prefs'
+import { layoverPlan, useStudyPrefs } from '@/features/study/prefs'
 import {
+  SOUNDS,
   chime,
-  duck,
   playSound,
   preloadSound,
-  playingSound,
   setVolume,
-  stopSound,
-  unlockAudio,
   type SoundId,
 } from '@/features/study/soundscape'
 
@@ -75,7 +76,7 @@ export default function StudyView() {
   const dispatch = useDispatch()
   const today = useToday()
   const toast = useToast()
-  const { navigate } = useRoute()
+  const { route, navigate } = useRoute()
   const subjects = useSubjects()
   const subjectMap = useSubjectMap()
   const theme = useResolvedTheme()
@@ -93,6 +94,8 @@ export default function StudyView() {
   const [passId, setPassId] = useState(() => newId('pase'))
   const [landedId, setLandedId] = useState<string | null>(null)
   const [following, setFollowing] = useState(true)
+  /** La cámara ya hizo el despegue de este vuelo. */
+  const tookOff = useRef(false)
 
   // --- Destinos ---
   const candidates = useMemo(
@@ -132,7 +135,8 @@ export default function StudyView() {
       window.removeEventListener('resize', onResize)
       map.destroy()
       mapRef.current = null
-      stopSound()
+      // El ambiente no se para aquí: el vuelo sigue (y suena) fuera de esta
+      // vista. Lo apaga el controlador del vuelo al aterrizar o abandonar.
     }
     // El mapa se crea una vez; estilo y contenido cambian después.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -159,28 +163,57 @@ export default function StudyView() {
   }, [look])
 
   // --- Sesión en el aire (también si despegó en otro dispositivo) ---
+  // Las escalas y el aterrizaje los aplica el controlador del vuelo, que vive
+  // fuera de esta vista; aquí solo se sigue lo que le pasa a la sesión.
   const sessionShown =
     active ?? (landedId ? data.sessions.find((s) => s.id === landedId) : undefined)
+  const lastActive = useRef<string | null>(active?.id ?? null)
   useEffect(() => {
-    if (active && stage !== 'vuelo' && stage !== 'despegue') setStage('vuelo')
-    if (!active && stage === 'vuelo' && !landedId) setStage('inicio')
-  }, [active, stage, landedId])
+    if (active) {
+      lastActive.current = active.id
+      if (stage !== 'vuelo' && stage !== 'despegue') setStage('vuelo')
+      return
+    }
+    const id = lastActive.current
+    lastActive.current = null
+    const ended = id ? data.sessions.find((s) => s.id === id) : undefined
+    if (ended?.status === 'aterrizado') {
+      // Acaba de aterrizar con la vista delante: la bienvenida.
+      setLandedId(ended.id)
+      setStage('aterrizado')
+    } else if (stage === 'vuelo' && !landedId) {
+      tookOff.current = false
+      setStage('inicio')
+    }
+  }, [active, stage, landedId, data.sessions])
 
   const flightFrom = sessionShown ? AIRPORT_BY_IATA.get(sessionShown.from) : undefined
   const flightTo = sessionShown ? AIRPORT_BY_IATA.get(sessionShown.to) : undefined
-  const layoverCity = useMemo(() => {
-    if (!flightFrom || !flightTo || !sessionShown?.layoverMinutes) return undefined
-    return nearestAirport(interpolate(flightFrom, flightTo, 0.5), AIRPORTS, [
-      flightFrom.iata,
-      flightTo.iata,
-    ])?.city
-  }, [flightFrom, flightTo, sessionShown?.layoverMinutes])
-
   const now = useNow(stage === 'vuelo', 1000)
   const prog = active ? flightProgress(active, now) : stage === 'aterrizado' ? 1 : 0
   const remaining = active ? flightRemaining(active, now) : 0
   const onLayover = !!active && inLayover(active)
   const layoverLeft = active ? layoverRemainingMs(active, now) : 0
+
+  /** Escalas programadas que quedan, como fracción del vuelo (0…1). */
+  const layoverMarks = useMemo(
+    () =>
+      active
+        ? layoverPoints(active)
+            .slice(layoversTaken(active))
+            .map((point) => point / active.plannedMinutes)
+        : [],
+    [active],
+  )
+  // La ciudad de la escala: la más cercana a donde está (o estará) el avión.
+  const layoverAt = onLayover ? Math.round(prog * 200) / 200 : layoverMarks[0]
+  const layoverCity = useMemo(() => {
+    if (!flightFrom || !flightTo || layoverAt === undefined) return undefined
+    return nearestAirport(interpolate(flightFrom, flightTo, layoverAt), AIRPORTS, [
+      flightFrom.iata,
+      flightTo.iata,
+    ])?.city
+  }, [flightFrom, flightTo, layoverAt])
 
   useWakeLock(prefs.keepAwake && stage === 'vuelo' && !!active)
 
@@ -190,59 +223,8 @@ export default function StudyView() {
     if (stage === 'asiento' || stage === 'tarjeta' || stage === 'vuelo') preloadSound(prefs.sound)
   }, [stage, prefs.sound])
 
-  // --- Sonido ---
-  const startAmbient = useCallback(
-    (id: SoundId | 'ninguno') => {
-      unlockAudio()
-      setVolume(prefs.volume)
-      if (id === 'ninguno') stopSound()
-      else playSound(id)
-    },
-    [prefs.volume],
-  )
-
-  // Al volver a un vuelo ya en marcha no hay gesto con el que arrancar el
-  // audio (Safari lo exige): el primer toque en la pantalla lo enciende.
-  useEffect(() => {
-    if (stage !== 'vuelo' || prefs.sound === 'ninguno' || playingSound()) return
-    const kick = () => startAmbient(prefs.sound)
-    window.addEventListener('pointerdown', kick, { once: true })
-    return () => window.removeEventListener('pointerdown', kick)
-  }, [stage, prefs.sound, startAmbient])
-
-  // --- Escala: empieza a mitad de vuelo y termina sola ---
-  useEffect(() => {
-    if (!active) return
-    if (layoverDue(active, now)) {
-      dispatch({ type: 'session/layover', id: active.id })
-      duck(true)
-      chime()
-      haptic('success')
-    } else if (inLayover(active) && layoverRemainingMs(active, now) <= 0) {
-      dispatch({ type: 'session/resume', id: active.id })
-      duck(false)
-      chime()
-    }
-  }, [active, now, dispatch])
-
-  // --- Aterrizaje: al acabarse el tiempo, una vez ---
-  useEffect(() => {
-    if (!active || active.pausedAt || remaining > 0) return
-    setLandedId(active.id)
-    dispatch({
-      type: 'session/land',
-      id: active.id,
-      route: `${flightFrom?.city ?? active.from} → ${flightTo?.city ?? active.to}`,
-    })
-    setStage('aterrizado')
-    stopSound()
-    chime()
-    haptic('success')
-  }, [active, remaining, dispatch, flightFrom, flightTo])
-
   // --- Cámara y contenido por etapa ---
   const fitTimer = useRef<number | null>(null)
-  const tookOff = useRef(false)
 
   const history = useMemo(() => {
     const out: Route2[] = []
@@ -351,18 +333,28 @@ export default function StudyView() {
     setMinutes(pick.minutes)
   }
 
-  const layover = selected && selected.minutes >= 40 ? prefs.layover : 0
+  const plan = selected ? layoverPlan(prefs, selected.minutes) : {}
+  const layoverCount = selected
+    ? layoverPoints({ plannedMinutes: selected.minutes, ...plan }).length
+    : 0
+  const layoverLabel =
+    layoverCount === 0
+      ? 'Directo'
+      : layoverCount === 1
+        ? `${plan.layoverMinutes} min`
+        : `${layoverCount} × ${plan.layoverMinutes} min`
 
   const takeoff = () => {
     if (!selected || !seat) return
-    unlockAudio()
-    setVolume(prefs.volume)
-    chime()
+    // Dentro del toque: Safari no deja arrancar audio de otra forma.
+    beginFlightAudio(prefs, { ambient: false })
+    chime('megafonia')
     haptic('success')
     setPrefs({ minutes: selected.minutes })
     if (prefs.sound !== 'ninguno') {
       const id = prefs.sound
-      window.setTimeout(() => playSound(id), 1300)
+      // El ambiente entra cuando la megafonía ya ha dicho lo suyo.
+      window.setTimeout(() => playSound(id), 1600)
     }
     tookOff.current = false
     setFollowing(true)
@@ -377,7 +369,7 @@ export default function StudyView() {
         seat: seat.seat,
         subjectId: seat.subjectId,
         taskId: seat.taskId,
-        layoverMinutes: layover || undefined,
+        ...plan,
       },
     })
     setStage('vuelo')
@@ -388,7 +380,6 @@ export default function StudyView() {
     const end = active.pausedAt ? Date.parse(active.pausedAt) : Date.now()
     const done = Math.floor((end - Date.parse(active.startedAt) - active.pausedMs) / 60_000)
     dispatch({ type: 'session/cancel', id: active.id })
-    stopSound()
     tookOff.current = false
     setStage('inicio')
     toast({ text: done > 0 ? `Vuelo abandonado · ${done} min estudiados` : 'Vuelo abandonado' })
@@ -402,6 +393,47 @@ export default function StudyView() {
     mapRef.current.setRoute(from, to, 1)
     mapRef.current.fitRoute(from, to, panelPadding(), 900)
   }
+
+  // --- Despegue rápido: `#/estudio?despegar=25` -----------------------------
+  // Llega del atajo de teclado, de los accesos directos de la app instalada o
+  // del asistente («ponme 45 min de Mates con lluvia»). Deja el vuelo listo en
+  // la pantalla de cabina: falta un toque, que además es el que Safari exige
+  // para poder encender el sonido.
+  const [quick, setQuick] = useState(false)
+  const quickParam = route.params.get('despegar')
+  useEffect(() => {
+    if (!quickParam) return
+    const wantedSubject = route.params.get('asignatura')
+    const wantedTask = route.params.get('tarea')
+    const wantedSound = route.params.get('sonido')
+    // El parámetro se consume: recargar no debe volver a preparar el vuelo.
+    navigate('estudio')
+    if (active) return
+    const wanted = Math.min(MAX_MINUTES, Math.max(MIN_MINUTES, Math.round(Number(quickParam))))
+    if (!Number.isFinite(wanted)) return
+    const pick = destinationsFor(origin, AIRPORTS, wanted)[0]
+    if (!pick) return
+    const subject = subjects.find((s) => s.id === wantedSubject)
+    const task = data.tasks.find((t) => t.id === wantedTask && t.status !== 'completada')
+    if (wantedSound === 'ninguno' || SOUNDS.some((x) => x.id === wantedSound)) {
+      setPrefs({ sound: wantedSound as SoundId | 'ninguno' })
+    }
+    setDestIata(pick.airport.iata)
+    setMinutes(pick.minutes)
+    setPassId(newId('pase'))
+    setLandedId(null)
+    setSeat({
+      // Ventanilla en la fila 7: el asiento de quien no quiere elegir.
+      seat: '07A',
+      cabin: 'Turista',
+      subjectId: subject?.id ?? task?.subjectId,
+      taskId: task?.id,
+    })
+    setQuick(true)
+    setStage('despegue')
+    // Solo reacciona al parámetro: el resto se lee en ese instante.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickParam])
 
   const landedTask = sessionShown?.taskId
     ? data.tasks.find((t) => t.id === sessionShown.taskId)
@@ -458,8 +490,8 @@ export default function StudyView() {
                 setMinutes(m)
               }}
               onRandom={random}
-              layover={prefs.layover}
-              onLayover={(m) => setPrefs({ layover: m })}
+              layover={{ mode: prefs.layoverMode, minutes: prefs.layover, focus: prefs.focus }}
+              onLayover={(patch) => setPrefs(patch)}
               onBack={() => setStage('inicio')}
               onBook={() => {
                 if (selected) {
@@ -501,7 +533,7 @@ export default function StudyView() {
               minutes: selected.minutes,
               seat: seat.seat,
               cabin: seat.cabin,
-              layover,
+              layover: layoverLabel,
               subject: seat.subjectId ? subjectMap.get(seat.subjectId) : undefined,
               task: passTask,
             }}
@@ -514,8 +546,25 @@ export default function StudyView() {
             key="despegue"
             from={origin}
             to={selected.airport}
-            onGo={takeoff}
-            onCancel={() => setStage('tarjeta')}
+            minutes={selected.minutes}
+            onGo={() => {
+              setQuick(false)
+              takeoff()
+            }}
+            onCancel={() => {
+              // Un despegue rápido no pasó por la tarjeta: se vuelve al inicio.
+              setStage(quick ? 'inicio' : 'tarjeta')
+              setQuick(false)
+            }}
+            quick={
+              quick && seat
+                ? {
+                    subjects,
+                    subjectId: seat.subjectId,
+                    onSubject: (id) => setSeat({ ...seat, subjectId: id, taskId: undefined }),
+                  }
+                : undefined
+            }
           />
         )}
       </AnimatePresence>
@@ -533,13 +582,19 @@ export default function StudyView() {
             onLabels={(on) => setPrefs({ labels: on })}
             onSound={(id) => {
               setPrefs({ sound: id })
-              if (stage === 'vuelo') startAmbient(id)
+              // En vuelo, el cambio suena ya (y ajusta la tarjeta de bloqueo).
+              if (stage === 'vuelo') beginFlightAudio({ ...prefs, sound: id })
             }}
             onVolume={(v) => {
               setPrefs({ volume: v })
               setVolume(v)
             }}
             onKeepAwake={(on) => setPrefs({ keepAwake: on })}
+            lockCard={prefs.lockCard}
+            onLockCard={(on) => {
+              setPrefs({ lockCard: on })
+              if (stage === 'vuelo') beginFlightAudio({ ...prefs, lockCard: on })
+            }}
             flight={
               stage === 'vuelo' && flightFrom && flightTo
                 ? {
@@ -574,6 +629,8 @@ export default function StudyView() {
             subject={active.subjectId ? subjectMap.get(active.subjectId) : undefined}
             task={activeTask}
             layoverCity={layoverCity}
+            layoverMarks={layoverMarks}
+            breakMinutes={prefs.layover}
             remainingMs={remaining}
             remainingKm={active.distanceKm * (1 - prog)}
             progress={prog}
@@ -582,7 +639,10 @@ export default function StudyView() {
               haptic()
               if (onLayover) return
               dispatch({ type: active.pausedAt ? 'session/resume' : 'session/pause', id: active.id })
-              duck(!active.pausedAt)
+            }}
+            onBreak={() => {
+              haptic()
+              dispatch({ type: 'session/layover', id: active.id, minutes: prefs.layover })
             }}
             onAbandon={abandon}
           />
@@ -597,7 +657,6 @@ export default function StudyView() {
               onResume={() => {
                 haptic()
                 dispatch({ type: 'session/resume', id: active.id })
-                duck(false)
               }}
             />
           )}

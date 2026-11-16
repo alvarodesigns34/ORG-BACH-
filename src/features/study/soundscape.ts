@@ -13,6 +13,10 @@
  *
  * Cambiar de ambiente funde uno en otro. Safari solo permite arrancar el
  * audio dentro de un toque: `unlockAudio()` en el gesto.
+ *
+ * Además del ambiente, aquí viven los avisos de megafonía (una grabación real
+ * de cabina) y el audio «portador»: un `<audio>` mudo en bucle que le da al
+ * sistema algo que enseñar en la pantalla de bloqueo (ver `mediaSession.ts`).
  */
 
 export type SoundId =
@@ -62,7 +66,10 @@ function context(): AudioContext | null {
  */
 function watchInterruptions(c: AudioContext) {
   const revive = () => {
-    if ((current || wanted) && c.state !== 'running' && c.state !== 'closed') void c.resume().catch(() => {})
+    if ((current || wanted || carrierWanted) && c.state !== 'running' && c.state !== 'closed') {
+      void c.resume().catch(() => {})
+    }
+    if (carrierWanted && carrier?.paused) void carrier.play().catch(() => {})
   }
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') revive()
@@ -103,6 +110,35 @@ export function unlockAudio(): void {
   if (c && c.state === 'suspended') void c.resume()
 }
 
+/**
+ * Cómo convive el audio de la app con el resto del sistema (iPhone y iPad):
+ *
+ * - `playback`: como una app de música. Suena aunque el interruptor esté en
+ *   silencio, sigue con la pantalla bloqueada y aparece en la pantalla de
+ *   bloqueo, pero corta lo que estuviera sonando en otras apps.
+ * - `ambient`: se mezcla con la música de otras apps y respeta el modo
+ *   silencio; se para al bloquear. Es lo correcto cuando eliges «Silencio»:
+ *   los avisos suenan por encima de tu música en vez de pararla.
+ */
+export type AudioMode = 'playback' | 'ambient'
+let audioMode: AudioMode = 'playback'
+
+export function setAudioMode(mode: AudioMode): void {
+  audioMode = mode
+  applyAudioMode()
+}
+
+function applyAudioMode(): boolean {
+  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession
+  if (!session) return false
+  try {
+    session.type = audioMode
+    return true
+  } catch {
+    return false
+  }
+}
+
 let silentLoop: HTMLAudioElement | null = null
 
 /**
@@ -117,15 +153,7 @@ let silentLoop: HTMLAudioElement | null = null
  * Tiene que llamarse dentro de un toque.
  */
 function ignoreSilentSwitch(): void {
-  const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession
-  if (session) {
-    try {
-      session.type = 'playback'
-      return
-    } catch {
-      // Sigue con el truco de abajo.
-    }
-  }
+  if (applyAudioMode() || audioMode !== 'playback') return
   if (silentLoop || !/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) return
   silentLoop = new Audio(silentWav())
   silentLoop.loop = true
@@ -135,10 +163,64 @@ function ignoreSilentSwitch(): void {
   })
 }
 
-/** Medio segundo de silencio en WAV (8 kHz, 8 bits), como data URI. */
-function silentWav(): string {
-  const samples = 4000
-  const bytes = new Uint8Array(44 + samples)
+// ---------------------------------------------------------------------------
+// Audio portador (pantalla de bloqueo)
+// ---------------------------------------------------------------------------
+
+let carrier: HTMLAudioElement | null = null
+let carrierUrl: string | null = null
+let carrierWanted = false
+const carrierListeners = new Set<() => void>()
+
+/**
+ * El sistema solo enseña la tarjeta «Ahora suena» (pantalla de bloqueo,
+ * Centro de control) si hay un elemento multimedia reproduciéndose; el
+ * ambiente sale por Web Audio, que no cuenta. Este `<audio>` reproduce medio
+ * minuto de silencio en bucle: no se oye, pero ancla la tarjeta y mantiene
+ * viva la página con la pantalla bloqueada, que es lo que deja que la escala
+ * termine y el aviso de aterrizaje suene a su hora.
+ *
+ * Tiene que arrancar dentro de un toque.
+ */
+export function startCarrier(): void {
+  carrierWanted = true
+  if (typeof Audio === 'undefined') return
+  if (!carrier) {
+    carrierUrl = URL.createObjectURL(new Blob([silentWavBytes(30)], { type: 'audio/wav' }))
+    carrier = new Audio(carrierUrl)
+    carrier.loop = true
+    carrier.preload = 'auto'
+    carrier.setAttribute('playsinline', '')
+    carrier.addEventListener('playing', () => carrierListeners.forEach((fn) => fn()))
+  }
+  if (carrier.paused) void carrier.play().catch(() => {})
+}
+
+export function stopCarrier(): void {
+  carrierWanted = false
+  if (!carrier) return
+  carrier.pause()
+  try {
+    carrier.currentTime = 0
+  } catch {
+    // Aún sin datos: no hay posición que reiniciar.
+  }
+}
+
+export function carrierPlaying(): boolean {
+  return !!carrier && !carrier.paused
+}
+
+/** Avisa cada vez que el portador empieza a sonar (también tras una interrupción). */
+export function onCarrierPlaying(fn: () => void): () => void {
+  carrierListeners.add(fn)
+  return () => carrierListeners.delete(fn)
+}
+
+/** Silencio en WAV (8 kHz, 8 bits, mono). */
+function silentWavBytes(seconds: number): Uint8Array<ArrayBuffer> {
+  const samples = Math.floor(8000 * seconds)
+  const bytes = new Uint8Array(new ArrayBuffer(44 + samples))
   const view = new DataView(bytes.buffer)
   const text = (at: number, value: string) =>
     [...value].forEach((ch, i) => view.setUint8(at + i, ch.charCodeAt(0)))
@@ -155,8 +237,13 @@ function silentWav(): string {
   text(36, 'data')
   view.setUint32(40, samples, true)
   bytes.fill(128, 44)
+  return bytes
+}
+
+/** Medio segundo de silencio, como data URI. */
+function silentWav(): string {
   let binary = ''
-  for (const b of bytes) binary += String.fromCharCode(b)
+  for (const b of silentWavBytes(0.5)) binary += String.fromCharCode(b)
   return `data:audio/wav;base64,${btoa(binary)}`
 }
 
@@ -524,12 +611,93 @@ export function duck(on: boolean): void {
   current.gain.gain.linearRampToValueAtTime(TRIM[current.id] * (on ? 0.15 : 1), t + 0.8)
 }
 
-/** «Ding-dong» de megafonía, con un poco de cola. */
-export function chime(): void {
+// ---------------------------------------------------------------------------
+// Megafonía
+// ---------------------------------------------------------------------------
+
+/**
+ * - `megafonia`: el «ding-dong» de dos notas antes de un anuncio de cabina.
+ *   Suena al despegar y al aterrizar.
+ * - `aviso`: una sola nota, la primera del mismo aviso. Marca el principio y
+ *   el final de una escala.
+ *
+ * Los dos salen de la misma grabación real, hecha en la cabina de un Boeing
+ * 737 antes de despegar (dominio público; ver `CHIME_CREDIT`), limpiada del
+ * ruido de fondo. Si el archivo no se puede cargar (sin red la primera vez),
+ * se sintetiza uno parecido para que el aviso no falte.
+ */
+export type ChimeId = 'megafonia' | 'aviso'
+
+export const CHIME_CREDIT = {
+  what: 'Aviso de cabina de un Boeing 737 en Poznań',
+  author: 'maciej janasik',
+}
+
+const chimeBuffers = new Map<ChimeId, AudioBuffer>()
+const chimePending = new Map<ChimeId, Promise<AudioBuffer | null>>()
+
+function loadChime(c: AudioContext, id: ChimeId): Promise<AudioBuffer | null> {
+  const ready = chimeBuffers.get(id)
+  if (ready) return Promise.resolve(ready)
+  let p = chimePending.get(id)
+  if (!p) {
+    p = fetch(`${import.meta.env.BASE_URL}sounds/${id}.m4a`)
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status))
+        return r.arrayBuffer()
+      })
+      .then((data) => new Promise<AudioBuffer>((resolve, reject) => c.decodeAudioData(data, resolve, reject)))
+      .then((b) => {
+        chimeBuffers.set(id, b)
+        return b
+      })
+      .catch(() => null)
+      .finally(() => chimePending.delete(id))
+    chimePending.set(id, p)
+  }
+  return p
+}
+
+/** Deja los avisos decodificados para que suenen en su instante exacto. */
+export function preloadChimes(): void {
   const c = context()
   if (!c) return
+  void loadChime(c, 'megafonia')
+  void loadChime(c, 'aviso')
+}
+
+/** Nivel del aviso: sigue al volumen elegido, pero nunca desaparece del todo. */
+function chimeGain(): number {
+  return 0.55 * (0.45 + 0.55 * volume)
+}
+
+export function chime(id: ChimeId = 'megafonia'): void {
+  const c = context()
+  if (!c) return
+  if (c.state === 'suspended') void c.resume().catch(() => {})
+  const ready = chimeBuffers.get(id)
+  if (ready) {
+    playChime(c, ready)
+    return
+  }
+  void loadChime(c, id).then((b) => (b ? playChime(c, b) : synthChime(c, id)))
+}
+
+function playChime(c: AudioContext, b: AudioBuffer) {
   const out = c.createGain()
-  out.gain.value = 0.32
+  out.gain.value = chimeGain()
+  out.connect(c.destination)
+  const src = c.createBufferSource()
+  src.buffer = b
+  src.connect(out)
+  src.onended = () => out.disconnect()
+  src.start()
+}
+
+/** Respaldo sintetizado: las mismas notas (re y si) con un poco de cola. */
+function synthChime(c: AudioContext, id: ChimeId) {
+  const out = c.createGain()
+  out.gain.value = 0.6 * chimeGain()
   out.connect(c.destination)
   const tone = (freq: number, at: number) => {
     for (const [mult, amp] of [
@@ -550,8 +718,9 @@ export function chime(): void {
     }
   }
   const t = c.currentTime + 0.02
-  tone(659.25, t)
-  tone(523.25, t + 0.62)
+  tone(587.33, t)
+  if (id === 'megafonia') tone(493.88, t + 0.9)
+  window.setTimeout(() => out.disconnect(), 3200)
 }
 
 /**

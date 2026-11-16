@@ -1,7 +1,7 @@
 /**
- * Resumen diario por notificación push.
+ * Notificaciones push: el resumen diario y los avisos del modo estudio.
  *
- * Tres usos:
+ * Cuatro usos:
  *  - GET  ?action=vapid          → clave pública VAPID (la genera la primera vez).
  *  - POST {action: 'test'}       → envía ya el resumen a los dispositivos del
  *                                  usuario autenticado (botón «Probar» de Ajustes).
@@ -9,6 +9,10 @@
  *                                  compartido. Envía a cada suscripción cuya hora
  *                                  local (por defecto 17:00 Europe/Madrid) ha
  *                                  llegado y que aún no ha recibido el de hoy.
+ *  - POST {action: 'flights'}    → lo llama pg_cron cada minuto, solo si hay
+ *                                  avisos de vuelo para el minuto siguiente
+ *                                  (aterrizaje, principio y fin de escala).
+ *                                  Espera al segundo exacto de cada uno.
  *
  * El horario de verano no necesita tratamiento especial: la hora local se
  * calcula con la base de datos de zonas horarias en cada ejecución, así que el
@@ -131,23 +135,51 @@ interface Subscription {
   last_sent_on: string | null
 }
 
+interface PushMessage {
+  title: string
+  body: string
+  /** Un aviso nuevo con la misma etiqueta sustituye al anterior. */
+  tag: string
+  /** Ruta de la app a la que lleva tocar el aviso ('#/inicio'). */
+  url: string
+}
+
+/**
+ * Cuerpo del mensaje. Lleva dos formas a la vez:
+ * - la declarativa (`web_push: 8030`), que Safari 18.4+ muestra por sí mismo
+ *   sin despertar al Service Worker;
+ * - los campos sueltos que lee `push-sw.js` en el resto de navegadores.
+ */
+function payload(message: PushMessage): string {
+  return JSON.stringify({
+    web_push: 8030,
+    notification: {
+      title: message.title,
+      body: message.body,
+      navigate: `${VAPID_SUBJECT}${message.url}`,
+      lang: 'es',
+      tag: message.tag,
+    },
+    title: message.title,
+    body: message.body,
+    tag: message.tag,
+    url: message.url,
+  })
+}
+
 async function send(
-  sub: Subscription,
-  digest: Digest,
+  sub: Pick<Subscription, 'id' | 'endpoint' | 'p256dh' | 'auth'>,
+  message: PushMessage,
   keys: Vapid,
+  delivery: { ttl: number; urgency: 'normal' | 'high' } = { ttl: 6 * 3600, urgency: 'normal' },
 ): Promise<'ok' | 'gone' | 'error'> {
   try {
     await webpush.sendNotification(
       { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-      JSON.stringify({
-        title: digest.title,
-        body: digest.body,
-        tag: 'resumen-diario',
-        url: '#/inicio',
-      }),
+      payload(message),
       {
-        TTL: 6 * 3600,
-        urgency: 'normal',
+        TTL: delivery.ttl,
+        urgency: delivery.urgency,
         vapidDetails: {
           subject: VAPID_SUBJECT,
           publicKey: keys.publicKey,
@@ -167,6 +199,13 @@ async function send(
     return 'error'
   }
 }
+
+const digestMessage = (digest: Digest): PushMessage => ({
+  title: digest.title,
+  body: digest.body,
+  tag: 'resumen-diario',
+  url: '#/inicio',
+})
 
 /** Margen para recuperar una ejecución del cron perdida o retrasada. */
 const CATCH_UP_HOURS = 2
@@ -207,9 +246,63 @@ async function runCron(): Promise<Response> {
     // Sin nada que contar no se molesta: una notificación vacía diaria acaba
     // enseñando a ignorarlas todas.
     if (digest.empty) continue
-    if ((await send(sub, digest, keys)) === 'ok') sent++
+    if ((await send(sub, digestMessage(digest), keys)) === 'ok') sent++
   }
   return json({ ok: true, checked: subs.length, sent })
+}
+
+// ---------------------------------------------------------------------------
+// Avisos del modo estudio
+// ---------------------------------------------------------------------------
+
+interface FlightAlert {
+  id: string
+  user_id: string
+  kind: string
+  fire_at: Date
+  title: string
+  body: string
+}
+
+/** Lo que se recoge en cada pasada: lo de este minuto y un poco más. */
+const FLIGHT_WINDOW_SECONDS = 65
+
+async function runFlights(): Promise<Response> {
+  // Se reclaman antes de esperar: otra ejecución solapada no los ve.
+  const alerts = await sql<FlightAlert[]>`
+    update public.flight_alerts set claimed_at = now()
+    where fire_at <= now() + make_interval(secs => ${FLIGHT_WINDOW_SECONDS})
+      and (claimed_at is null or claimed_at < now() - interval '3 minutes')
+    returning id, user_id, kind, fire_at, title, body`
+  if (alerts.length === 0) return json({ ok: true, sent: 0 })
+
+  const keys = await vapid()
+  alerts.sort((a, b) => a.fire_at.getTime() - b.fire_at.getTime())
+  let sent = 0
+  for (const alert of alerts) {
+    const wait = alert.fire_at.getTime() - Date.now()
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
+    // Si la app lo canceló mientras tanto (pausa, abandono, o el vuelo se
+    // está viendo en pantalla), la fila ya no existe: no se envía.
+    const still = await sql`delete from public.flight_alerts where id = ${alert.id} returning id`
+    if (still.length === 0) continue
+    const subs = await sql<Pick<Subscription, 'id' | 'endpoint' | 'p256dh' | 'auth'>[]>`
+      select id, endpoint, p256dh, auth
+      from public.push_subscriptions where user_id = ${alert.user_id} and flights`
+    const results = await Promise.all(
+      subs.map((sub) =>
+        send(
+          sub,
+          { title: alert.title, body: alert.body, tag: 'vuelo', url: '#/estudio' },
+          keys,
+          // Un aviso de aterrizaje que llega media hora tarde ya no sirve.
+          { ttl: 15 * 60, urgency: 'high' },
+        ),
+      ),
+    )
+    if (results.includes('ok')) sent++
+  }
+  return json({ ok: true, claimed: alerts.length, sent })
 }
 
 async function userFromRequest(req: Request): Promise<string | null> {
@@ -238,7 +331,7 @@ async function runTest(req: Request, body: Record<string, unknown>): Promise<Res
 
   const today = localParts(new Date(), subs[0].timezone).day
   const digest = await digestFor(userId, today)
-  const results = await Promise.all(subs.map((s) => send(s, digest, keys)))
+  const results = await Promise.all(subs.map((s) => send(s, digestMessage(digest), keys)))
   return json({ ok: results.includes('ok'), results })
 }
 
@@ -252,11 +345,11 @@ Deno.serve(async (req) => {
     if (req.method !== 'POST') return json({ error: 'Método no permitido' }, 405)
 
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
-    if (body.action === 'cron') {
+    if (body.action === 'cron' || body.action === 'flights') {
       const expected = await cronSecret()
       const given = req.headers.get('x-cron-secret') ?? ''
       if (!expected || !safeEqual(given, expected)) return json({ error: 'No autorizado' }, 401)
-      return await runCron()
+      return body.action === 'cron' ? await runCron() : await runFlights()
     }
     if (body.action === 'test') return await runTest(req, body)
     return json({ error: 'Acción desconocida' }, 400)

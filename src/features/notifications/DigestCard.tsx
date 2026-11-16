@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { BellRing, Clock, Send } from 'lucide-react'
+import { BellRing, Clock, PlaneLanding, Send } from 'lucide-react'
 
 import {
   DEFAULT_DIGEST_HOUR,
   disableDigest,
+  disableFlightAlerts,
   enableDigest,
+  enableFlightAlerts,
   loadPrefs,
   permission,
   pushSupport,
@@ -17,11 +19,13 @@ import { ListGroup, ListRow, RowSelect, RowSwitch } from '@/ui/list'
 const HOURS = Array.from({ length: 18 }, (_, i) => i + 6) // 06:00 – 23:00
 
 /**
- * Resumen diario por notificación, como grupo de Ajustes.
+ * Notificaciones, como grupo de Ajustes: el resumen diario y los avisos del
+ * modo estudio (aterrizaje y escalas).
  *
- * Es voluntario: no se pide permiso hasta que el alumno activa el interruptor,
- * y nunca al abrir la aplicación. Se guarda por dispositivo (cada uno con su
- * hora) y se puede apagar aquí mismo o en los ajustes del sistema.
+ * Son voluntarias: no se pide permiso hasta que el alumno activa un
+ * interruptor, y nunca al abrir la aplicación. Se guardan por dispositivo
+ * (cada uno con su hora) y se pueden apagar aquí mismo o en los ajustes del
+ * sistema.
  */
 export function DigestSection() {
   const sync = useSync()
@@ -34,6 +38,7 @@ export function DigestSection() {
   const signedIn = !!sync.email
   const blocked = permission() === 'denied'
   const enabled = prefs.enabled && permission() === 'granted'
+  const flights = prefs.flights && permission() === 'granted'
   const available = support.ok && signedIn
 
   const run = async (task: () => Promise<void>, ok?: string) => {
@@ -57,6 +62,15 @@ export function DigestSection() {
     else void run(disableDigest)
   }
 
+  const toggleFlights = (on: boolean) => {
+    if (on) {
+      void run(
+        enableFlightAlerts,
+        'Listo. Te avisaré al aterrizar y en cada escala, aunque el dispositivo esté bloqueado.',
+      )
+    } else void run(disableFlightAlerts)
+  }
+
   const footer = message ? (
     <span className={message.tone === 'ok' ? 'text-ok' : 'text-danger'}>{message.text}</span>
   ) : !support.ok && support.reason === 'needs-install' ? (
@@ -68,11 +82,11 @@ export function DigestSection() {
   ) : !support.ok ? (
     'Este navegador no admite notificaciones push.'
   ) : !signedIn ? (
-    'Inicia sesión para activarlo: el resumen se prepara en el servidor con tus datos sincronizados, por eso llega aunque la app esté cerrada.'
+    'Inicia sesión para activarlas: los avisos salen del servidor, por eso llegan aunque la app esté cerrada.'
   ) : blocked ? (
     'Las notificaciones están bloqueadas para esta app. Actívalas en los ajustes del sistema.'
   ) : (
-    'Las tareas de hoy y los próximos exámenes, a la hora elegida (peninsular española), aunque la app esté cerrada. Si no hay nada pendiente, no se envía.'
+    'El resumen trae las tareas de hoy y los próximos exámenes a la hora elegida (peninsular española); si no hay nada pendiente, no se envía. Los avisos de vuelo llegan al aterrizar y al empezar y terminar cada escala.'
   )
 
   return (
@@ -111,6 +125,14 @@ export function DigestSection() {
           />
         </>
       )}
+      <RowSwitch
+        icon={PlaneLanding}
+        tint="#0a84ff"
+        label="Avisos de vuelo"
+        checked={flights}
+        onChange={toggleFlights}
+        disabled={!available || busy}
+      />
     </ListGroup>
   )
 }

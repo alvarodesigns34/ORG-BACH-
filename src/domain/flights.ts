@@ -317,7 +317,9 @@ export const LAYOVER_MIN_TAIL = 5
  * programada: cada `layoverEvery` si es un vuelo tipo Pomodoro, o una sola a
  * mitad de camino.
  */
-export function layoverPoints(session: FocusSession): number[] {
+export function layoverPoints(
+  session: Pick<FocusSession, 'plannedMinutes' | 'layoverMinutes' | 'layoverEvery'>,
+): number[] {
   if (!session.layoverMinutes) return []
   const total = session.plannedMinutes
   if (!session.layoverEvery) return [total / 2]

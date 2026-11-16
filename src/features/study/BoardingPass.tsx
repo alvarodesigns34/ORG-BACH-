@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { ChevronLeft, Plane, PlaneTakeoff } from 'lucide-react'
 
 import { barcode, formatFlightTime, type Airport } from '@/domain/flights'
-import { colorVar } from '@/domain/palette'
+import { colorVar, quietVar } from '@/domain/palette'
 import type { Subject, Task } from '@/domain/types'
 import { haptic, spring } from '@/ui/motion'
 import { Button, IconButton } from '@/ui/primitives'
@@ -16,7 +16,8 @@ export interface PassData {
   minutes: number
   seat: string
   cabin: 'Preferente' | 'Turista'
-  layover: number
+  /** «Directo», «10 min», «2 × 10 min». */
+  layover: string
   subject?: Subject
   task?: Task
 }
@@ -120,7 +121,7 @@ export function BoardingPass({
               <Field label="Puerta" value={gate(pass.id)} />
               <Field label="Embarque" value="Ahora" align="right" />
               <Field label="Distancia" value={`${Math.round(pass.km).toLocaleString('es')} km`} />
-              <Field label="Escala" value={pass.layover ? `${pass.layover} min` : 'Directo'} />
+              <Field label="Escala" value={pass.layover} />
               <Field label="Fecha" value={date} align="right" />
             </dl>
 
@@ -215,13 +216,25 @@ function Barcode({ id }: { id: string }) {
 export function Takeoff({
   from,
   to,
+  minutes,
   onGo,
   onCancel,
+  quick,
 }: {
   from: Airport
   to: Airport
+  minutes: number
   onGo: () => void
   onCancel: () => void
+  /**
+   * Despegue rápido: no se pasó por el asiento, así que aquí se puede decir
+   * (o no) qué se va a estudiar.
+   */
+  quick?: {
+    subjects: Subject[]
+    subjectId?: string
+    onSubject: (id: string | undefined) => void
+  }
 }) {
   return (
     <motion.div
@@ -234,13 +247,18 @@ export function Takeoff({
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ...spring.smooth, delay: 0.2 }}
-        className="flex flex-col items-center text-center"
+        className="flex flex-col items-center text-center px-6"
       >
         <p className="flex items-center gap-3 font-mono text-[0.9375rem] font-bold tracking-[0.2em] text-white/55">
           {from.iata}
           <Plane className="size-3.5 rotate-45" strokeWidth={2.4} />
           {to.iata}
         </p>
+        {quick && (
+          <p className="mt-2 text-[0.9375rem] text-white/55">
+            {to.city} · {formatFlightTime(minutes)}
+          </p>
+        )}
 
         {/* Luces de pista que se encienden hacia delante. */}
         <div aria-hidden className="flex gap-3 mt-10 mb-10">
@@ -258,9 +276,46 @@ export function Takeoff({
           <br />
           <span className="text-white/60">Listos para despegar.</span>
         </p>
+
+        {quick && quick.subjects.length > 0 && (
+          <div
+            role="radiogroup"
+            aria-label="Qué vas a estudiar"
+            data-theme="dark"
+            className="mt-8 flex flex-wrap justify-center gap-1.5 max-w-[34rem]"
+          >
+            {[undefined, ...quick.subjects].map((subject) => {
+              const active = quick.subjectId === subject?.id
+              return (
+                <button
+                  key={subject?.id ?? 'libre'}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => {
+                    haptic()
+                    quick.onSubject(subject?.id)
+                  }}
+                  className="pressable h-9 px-3.5 rounded-full text-[0.8125rem] font-semibold transition-colors"
+                  style={
+                    active
+                      ? subject
+                        ? { background: quietVar(subject.color), color: colorVar(subject.color) }
+                        : { background: '#fff', color: '#000' }
+                      : { background: 'rgb(255 255 255 / 0.1)', color: 'rgb(255 255 255 / 0.7)' }
+                  }
+                >
+                  {subject ? subject.shortName || subject.name : 'Estudio libre'}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         <button
           type="button"
           onClick={onGo}
+          autoFocus
           className="pressable mt-10 h-14 px-12 rounded-full bg-white text-black text-[1.0625rem] font-semibold shadow-[0_10px_40px_rgb(255_255_255/0.15)]"
         >
           Despegar
@@ -270,7 +325,7 @@ export function Takeoff({
           onClick={onCancel}
           className="mt-5 text-[0.875rem] font-medium text-white/45 hover:text-white/75 transition-colors"
         >
-          Volver a la tarjeta
+          {quick ? 'Cancelar' : 'Volver a la tarjeta'}
         </button>
       </motion.div>
     </motion.div>

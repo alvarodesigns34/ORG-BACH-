@@ -1,5 +1,5 @@
 /*
- * Avisos push. Lo importa el Service Worker que genera Workbox
+ * Avisos push (resumen diario y modo estudio). Lo importa el Service Worker que genera Workbox
  * (`workbox.importScripts` en vite.config.ts).
  *
  * Funciona con la aplicación cerrada: el sistema despierta al Service Worker
@@ -14,12 +14,18 @@ self.addEventListener('push', (event) => {
     payload = { body: event.data ? event.data.text() : '' }
   }
 
-  const title = payload.title || 'Bachillerato OS'
+  // El servidor manda también la forma declarativa (`notification`), que
+  // Safari 18.4+ muestra sin pasar por aquí; el resto de navegadores llegan a
+  // este manejador y leen los mismos datos.
+  const declared = payload.notification || {}
+  const title = payload.title || declared.title || 'Órbita'
+  const tag = payload.tag || declared.tag || 'orbita'
   const options = {
-    body: payload.body || '',
-    tag: payload.tag || 'bachillerato-os',
-    // Un resumen nuevo sustituye al de ayer en lugar de apilarse.
-    renotify: false,
+    body: payload.body || declared.body || '',
+    tag,
+    // Un resumen nuevo sustituye al de ayer en lugar de apilarse; un aviso de
+    // vuelo (aterrizaje, escala) sí vuelve a sonar aunque sustituya a otro.
+    renotify: tag === 'vuelo',
     icon: new URL('pwa-192x192.png', self.registration.scope).href,
     badge: new URL('pwa-192x192.png', self.registration.scope).href,
     lang: 'es',

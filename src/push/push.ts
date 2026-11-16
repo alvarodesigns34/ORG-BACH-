@@ -1,10 +1,14 @@
 /**
- * Resumen diario por notificación push.
+ * Notificaciones push: el resumen diario y los avisos del modo estudio.
  *
- * El aviso lo manda el servidor (pg_cron + la función `daily-digest`), no un
- * temporizador del navegador: llega con la aplicación cerrada y el móvil
- * bloqueado. El servidor calcula el resumen con los datos sincronizados, por
- * eso requiere haber iniciado sesión.
+ * Los avisos los manda el servidor (pg_cron + la función `daily-digest`), no
+ * un temporizador del navegador: llegan con la aplicación cerrada y el móvil
+ * bloqueado. El resumen se calcula con los datos sincronizados y los avisos
+ * de vuelo los programa la app al despegar (ver `flightAlerts.ts`); las dos
+ * cosas requieren haber iniciado sesión.
+ *
+ * Son dos interruptores independientes sobre la misma suscripción del
+ * dispositivo: se puede querer el aviso de aterrizaje sin el resumen.
  *
  * Cada dispositivo tiene su propia suscripción y su propia hora; la zona
  * horaria es la peninsular española, con el cambio de hora resuelto en el
@@ -20,8 +24,11 @@ export const DEFAULT_DIGEST_HOUR = 17
 const PREFS_KEY = 'bachillerato-os:push'
 
 export interface PushPrefs {
+  /** Resumen diario. */
   enabled: boolean
   hour: number
+  /** Avisos del modo estudio (aterrizaje y escalas) en este dispositivo. */
+  flights: boolean
 }
 
 export type PushSupport =
@@ -61,9 +68,10 @@ export function loadPrefs(): PushPrefs {
     return {
       enabled: raw?.enabled === true,
       hour: Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : DEFAULT_DIGEST_HOUR,
+      flights: raw?.flights === true,
     }
   } catch {
-    return { enabled: false, hour: DEFAULT_DIGEST_HOUR }
+    return { enabled: false, hour: DEFAULT_DIGEST_HOUR, flights: false }
   }
 }
 
@@ -124,15 +132,22 @@ async function register(subscription: PushSubscription, prefs: PushPrefs) {
     p_user_agent: navigator.userAgent,
   })
   if (error) throw new Error(error.message)
+  // El alta deja los avisos de vuelo activados por defecto: se ajusta a lo
+  // que este dispositivo ha elegido.
+  const flights = await client.rpc('set_push_flights', {
+    p_endpoint: subscription.endpoint,
+    p_enabled: prefs.flights,
+  })
+  if (flights.error) throw new Error(flights.error.message)
 }
 
 /**
- * Activa el resumen en este dispositivo.
+ * Pide permiso (si hace falta) y deja este dispositivo suscrito.
  *
  * Debe llamarse directamente desde el gesto del usuario: Safari solo muestra
  * la petición de permiso si `requestPermission` es lo primero que ocurre.
  */
-export async function enableDigest(hour: number): Promise<void> {
+async function subscribe(): Promise<PushSubscription> {
   const granted = await Notification.requestPermission()
   if (granted !== 'granted') {
     throw new Error(
@@ -142,14 +157,34 @@ export async function enableDigest(hour: number): Promise<void> {
     )
   }
   const [reg, key] = await Promise.all([registration(), vapidPublicKey()])
-  let subscription = await reg.pushManager.getSubscription()
-  if (!subscription) {
-    subscription = await reg.pushManager.subscribe({
+  return (
+    (await reg.pushManager.getSubscription()) ??
+    (await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: base64UrlToBytes(key),
-    })
+    }))
+  )
+}
+
+/** Guarda en el servidor lo que este dispositivo quiere recibir, o lo da de baja si ya no quiere nada. */
+async function apply(prefs: PushPrefs): Promise<void> {
+  savePrefs(prefs)
+  const reg = await registration()
+  const subscription = await reg.pushManager.getSubscription()
+  if (!subscription) return
+  if (prefs.enabled || prefs.flights) {
+    await register(subscription, prefs)
+    return
   }
-  const prefs = { enabled: true, hour }
+  const client = await getClient()
+  await client.rpc('unregister_push_subscription', { p_endpoint: subscription.endpoint })
+  await subscription.unsubscribe()
+}
+
+/** Activa el resumen en este dispositivo. Dentro de un gesto del usuario. */
+export async function enableDigest(hour: number): Promise<void> {
+  const subscription = await subscribe()
+  const prefs = { ...loadPrefs(), enabled: true, hour }
   await register(subscription, prefs)
   savePrefs(prefs)
 }
@@ -157,7 +192,7 @@ export async function enableDigest(hour: number): Promise<void> {
 export async function updateDigestHour(hour: number): Promise<void> {
   const reg = await registration()
   const subscription = await reg.pushManager.getSubscription()
-  const prefs = { enabled: true, hour }
+  const prefs = { ...loadPrefs(), enabled: true, hour }
   if (subscription) await register(subscription, prefs)
   savePrefs(prefs)
 }
@@ -166,16 +201,34 @@ export async function disableDigest(): Promise<void> {
   const prefs = { ...loadPrefs(), enabled: false }
   savePrefs(prefs)
   try {
-    const reg = await registration()
-    const subscription = await reg.pushManager.getSubscription()
-    if (!subscription) return
-    const client = await getClient()
-    await client.rpc('unregister_push_subscription', { p_endpoint: subscription.endpoint })
-    await subscription.unsubscribe()
+    await apply(prefs)
   } catch {
     // Sin red: la preferencia local ya está apagada; el servidor dejará de
     // enviar cuando el navegador revoque la suscripción o al reintentar.
   }
+}
+
+/** Activa los avisos de aterrizaje y escalas aquí. Dentro de un gesto del usuario. */
+export async function enableFlightAlerts(): Promise<void> {
+  const subscription = await subscribe()
+  const prefs = { ...loadPrefs(), flights: true }
+  await register(subscription, prefs)
+  savePrefs(prefs)
+}
+
+export async function disableFlightAlerts(): Promise<void> {
+  const prefs = { ...loadPrefs(), flights: false }
+  savePrefs(prefs)
+  try {
+    await apply(prefs)
+  } catch {
+    // Sin red: se reintenta la próxima vez que se toque el interruptor.
+  }
+}
+
+/** Este dispositivo recibirá los avisos de vuelo (permiso concedido e interruptor encendido). */
+export function flightAlertsOn(): boolean {
+  return loadPrefs().flights && permission() === 'granted'
 }
 
 /** Envía ahora el resumen a este dispositivo, para comprobar que llega. */
