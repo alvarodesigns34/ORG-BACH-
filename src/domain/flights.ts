@@ -309,26 +309,169 @@ export function countryName(code: string): string {
 // Escalas
 // ---------------------------------------------------------------------------
 
+/** Con menos de estos minutos por delante no se hace escala: se aterriza. */
+export const LAYOVER_MIN_TAIL = 5
+
+/**
+ * Minutos de vuelo (de estudio efectivo) en los que toca una escala
+ * programada: cada `layoverEvery` si es un vuelo tipo Pomodoro, o una sola a
+ * mitad de camino.
+ */
+export function layoverPoints(session: FocusSession): number[] {
+  if (!session.layoverMinutes) return []
+  const total = session.plannedMinutes
+  if (!session.layoverEvery) return [total / 2]
+  const points: number[] = []
+  for (let at = session.layoverEvery; at <= total - LAYOVER_MIN_TAIL; at += session.layoverEvery) {
+    points.push(at)
+  }
+  return points
+}
+
+/** Escalas programadas ya hechas. Los vuelos antiguos solo tenían una. */
+export function layoversTaken(session: FocusSession): number {
+  return session.layoversDone ?? (session.layoverAt ? 1 : 0)
+}
+
+/** Escalas programadas que aún quedan por delante. */
+export function layoversLeft(session: FocusSession): number {
+  return Math.max(0, layoverPoints(session).length - layoversTaken(session))
+}
+
 /** En la escala ahora mismo: la pausa abierta es la de la escala. */
 export function inLayover(session: FocusSession): boolean {
   return !!session.layoverAt && session.pausedAt === session.layoverAt
 }
 
-/** Toca empezar la escala: mitad de vuelo, aún no hecha, sin pausa abierta. */
+/** Instante (ms) en que termina sola la escala abierta. */
+export function layoverEndMs(session: FocusSession): number | null {
+  if (!inLayover(session)) return null
+  if (session.layoverEndsAt) return Date.parse(session.layoverEndsAt)
+  if (!session.layoverMinutes) return null
+  return Date.parse(session.layoverAt!) + session.layoverMinutes * 60_000
+}
+
+/** Minuto de vuelo de la próxima escala programada, si queda alguna. */
+function nextLayoverPoint(session: FocusSession): number | null {
+  return layoverPoints(session)[layoversTaken(session)] ?? null
+}
+
+/** Toca empezar una escala programada: se llegó a su minuto, sin pausa abierta. */
 export function layoverDue(session: FocusSession, now: number): boolean {
-  return (
-    session.status === 'en_vuelo' &&
-    !!session.layoverMinutes &&
-    !session.layoverAt &&
-    !session.pausedAt &&
-    progress(session, now) >= 0.5
-  )
+  if (session.status !== 'en_vuelo' || session.pausedAt) return false
+  const point = nextLayoverPoint(session)
+  return point !== null && elapsedMs(session, now) >= point * 60_000
 }
 
 /** Milisegundos que quedan de escala (0 si ya terminó o no se está en ella). */
 export function layoverRemainingMs(session: FocusSession, now: number): number {
-  if (!inLayover(session) || !session.layoverMinutes) return 0
-  return Math.max(0, Date.parse(session.layoverAt!) + session.layoverMinutes * 60_000 - now)
+  const end = layoverEndMs(session)
+  return end === null ? 0 : Math.max(0, end - now)
+}
+
+// ---------------------------------------------------------------------------
+// Línea de tiempo: lo que pasa solo
+// ---------------------------------------------------------------------------
+
+export type FlightEventKind = 'escala' | 'fin_escala' | 'aterrizaje'
+
+export interface FlightEvent {
+  kind: FlightEventKind
+  /** Instante (ms) en que ocurre. */
+  at: number
+}
+
+/**
+ * Lo próximo que le pasa al vuelo sin que nadie toque nada: empezar una
+ * escala, terminarla o aterrizar. En una pausa manual no hay nada previsto:
+ * el reloj del vuelo está parado hasta que se reanude.
+ */
+export function nextEvent(session: FocusSession): FlightEvent | null {
+  if (session.status !== 'en_vuelo') return null
+  const end = layoverEndMs(session)
+  if (end !== null) return { kind: 'fin_escala', at: end }
+  if (session.pausedAt) return null
+  const origin = Date.parse(session.startedAt) + session.pausedMs
+  const landing = origin + session.plannedMinutes * 60_000
+  const point = nextLayoverPoint(session)
+  if (point !== null) {
+    const at = origin + point * 60_000
+    if (at < landing) return { kind: 'escala', at }
+  }
+  return { kind: 'aterrizaje', at: landing }
+}
+
+function applyEvent(session: FocusSession, event: FlightEvent): FocusSession {
+  const stamp = new Date(event.at).toISOString()
+  switch (event.kind) {
+    case 'escala':
+      return {
+        ...session,
+        pausedAt: stamp,
+        layoverAt: stamp,
+        layoverEndsAt: new Date(event.at + (session.layoverMinutes ?? 0) * 60_000).toISOString(),
+        layoversDone: layoversTaken(session) + 1,
+      }
+    case 'fin_escala':
+      return {
+        ...session,
+        pausedAt: undefined,
+        layoverEndsAt: undefined,
+        pausedMs: session.pausedMs + Math.max(0, event.at - Date.parse(session.pausedAt!)),
+      }
+    case 'aterrizaje':
+      return {
+        ...session,
+        status: 'aterrizado',
+        pausedAt: undefined,
+        layoverEndsAt: undefined,
+        endedAt: stamp,
+        focusedMinutes: session.plannedMinutes,
+      }
+  }
+}
+
+/**
+ * El vuelo tal y como debe estar en `now`: aplica, cada una en su instante
+ * exacto, las escalas y el aterrizaje que hayan ocurrido mientras tanto.
+ *
+ * Es lo que hace que el vuelo no dependa de que la app esté abierta: si el
+ * iPad estuvo bloqueado media hora, al volver la escala empezó y terminó
+ * cuando tocaba, y el aterrizaje lleva su hora real. Devuelve el mismo objeto
+ * si no ha cambiado nada.
+ */
+export function advance(session: FocusSession, now: number): FocusSession {
+  let current = session
+  // Tope de seguridad: un vuelo de 24 h con escalas cada 5 min no llega a 600.
+  for (let i = 0; i < 1000; i++) {
+    const event = nextEvent(current)
+    if (!event || event.at > now) break
+    current = applyEvent(current, event)
+  }
+  return current
+}
+
+/**
+ * Todo lo que queda por pasar, en orden, si no se toca nada. Sirve para
+ * programar los avisos y para decir a qué hora se aterriza.
+ */
+export function timeline(session: FocusSession, now: number): FlightEvent[] {
+  const events: FlightEvent[] = []
+  let current = advance(session, now)
+  for (let i = 0; i < 1000; i++) {
+    const event = nextEvent(current)
+    if (!event) break
+    events.push(event)
+    current = applyEvent(current, event)
+  }
+  return events
+}
+
+/** Hora prevista de aterrizaje (ms), o null si el vuelo está en pausa manual. */
+export function landingAt(session: FocusSession, now: number): number | null {
+  const events = timeline(session, now)
+  const last = events[events.length - 1]
+  return last?.kind === 'aterrizaje' ? last.at : null
 }
 
 /** Aeropuerto más cercano a un punto, sin contar los de `exclude`. */

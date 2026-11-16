@@ -9,6 +9,7 @@
 import { newId } from '../domain/id.ts'
 import { nowISO } from '../domain/dates.ts'
 import { deriveShortName } from '../domain/palette.ts'
+import { advance, layoverPoints, layoversTaken } from '../domain/flights.ts'
 import { applyManualOrder } from '../domain/tasks.ts'
 import type {
   ActivityEntry,
@@ -62,14 +63,24 @@ export type Action =
         | 'subjectId'
         | 'taskId'
         | 'layoverMinutes'
+        | 'layoverEvery'
       >
       /** El texto de la actividad: «Madrid → Barcelona». */
       route?: string
     }
   | { type: 'session/pause'; id: ID }
   | { type: 'session/resume'; id: ID }
-  /** Empieza la escala: una pausa marcada, que la vista reanuda sola. */
-  | { type: 'session/layover'; id: ID }
+  /**
+   * Empieza una escala ahora. Sin `minutes` es la siguiente programada; con
+   * `minutes`, un descanso pedido a mano que no gasta ninguna de las
+   * programadas. En los dos casos termina sola.
+   */
+  | { type: 'session/layover'; id: ID; minutes?: number }
+  /**
+   * Pone el vuelo al día: escalas que empiezan o terminan solas y el
+   * aterrizaje, cada cosa en su instante aunque la app estuviera cerrada.
+   */
+  | { type: 'session/tick'; id: ID; now?: number; route?: string }
   | { type: 'session/land'; id: ID; route?: string }
   | { type: 'session/cancel'; id: ID }
   | { type: 'grade/add'; grade: New<GradeEntry>; linkExamId?: ID }
@@ -333,6 +344,9 @@ export function reducer(state: AppData, action: Action): AppData {
       const now = nowISO()
       const session: FocusSession = {
         ...action.session,
+        // El ritmo Pomodoro no significa nada sin duración de descanso.
+        layoverEvery: action.session.layoverMinutes ? action.session.layoverEvery : undefined,
+        layoversDone: action.session.layoverMinutes ? 0 : undefined,
         id: newId('vuelo'),
         kind: 'vuelo',
         status: 'en_vuelo',
@@ -351,9 +365,24 @@ export function reducer(state: AppData, action: Action): AppData {
 
     case 'session/layover': {
       const s = state.sessions.find((x) => x.id === action.id)
-      if (!s || s.status !== 'en_vuelo' || s.pausedAt || s.layoverAt || !s.layoverMinutes) return state
-      const now = nowISO()
-      return { ...state, sessions: patchById(state.sessions, s.id, { pausedAt: now, layoverAt: now }) }
+      if (!s || s.status !== 'en_vuelo' || s.pausedAt) return state
+      const manual = action.minutes !== undefined
+      const minutes = manual ? action.minutes! : (s.layoverMinutes ?? 0)
+      if (!(minutes > 0)) return state
+      const taken = layoversTaken(s)
+      // Una programada solo si queda alguna por hacer.
+      if (!manual && taken >= layoverPoints(s).length) return state
+      const now = Date.now()
+      const stamp = new Date(now).toISOString()
+      return {
+        ...state,
+        sessions: patchById(state.sessions, s.id, {
+          pausedAt: stamp,
+          layoverAt: stamp,
+          layoverEndsAt: new Date(now + Math.min(minutes, 60) * 60_000).toISOString(),
+          ...(manual ? {} : { layoversDone: taken + 1 }),
+        }),
+      }
     }
 
     case 'session/resume': {
@@ -364,8 +393,29 @@ export function reducer(state: AppData, action: Action): AppData {
         ...state,
         sessions: patchById(state.sessions, s.id, {
           pausedAt: undefined,
+          layoverEndsAt: undefined,
           pausedMs: s.pausedMs + paused,
         }),
+      }
+    }
+
+    case 'session/tick': {
+      const s = state.sessions.find((x) => x.id === action.id)
+      if (!s || s.status !== 'en_vuelo') return state
+      const next = advance(s, action.now ?? Date.now())
+      if (next === s) return state
+      const sessions = state.sessions.map((x) => (x.id === s.id ? next : x))
+      if (next.status !== 'aterrizado') return { ...state, sessions }
+      const subject = subjectName(state, s.subjectId)
+      return {
+        ...state,
+        sessions,
+        activity: logActivity(
+          state,
+          'vuelo_aterrizado',
+          `Vuelo ${action.route ?? `${s.from} → ${s.to}`}${subject ? ` · ${subject}` : ''}`,
+          s.subjectId,
+        ),
       }
     }
 
@@ -385,6 +435,7 @@ export function reducer(state: AppData, action: Action): AppData {
         sessions: patchById(state.sessions, s.id, {
           status: 'aterrizado',
           pausedAt: undefined,
+          layoverEndsAt: undefined,
           endedAt: new Date(landed).toISOString(),
           focusedMinutes: s.plannedMinutes,
         }),
@@ -407,6 +458,7 @@ export function reducer(state: AppData, action: Action): AppData {
         sessions: patchById(state.sessions, s.id, {
           status: 'cancelado',
           pausedAt: undefined,
+          layoverEndsAt: undefined,
           endedAt: new Date(end).toISOString(),
           focusedMinutes: Math.min(minutes, s.plannedMinutes),
         }),

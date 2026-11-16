@@ -352,10 +352,20 @@ export interface FocusSession {
   endedAt?: TimestampISO
   /** Minutos de estudio efectivos, fijados al aterrizar o abandonar. */
   focusedMinutes?: number
-  /** Escala: descanso de estos minutos a mitad de vuelo (opcional). */
+  /** Escala: descanso de estos minutos (a mitad de vuelo o cada `layoverEvery`). */
   layoverMinutes?: number
-  /** Cuándo empezó la escala. Mientras `pausedAt` sea este instante, se está en ella. */
+  /**
+   * Escalas automáticas tipo Pomodoro: una cada estos minutos de vuelo
+   * (50 → descanso tras cada 50 minutos estudiados). Sin él, la escala es una
+   * sola, a mitad de vuelo.
+   */
+  layoverEvery?: number
+  /** Escalas programadas ya hechas o empezadas. */
+  layoversDone?: number
+  /** Cuándo empezó la última escala. Mientras `pausedAt` sea este instante, se está en ella. */
   layoverAt?: TimestampISO
+  /** Cuándo termina sola la escala abierta. */
+  layoverEndsAt?: TimestampISO
   createdAt: TimestampISO
 }
 

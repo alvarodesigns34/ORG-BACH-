@@ -9,6 +9,7 @@ import { describe, it } from 'node:test'
 import { createEmptyData } from '../src/data/defaults.ts'
 import {
   HOME_IATA,
+  advance,
   airportFromRow,
   arc,
   currentAirport,
@@ -18,8 +19,13 @@ import {
   formatFlightTime,
   inLayover,
   interpolate,
+  landingAt,
   layoverDue,
+  layoverPoints,
   layoverRemainingMs,
+  layoversLeft,
+  nextEvent,
+  timeline,
   minutesBySubject,
   passport,
   minutesFor,
@@ -266,6 +272,170 @@ describe('escalas', () => {
     state = reducer(state, { type: 'session/resume', id })
     assert.equal(state.sessions[0].pausedAt, undefined)
     assert.ok(state.sessions[0].layoverAt)
+  })
+})
+
+describe('escalas tipo Pomodoro y línea de tiempo', () => {
+  const T0 = at('2026-11-15T10:00:00.000Z')
+  const min = (m: number) => T0 + m * 60_000
+  // 120 minutos de estudio, descanso de 10 cada 50.
+  const pomodoro = (overrides: Partial<FocusSession> = {}) =>
+    session({ plannedMinutes: 120, layoverMinutes: 10, layoverEvery: 50, layoversDone: 0, ...overrides })
+
+  it('reparte las escalas cada N minutos y no pone una al final', () => {
+    assert.deepEqual(layoverPoints(pomodoro()), [50, 100])
+    // 100 minutos con 50/10: la segunda coincidiría con el aterrizaje.
+    assert.deepEqual(layoverPoints(pomodoro({ plannedMinutes: 100 })), [50])
+    // Quedarían 3 minutos tras la escala: no merece la pena parar.
+    assert.deepEqual(layoverPoints(pomodoro({ plannedMinutes: 53 })), [])
+    // Sin ritmo, una sola a mitad de vuelo; sin duración, ninguna.
+    assert.deepEqual(layoverPoints(session({ layoverMinutes: 5 })), [24])
+    assert.deepEqual(layoverPoints(session({ layoverEvery: 25 })), [])
+  })
+
+  it('la línea de tiempo encadena escalas y aterrizaje con sus horas reales', () => {
+    const events = timeline(pomodoro(), T0)
+    assert.deepEqual(
+      events.map((e) => [e.kind, (e.at - T0) / 60_000]),
+      [
+        ['escala', 50],
+        ['fin_escala', 60],
+        ['escala', 110],
+        ['fin_escala', 120],
+        ['aterrizaje', 140],
+      ],
+    )
+    assert.equal(landingAt(pomodoro(), T0), min(140))
+    assert.equal(layoversLeft(pomodoro()), 2)
+  })
+
+  it('en pausa manual no hay nada previsto', () => {
+    const paused = pomodoro({ pausedAt: '2026-11-15T10:20:00.000Z' })
+    assert.equal(nextEvent(paused), null)
+    assert.deepEqual(timeline(paused, min(30)), [])
+    assert.equal(landingAt(paused, min(30)), null)
+  })
+
+  it('advance no toca el vuelo si aún no ha pasado nada', () => {
+    const s = pomodoro()
+    assert.equal(advance(s, min(49)), s)
+  })
+
+  it('advance empieza la escala en su minuto exacto aunque se mire tarde', () => {
+    const s = advance(pomodoro(), min(53))
+    assert.equal(inLayover(s), true)
+    assert.equal(s.layoverAt, new Date(min(50)).toISOString())
+    assert.equal(s.layoverEndsAt, new Date(min(60)).toISOString())
+    assert.equal(s.layoversDone, 1)
+    assert.equal(layoverRemainingMs(s, min(53)), 7 * 60_000)
+    // En escala el reloj del vuelo está parado.
+    assert.equal(remainingMs(s, min(53)), 70 * 60_000)
+  })
+
+  it('advance recupera de una vez todo lo ocurrido con la app cerrada', () => {
+    // Se mira a los 115 min: una escala entera hecha y la segunda en curso.
+    const mid = advance(pomodoro(), min(115))
+    assert.equal(mid.pausedMs, 10 * 60_000)
+    assert.equal(mid.layoversDone, 2)
+    assert.equal(inLayover(mid), true)
+    // Y a las tres horas: aterrizó a su hora, no «ahora».
+    const done = advance(pomodoro(), min(180))
+    assert.equal(done.status, 'aterrizado')
+    assert.equal(done.endedAt, new Date(min(140)).toISOString())
+    assert.equal(done.focusedMinutes, 120)
+    assert.equal(done.pausedAt, undefined)
+    assert.equal(done.layoverEndsAt, undefined)
+    assert.equal(done.pausedMs, 20 * 60_000)
+  })
+
+  it('una pausa manual retrasa todo lo que viene detrás', () => {
+    // 10 minutos de pausa ya cerrada: la primera escala pasa a los 60.
+    const s = pomodoro({ pausedMs: 10 * 60_000 })
+    assert.deepEqual(nextEvent(s), { kind: 'escala', at: min(60) })
+    assert.equal(landingAt(s, T0), min(150))
+  })
+
+  it('los vuelos antiguos con una escala a mitad siguen funcionando', () => {
+    const legacy = session({ layoverMinutes: 10 })
+    assert.deepEqual(
+      timeline(legacy, T0).map((e) => [e.kind, (e.at - T0) / 60_000]),
+      [
+        ['escala', 24],
+        ['fin_escala', 34],
+        ['aterrizaje', 58],
+      ],
+    )
+    // Ya hecha (sin contador, como se guardaba antes): no se repite.
+    const taken = session({ layoverMinutes: 10, layoverAt: '2026-11-15T10:24:00.000Z', pausedMs: 600_000 })
+    assert.deepEqual(timeline(taken, min(40)).map((e) => e.kind), ['aterrizaje'])
+  })
+
+  it('el reductor pone el vuelo al día y apunta el aterrizaje una sola vez', () => {
+    let state: AppData = {
+      ...createEmptyData(),
+      sessions: [pomodoro({ plannedMinutes: 60, layoverEvery: 25, layoverMinutes: 5 })],
+    }
+    const same = reducer(state, { type: 'session/tick', id: 'v1', now: min(10) })
+    assert.equal(same, state)
+    state = reducer(state, { type: 'session/tick', id: 'v1', now: min(26) })
+    assert.equal(inLayover(state.sessions[0]), true)
+    assert.equal(state.activity.length, 0)
+    state = reducer(state, { type: 'session/tick', id: 'v1', now: min(500), route: 'Madrid → Barcelona' })
+    assert.equal(state.sessions[0].status, 'aterrizado')
+    // 60 de vuelo + dos escalas de 5 (a los 25 y a los 50).
+    assert.equal(state.sessions[0].endedAt, new Date(min(70)).toISOString())
+    assert.equal(state.activity.length, 1)
+    assert.match(state.activity[0].text, /Madrid → Barcelona/)
+    assert.equal(reducer(state, { type: 'session/tick', id: 'v1', now: min(600) }), state)
+  })
+
+  it('una escala pedida a mano no gasta las programadas', () => {
+    let state = reducer(createEmptyData(), {
+      type: 'session/start',
+      session: { from: 'MAD', to: 'BCN', distanceKm: 483, plannedMinutes: 120, seat: '02C', layoverMinutes: 10, layoverEvery: 50 },
+    })
+    const id = state.sessions[0].id
+    assert.equal(state.sessions[0].layoversDone, 0)
+    state = reducer(state, { type: 'session/layover', id, minutes: 5 })
+    assert.equal(inLayover(state.sessions[0]), true)
+    assert.equal(state.sessions[0].layoversDone, 0)
+    const ends = Date.parse(state.sessions[0].layoverEndsAt!) - Date.parse(state.sessions[0].layoverAt!)
+    assert.equal(ends, 5 * 60_000)
+    state = reducer(state, { type: 'session/resume', id })
+    assert.equal(state.sessions[0].layoverEndsAt, undefined)
+    assert.equal(layoversLeft(state.sessions[0]), 2)
+  })
+
+  it('sin duración de descanso, el ritmo no se guarda', () => {
+    const state = reducer(createEmptyData(), {
+      type: 'session/start',
+      session: { from: 'MAD', to: 'BCN', distanceKm: 483, plannedMinutes: 120, seat: '02C', layoverEvery: 50 },
+    })
+    assert.equal(state.sessions[0].layoverEvery, undefined)
+    assert.equal(state.sessions[0].layoversDone, undefined)
+  })
+
+  it('el validador conserva los campos nuevos y descarta los imposibles', () => {
+    const ok = parseSession(
+      pomodoro({
+        layoversDone: 1,
+        pausedAt: '2026-11-15T10:50:00.000Z',
+        layoverAt: '2026-11-15T10:50:00.000Z',
+        layoverEndsAt: '2026-11-15T11:00:00.000Z',
+      }),
+    )
+    assert.equal(ok?.layoverEvery, 50)
+    assert.equal(ok?.layoversDone, 1)
+    assert.equal(ok?.layoverEndsAt, '2026-11-15T11:00:00.000Z')
+    const bad = parseSession({ ...pomodoro(), layoverEvery: 1, layoversDone: -2, layoverEndsAt: 'ayer' })
+    assert.equal(bad?.layoverEvery, undefined)
+    assert.equal(bad?.layoversDone, undefined)
+    assert.equal(bad?.layoverEndsAt, undefined)
+    // Aterrizado: ya no hay fin de escala pendiente.
+    const landed = parseSession(
+      pomodoro({ status: 'aterrizado', endedAt: '2026-11-15T12:20:00.000Z', layoverEndsAt: '2026-11-15T11:00:00.000Z' }),
+    )
+    assert.equal(landed?.layoverEndsAt, undefined)
   })
 })
 

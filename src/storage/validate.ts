@@ -427,7 +427,20 @@ export function parseSession(raw: unknown): FocusSession | null {
       isNum(raw.layoverMinutes) && raw.layoverMinutes > 0 && raw.layoverMinutes <= 60
         ? raw.layoverMinutes
         : undefined,
+    layoverEvery:
+      isNum(raw.layoverEvery) && raw.layoverEvery >= 5 && raw.layoverEvery <= 240
+        ? raw.layoverEvery
+        : undefined,
+    layoversDone:
+      isNum(raw.layoversDone) && Number.isInteger(raw.layoversDone) && raw.layoversDone >= 0
+        ? Math.min(raw.layoversDone, 300)
+        : undefined,
     layoverAt: isStamp(raw.layoverAt) ? raw.layoverAt : undefined,
+    // El fin previsto de una escala solo existe mientras el vuelo está en ella.
+    layoverEndsAt:
+      status === 'en_vuelo' && isStamp(raw.layoverEndsAt) && isStamp(raw.pausedAt)
+        ? raw.layoverEndsAt
+        : undefined,
     createdAt: isStamp(raw.createdAt) ? raw.createdAt : raw.startedAt,
   }
 }
