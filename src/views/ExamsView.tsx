@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
-import { CalendarPlus, ClipboardList } from 'lucide-react'
+import { CalendarPlus, ClipboardList, PlaneTakeoff } from 'lucide-react'
 
 import { MONTHS_LONG, daysUntil, parseDay, WEEKDAYS_LONG } from '@/domain/dates'
+import { formatFlightTime } from '@/domain/flights'
+import { studyHref } from '@/router'
 import { colorVar, quietVar } from '@/domain/palette'
 import { TERMS, termName, type Exam, type GradeEntry, type Subject, type TermId } from '@/domain/types'
 import { useSettings, useStore, useToday } from '@/state/StoreProvider'
@@ -44,6 +46,15 @@ function countdown(days: number): string {
 export function ExamsView() {
   const settings = useSettings()
   const { data } = useStore()
+  const preparation = useMemo(() => {
+    const byExam = new Map<string, number>()
+    for (const session of data.sessions) {
+      if (session.examId && session.status !== 'en_vuelo') {
+        byExam.set(session.examId, (byExam.get(session.examId) ?? 0) + (session.focusedMinutes ?? 0))
+      }
+    }
+    return byExam
+  }, [data.sessions])
   const today = useToday()
   const subjects = useSubjectMap()
 
@@ -82,7 +93,7 @@ export function ExamsView() {
         <button
           type="button"
           onClick={() => setEditing(exam)}
-          className="w-full text-left flex items-center gap-3.5 pl-4 pr-4 py-3 transition-colors duration-150 active:bg-fill hover:bg-fill/50"
+          className="flex-1 min-w-0 text-left flex items-center gap-2.5 sm:gap-3.5 pl-3 sm:pl-4 pr-2 py-3 rounded-xl transition-colors duration-150 active:bg-fill hover:bg-fill/50"
         >
           <DateLeaf date={exam.date} subject={subject} />
           <span className="flex-1 min-w-0">
@@ -162,7 +173,7 @@ export function ExamsView() {
               const days = daysUntil(exam.date, today)
               const near = days <= 3
               return (
-                <li key={exam.id} className={cx(i > 0 && 'inset-separator-wide')}>
+                <li key={exam.id} className={cx('flex items-center pr-2 sm:pr-3', i > 0 && 'inset-separator-wide')}>
                   <button
                     type="button"
                     onClick={() => setEditing(exam)}
@@ -182,6 +193,9 @@ export function ExamsView() {
                       {exam.topics && (
                         <span className="block text-[0.75rem] text-ink-3 mt-0.5 truncate">{exam.topics}</span>
                       )}
+                      {!!preparation.get(exam.id) && (
+                        <span className="block text-xs text-accent mt-1">{formatFlightTime(preparation.get(exam.id)!)} de preparación</span>
+                      )}
                     </span>
                     <span
                       className={cx(
@@ -192,6 +206,14 @@ export function ExamsView() {
                       {countdown(days)}
                     </span>
                   </button>
+                  <a
+                    href={studyHref({ examId: exam.id, subjectId: exam.subjectId })}
+                    aria-label={`Preparar ${exam.title}`}
+                    title="Preparar examen"
+                    className="pressable grid place-items-center size-11 shrink-0 rounded-full text-accent hover:bg-accent-quiet"
+                  >
+                    <PlaneTakeoff className="size-4" aria-hidden="true" />
+                  </a>
                 </li>
               )
             })}

@@ -9,9 +9,10 @@ import {
   useTransform,
   type DragControls,
 } from 'motion/react'
-import { Check, Ellipsis, ListTree, Menu as GripLines, Pencil, Trash2, Undo2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, Ellipsis, ListTree, Menu as GripLines, Pencil, PlaneTakeoff, Trash2, Undo2 } from 'lucide-react'
 
 import { relativeDay } from '@/domain/dates'
+import { studyHref } from '@/router'
 import { bucketOf, subtaskProgress } from '@/domain/tasks'
 import { PRIORITIES, type Priority, type Subject, type Task } from '@/domain/types'
 import { useDispatch, useToday } from '@/state/StoreProvider'
@@ -37,6 +38,8 @@ interface RowReorder {
   lifted: boolean
   onLift: () => void
   onDrop: () => void
+  onMoveUp?: () => void
+  onMoveDown?: () => void
 }
 
 /** Tono del plazo. El texto ya dice «Ayer» o «En 3 días»: el color solo refuerza. */
@@ -88,17 +91,17 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className, reorder
   }
   const toggle = () => {
     if (task.status === 'completada') {
-      dispatch({ type: 'task/toggle', id: task.id })
+      dispatch({ type: 'task/update', id: task.id, patch: { status: 'pendiente' } })
       return
     }
     if (checking) return
     setChecking(true)
     window.setTimeout(() => {
-      dispatch({ type: 'task/toggle', id: task.id })
+      dispatch({ type: 'task/update', id: task.id, patch: { status: 'completada' } })
       setChecking(false)
       toast({
         text: 'Tarea completada',
-        action: { label: 'Deshacer', run: () => dispatch({ type: 'task/toggle', id: task.id }) },
+        action: { label: 'Deshacer', run: () => dispatch({ type: 'task/update', id: task.id, patch: { status: task.status } }) },
       })
     }, 420)
   }
@@ -245,6 +248,14 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className, reorder
               icon: <Pencil className="size-3.5" />,
               onSelect: () => onOpen(task),
             },
+            ...(task.status !== 'completada' ? [{
+              id: 'estudiar',
+              label: 'Estudiar esta tarea',
+              icon: <PlaneTakeoff className="size-3.5" />,
+              onSelect: () => { window.location.hash = studyHref({ taskId: task.id, minutes: task.estimatedMinutes }) },
+            }] : []),
+            ...(reorder?.onMoveUp ? [{ id: 'subir', label: 'Subir en el orden', icon: <ArrowUp className="size-3.5" />, onSelect: reorder.onMoveUp }] : []),
+            ...(reorder?.onMoveDown ? [{ id: 'bajar', label: 'Bajar en el orden', icon: <ArrowDown className="size-3.5" />, onSelect: reorder.onMoveDown }] : []),
             ...PRIORITIES.map((p, index) => ({
               id: `pri-${p.id}`,
               label: `Prioridad: ${PRIORITY_LABEL[p.id as Priority]}`,
@@ -432,8 +443,7 @@ export function TaskList({
  * recoloca en directo; al soltar se guarda UNA vez. Guardar en cada cruce
  * llenaría la sincronización de cambios intermedios que nadie quería.
  *
- * Con teclado: Tab hasta la fila, Espacio para cogerla, flechas para
- * moverla y Espacio para soltarla (Escape la devuelve a su sitio).
+ * El menú de cada fila también permite subir o bajar sin arrastrar.
  */
 export function ReorderableTaskList({
   tasks,
@@ -472,6 +482,11 @@ export function ReorderableTaskList({
     setDraft(null)
     if (final && final.join() !== tasks.map((t) => t.id).join()) onReorder(final)
   }
+  const move = (from: number, to: number) => {
+    const next = shown.map((task) => task.id)
+    ;[next[from], next[to]] = [next[to], next[from]]
+    onReorder(next)
+  }
 
   return (
     <Reorder.Group
@@ -485,14 +500,14 @@ export function ReorderableTaskList({
           setDraft(next)
           haptic()
         } else {
-          // Con el teclado cada movimiento es definitivo.
+          // Si no hay borrador de arrastre, el movimiento es definitivo.
           onReorder(next)
         }
       }}
       className={className}
     >
       <AnimatePresence initial={false}>
-        {shown.map((task) => (
+        {shown.map((task, index) => (
           <ReorderableRow
             key={task.id}
             task={task}
@@ -501,6 +516,8 @@ export function ReorderableTaskList({
             lifted={lifted === task.id}
             onLift={() => lift(task.id)}
             onDrop={drop}
+            onMoveUp={!draft && index > 0 ? () => move(index, index - 1) : undefined}
+            onMoveDown={!draft && index < shown.length - 1 ? () => move(index, index + 1) : undefined}
           />
         ))}
       </AnimatePresence>
@@ -515,6 +532,8 @@ function ReorderableRow({
   lifted,
   onLift,
   onDrop,
+  onMoveUp,
+  onMoveDown,
 }: {
   task: Task
   subject?: Subject
@@ -522,6 +541,8 @@ function ReorderableRow({
   lifted: boolean
   onLift: () => void
   onDrop: () => void
+  onMoveUp?: () => void
+  onMoveDown?: () => void
 }) {
   const controls = useDragControls()
   return (
@@ -529,7 +550,7 @@ function ReorderableRow({
       task={task}
       subject={subject}
       onOpen={onOpen}
-      reorder={{ controls, lifted, onLift, onDrop }}
+      reorder={{ controls, lifted, onLift, onDrop, onMoveUp, onMoveDown }}
     />
   )
 }

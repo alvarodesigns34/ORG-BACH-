@@ -40,6 +40,7 @@ import {
   canRecord,
   MAX_RECORDING_MS,
   startRecording,
+  type AssistantReply,
   type Recording,
 } from '@/assistant/client'
 import {
@@ -143,6 +144,12 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
     if (account) saveConversation(account, messages)
   }, [account, messages])
 
+  const [review, setReview] = useState<{
+    answer: AssistantReply
+    start: typeof data
+    account: string
+    items: string[]
+  } | null>(null)
   const [phase, setPhase] = useState<Phase>('idle')
   const [text, setText] = useState('')
   const [elapsed, setElapsed] = useState(0)
@@ -162,7 +169,10 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
     pending.current?.abort()
     pending.current = null
     setPhase('idle')
+    setReview(null)
   }, [open])
+
+  useEffect(() => () => { pending.current?.abort() }, [account])
 
   // Siempre a la vista lo último de la conversación.
   useLayoutEffect(() => {
@@ -204,8 +214,28 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
   const patchMessage = (id: string, patch: Partial<ChatMessage>) =>
     setMessages((list) => list.map((m) => (m.id === id ? { ...m, ...patch } : m)))
 
+  const commit = (answer: AssistantReply, result = applyAssistantActions(latest.current, answer.actions, today)) => {
+    const plan = planUndo(latest.current, result.data)
+    if (!isEmptyPlan(plan) && !replaceAndSave(result.data)) {
+      throw new Error('Los cambios no se pudieron guardar. Tu curso actual sigue abierto.')
+    }
+    setMessages((list) => [...list, {
+      id: newId('msg'),
+      role: 'assistant',
+      text: answer.reply || (result.applied.length ? 'Hecho.' : 'No he encontrado ningún cambio que aplicar.'),
+      at: Date.now(),
+      applied: result.applied,
+      skipped: result.skipped,
+      undo: isEmptyPlan(plan) ? null : plan,
+    }])
+    if (result.flight) {
+      onClose()
+      window.location.hash = flightHref(result.flight).slice(1)
+    }
+  }
+
   const send = async (input: Input) => {
-    if (phase === 'thinking') return
+    if (pending.current || (review && review.account === account)) return
     lastInput.current = input
     const userId = newId('msg')
     const history = historyForModel(messagesRef.current)
@@ -230,35 +260,16 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
         signal: controller.signal,
       })
       if (controller.signal.aborted) return
-      // Se aplica sobre el estado MÁS reciente: pudo cambiar mientras pensaba.
+      if (input.audio) patchMessage(userId, { text: answer.heard || 'Mensaje de voz' })
       const current = latest.current
       const result = applyAssistantActions(current, answer.actions, today)
-      const plan = planUndo(current, result.data)
-      if (!isEmptyPlan(plan)) replaceAndSave(result.data)
-      setMessages((list) => [
-        ...list.map((m) =>
-          m.id === userId && input.audio ? { ...m, text: answer.heard || 'Mensaje de voz' } : m,
-        ),
-        {
-          id: newId('msg'),
-          role: 'assistant',
-          text:
-            answer.reply ||
-            (result.applied.length > 0 ? 'Hecho.' : 'No he encontrado nada que hacer con eso.'),
-          at: Date.now(),
-          applied: result.applied,
-          skipped: result.skipped,
-          undo: isEmptyPlan(plan) ? null : plan,
-        },
-      ])
-      // Vuelo preparado: se cierra el asistente y se abre la cabina. Despegar
-      // es un toque del alumno (y Safari lo exige para encender el sonido).
-      if (result.flight) {
-        const href = flightHref(result.flight)
-        window.setTimeout(() => {
-          onClose()
-          window.location.hash = href.slice(1)
-        }, 900)
+      const protectedAction = answer.actions.some(({ type }) =>
+        type.startsWith('delete_') || type === 'update_exam' || type === 'update_grade',
+      )
+      if (result.applied.length > 1 || (result.applied.length > 0 && protectedAction)) {
+        setReview({ answer, start: current, account, items: result.applied.map((item) => item.text) })
+      } else {
+        commit(answer, result)
       }
     } catch (e) {
       if (controller.signal.aborted) return
@@ -277,8 +288,10 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
         },
       ])
     } finally {
-      if (pending.current === controller) pending.current = null
-      setPhase('idle')
+      if (pending.current === controller) {
+        pending.current = null
+        setPhase('idle')
+      }
     }
   }
 
@@ -359,8 +372,7 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
 
   const undo = (message: ChatMessage) => {
     if (!message.undo || message.undone) return
-    replaceAndSave(applyUndo(latest.current, message.undo))
-    patchMessage(message.id, { undone: true })
+    if (replaceAndSave(applyUndo(latest.current, message.undo))) patchMessage(message.id, { undone: true })
   }
 
   const newConversation = () => {
@@ -369,8 +381,27 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
     recording.current = null
     setPhase('idle')
     setMessages([])
+    setReview(null)
     setText('')
     field.current?.focus()
+  }
+
+  const pendingReview = review?.account === account ? review : null
+  const reviewChanges = () => {
+    if (!pendingReview) return
+    const current = latest.current
+    const result = applyAssistantActions(current, pendingReview.answer.actions, today)
+    const items = result.applied.map((item) => item.text)
+    if (pendingReview.start !== current && JSON.stringify(items) !== JSON.stringify(pendingReview.items)) {
+      setReview({ ...pendingReview, start: current, items })
+      return
+    }
+    try {
+      commit(pendingReview.answer, result)
+      setReview(null)
+    } catch (error) {
+      setMessages((list) => [...list, { id: newId('msg'), role: 'assistant', error: true, at: Date.now(), text: String(error) }])
+    }
   }
 
   const seconds = Math.floor(elapsed / 1000)
@@ -409,6 +440,7 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
       onClose={onClose}
       title="Asistente"
       size="md"
+      description="Al enviar, el asistente recibe tu mensaje y el contexto necesario de tu curso."
       headerAction={
         messages.length > 0 && (
           <IconButton
@@ -460,7 +492,7 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
                   type="button"
                   onClick={submitText}
                   aria-label="Enviar"
-                  disabled={!text.trim() || phase === 'thinking'}
+                  disabled={!text.trim() || phase === 'thinking' || !!pendingReview}
                   className={cx(
                     'pressable absolute right-1.5 bottom-1.5 grid place-items-center size-9 rounded-full bg-accent-fill text-white',
                     'transition-[opacity,transform] duration-200',
@@ -477,7 +509,7 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
                 <button
                   type="button"
                   onClick={() => void startVoice()}
-                  disabled={phase === 'thinking'}
+                  disabled={phase === 'thinking' || !!pendingReview}
                   aria-label="Dictar por voz"
                   className="pressable grid place-items-center size-12 rounded-full bg-accent-fill text-white shrink-0 shadow-[0_6px_18px_rgb(0_0_0/0.14)] disabled:opacity-50"
                 >
@@ -494,6 +526,21 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
           <Welcome onPick={(t) => void send({ text: t })} />
         ) : (
           messages.map((m) => <Bubble key={m.id} message={m} onUndo={() => undo(m)} />)
+        )}
+
+        {pendingReview && (
+          <section className="rounded-2xl border border-hairline bg-raised p-4" aria-labelledby="revision-asistente">
+            <h3 id="revision-asistente" className="font-semibold">Revisa los cambios propuestos</h3>
+            {pendingReview.items.length > 0 ? (
+              <ul className="mt-2 list-disc space-y-1 ps-4 text-sm text-ink-2">
+                {pendingReview.items.map((item, index) => <li key={index}>{item}</li>)}
+              </ul>
+            ) : <p className="mt-2 text-sm text-ink-2">Ya no hay cambios aplicables en tu curso.</p>}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => setReview(null)}>Descartar</Button>
+              <Button size="sm" variant="primary" onClick={reviewChanges} disabled={!pendingReview.items.length}>Aplicar cambios</Button>
+            </div>
+          </section>
         )}
 
         {phase === 'thinking' && (

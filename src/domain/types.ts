@@ -224,7 +224,7 @@ export interface CalendarEvent {
 // Objetivos
 // ---------------------------------------------------------------------------
 
-export type GoalKind = 'media' | 'tareas' | 'manual'
+export type GoalKind = 'media' | 'tareas' | 'estudio' | 'manual'
 export type GoalScope = 'diario' | 'semanal' | 'trimestral' | 'anual'
 
 export interface Goal {
@@ -343,6 +343,7 @@ export interface FocusSession {
   seat: string
   subjectId?: ID
   taskId?: ID
+  examId?: ID
   status: FocusSessionStatus
   startedAt: TimestampISO
   /** Milisegundos pasados en pausa (las pausas ya cerradas). */

@@ -25,6 +25,7 @@
  */
 
 import { DEFAULT_SETTINGS } from '../data/defaults.ts'
+import { reconcileActiveFlights } from '../domain/flights.ts'
 import type { AppData, Settings } from '../domain/types.ts'
 import {
   parseActivity,
@@ -298,6 +299,7 @@ export function mergeRemote(
   const out = cloneMeta(meta)
   let hlc = out.hlc
   let changed = false
+  const changedCollections = new Set<EntityCollection>()
   let rejected = 0
 
   // Colecciones como mapas para sustituir en su sitio sin recorrer la lista
@@ -357,9 +359,10 @@ export function mergeRemote(
         changed = true
       }
     } else {
-      const collection = collections.get(row.collection as EntityCollection)!
+      const name = row.collection as EntityCollection
+      const collection = collections.get(name)!
       if (deleted) {
-        if (collection.delete(row.id)) changed = true
+        if (collection.delete(row.id)) changedCollections.add(name)
       } else {
         const parsed = PARSERS[row.collection as EntityCollection]({ ...merged, id: row.id })
         if (!parsed) {
@@ -371,7 +374,7 @@ export function mergeRemote(
         const previous = collection.get(row.id)
         if (!previous || !same(previous, parsed)) {
           collection.set(row.id, parsed as unknown as Fields)
-          changed = true
+          changedCollections.add(name)
         }
       }
     }
@@ -381,15 +384,19 @@ export function mergeRemote(
   }
 
   out.hlc = hlc
-  if (!changed) return { data: local, meta: out, changed, rejected }
-
-  const data: AppData = { ...local, settings }
-  for (const name of ENTITY_COLLECTIONS) {
+  changed ||= changedCollections.size > 0
+  const data: AppData = changed ? { ...local, settings } : local
+  for (const name of changedCollections) {
     const items = [...collections.get(name)!.values()]
     ;(data[name] as unknown as Fields[]) = items
   }
   // La actividad se muestra de la más reciente a la más antigua.
-  data.activity = [...data.activity].sort((a, b) => b.at.localeCompare(a.at))
+  if (changedCollections.has('activity')) data.activity.sort((a, b) => b.at.localeCompare(a.at))
+  const sessions = reconcileActiveFlights(data.sessions)
+  if (sessions !== data.sessions) {
+    const reconciled = { ...data, sessions }
+    return { data: reconciled, meta: stampLocalChanges(out, data, reconciled, now), changed: true, rejected }
+  }
   return { data, meta: out, changed, rejected }
 }
 

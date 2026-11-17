@@ -43,7 +43,7 @@ function useAirports(needed: boolean): Airports | null {
     let alive = true
     void import('./airports').then((m) => {
       if (alive) setAirports({ byIata: m.AIRPORT_BY_IATA, all: m.AIRPORTS })
-    })
+    }).catch(() => { /* El vuelo puede continuar con los códigos IATA. */ })
     return () => {
       alive = false
     }
@@ -76,6 +76,10 @@ export function FlightController() {
   const subjects = useSubjectMap()
 
   const active = activeSession(data.sessions)
+  const hasConcurrentFlights = data.sessions.filter((session) => session.status === 'en_vuelo').length > 1
+  useEffect(() => {
+    if (hasConcurrentFlights) dispatch({ type: 'session/reconcile' })
+  }, [hasConcurrentFlights, dispatch])
   const airports = useAirports(!!active)
   const from = active ? airports?.byIata.get(active.from) : undefined
   const to = active ? airports?.byIata.get(active.to) : undefined
@@ -87,7 +91,7 @@ export function FlightController() {
   // --- Poner el vuelo al día ---------------------------------------------
   const activeId = active?.id
   useEffect(() => {
-    if (!activeId) return
+    if (!active) return
     const check = () => {
       const session = live.current.active
       if (!session) return
@@ -96,18 +100,18 @@ export function FlightController() {
         dispatch({ type: 'session/tick', id: session.id, now: Date.now(), route: live.current.routeName })
       }
     }
-    check()
-    const id = window.setInterval(check, 1000)
+    const event = nextEvent(active)
+    const id = event ? window.setTimeout(check, Math.max(0, event.at - Date.now())) : undefined
     document.addEventListener('visibilitychange', check)
     window.addEventListener('pageshow', check)
     window.addEventListener('focus', check)
     return () => {
-      window.clearInterval(id)
+      window.clearTimeout(id)
       document.removeEventListener('visibilitychange', check)
       window.removeEventListener('pageshow', check)
       window.removeEventListener('focus', check)
     }
-  }, [activeId, dispatch])
+  }, [active, dispatch])
 
   // --- Lo que suena (y se nota) en cada cambio ---------------------------
   const seen = useRef<{ id: string; layover: boolean; paused: boolean } | null>(null)
@@ -122,18 +126,18 @@ export function FlightController() {
     if (before && (!now || now.id !== before.id)) {
       // El vuelo que había ha terminado: aterrizó o se abandonó.
       const ended = data.sessions.find((s) => s.id === before.id)
+      const city = ended ? airports?.byIata.get(ended.to)?.city ?? ended.to : ''
       const landed = ended?.status === 'aterrizado' && ended.endedAt
       const fresh = landed && Date.now() - Date.parse(ended.endedAt!) < 15_000
       endNativeFlight(!!landed)
       if (fresh && audioRunning()) chime('megafonia')
       if (fresh) haptic('success')
       if (landed && !live.current.onStudy) {
-        const city = live.current.to?.city ?? ended.to
         toast({
           text: fresh
             ? `Has aterrizado en ${city} · ${formatFlightTime(ended.focusedMinutes ?? ended.plannedMinutes)}`
             : `Aterrizaste en ${city} a las ${clock(Date.parse(ended.endedAt!))}`,
-          action: { label: 'Ver', run: () => navigate('estudio') },
+          action: { label: 'Ver', run: () => navigate('estudio', { aterrizaje: ended.id }) },
           duration: 7000,
         })
       }
@@ -143,7 +147,7 @@ export function FlightController() {
       if (landedCard.current) window.clearTimeout(landedCard.current)
       if (fresh && ended) {
         showFlightCard({
-          title: `Has aterrizado en ${live.current.to?.city ?? ended.to}`,
+          title: `Has aterrizado en ${city}`,
           subtitle: `${formatFlightTime(ended.focusedMinutes ?? ended.plannedMinutes)} estudiados`,
           artwork: null,
           duration: ended.plannedMinutes * 60,
@@ -179,7 +183,7 @@ export function FlightController() {
     } else if (before.paused !== now.paused) {
       duck(now.paused)
     }
-  }, [active, data.sessions, toast, navigate])
+  }, [active, data.sessions, toast, navigate, airports])
 
   // --- Audio: el primer toque lo enciende si hace falta ------------------
   // Al volver a un vuelo ya en marcha (recarga, otro dispositivo) no hay

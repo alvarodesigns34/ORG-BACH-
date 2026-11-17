@@ -9,10 +9,13 @@
 
 import { startOfWeek, toDay } from './dates.ts'
 import { formatGrade, round } from './grades.ts'
+import { formatFlightTime } from './flights.ts'
+import { minutesByDay } from './study.ts'
 import type { SubjectResult } from './grades.ts'
 import { isDone } from './tasks.ts'
 import type {
   DateISO,
+  FocusSession,
   Goal,
   GoalKind,
   GoalScope,
@@ -25,6 +28,7 @@ import type {
 
 export interface GoalContext {
   tasks: Task[]
+  sessions?: FocusSession[]
   subjects: Subject[]
   /** Resultados de la evaluación activa. Los usa el alcance «trimestral». */
   results: Map<ID, SubjectResult>
@@ -72,6 +76,7 @@ export const SCOPES_BY_KIND: Record<GoalKind, GoalScope[]> = {
   // Una media no se mide por días: se mide por evaluación o por curso.
   media: ['trimestral', 'anual'],
   tareas: ['diario', 'semanal'],
+  estudio: ['semanal', 'diario'],
   manual: ['diario', 'semanal', 'trimestral', 'anual'],
 }
 
@@ -85,6 +90,7 @@ export const SCOPE_LABEL: Record<GoalScope, string> = {
 export const KIND_LABEL: Record<GoalKind, string> = {
   media: 'Nota media',
   tareas: 'Tareas completadas',
+  estudio: 'Tiempo de estudio',
   manual: 'Seguimiento manual',
 }
 
@@ -169,6 +175,25 @@ export function goalProgress(goal: Goal, ctx: GoalContext): GoalProgress {
       }
     }
 
+    case 'estudio': {
+      const sessions = ctx.sessions ?? []
+      const byDay = minutesByDay(goal.subjectId ? sessions.filter((s) => s.subjectId === goal.subjectId) : sessions)
+      let current = 0
+      for (const [day, minutes] of byDay) {
+        if ((!from || day >= from) && day <= ctx.today) current += minutes
+      }
+      const percent = clampPercent((current / target) * 100)
+      return {
+        current,
+        target,
+        percent,
+        label: `${formatFlightTime(current)} de ${formatFlightTime(target)}`,
+        headline: `${Math.round(percent)} %`,
+        done: current >= target,
+        measurable: true,
+      }
+    }
+
     case 'manual':
     default: {
       const current = goal.manualProgress ?? 0
@@ -203,6 +228,8 @@ export function suggestTitle(kind: GoalKind, scope: GoalScope, target: number, s
       return `Conseguir una media de ${target.toLocaleString('es-ES')}${where}`
     case 'tareas':
       return `Completar ${target} tareas${where} · ${SCOPE_LABEL[scope].toLowerCase()}`
+    case 'estudio':
+      return `Estudiar ${formatFlightTime(target)}${where} · ${SCOPE_LABEL[scope].toLowerCase()}`
     default:
       return ''
   }

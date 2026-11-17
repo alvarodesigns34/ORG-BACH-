@@ -27,6 +27,7 @@ interface GoalEditorProps {
 const TARGET_HINT: Record<GoalKind, { suffix: string; hint: string; step: number }> = {
   media: { suffix: '', hint: 'La nota media que quieres alcanzar.', step: 0.5 },
   tareas: { suffix: '', hint: 'Número de tareas completadas en el periodo.', step: 1 },
+  estudio: { suffix: 'min', hint: 'Minutos efectivos de los vuelos registrados.', step: 15 },
   manual: { suffix: '', hint: 'La cifra a la que quieres llegar.', step: 1 },
 }
 
@@ -76,8 +77,8 @@ export function GoalEditor({ open, onClose, goal }: GoalEditorProps) {
   }, [kind, scope, parsedTarget, subjectId, subjects, touchedTitle])
 
   const submit = () => {
-    if (!Number.isFinite(parsedTarget) || parsedTarget <= 0) {
-      setError('Escribe la cifra a la que quieres llegar.')
+    if (!Number.isFinite(parsedTarget) || parsedTarget <= 0 || (kind === 'estudio' && !Number.isInteger(parsedTarget))) {
+      setError(kind === 'estudio' ? 'Escribe un número entero de minutos.' : 'Escribe la cifra a la que quieres llegar.')
       return
     }
     if (!title.trim()) {
@@ -199,7 +200,7 @@ export function GoalEditor({ open, onClose, goal }: GoalEditorProps) {
                   aria-describedby={describedBy}
                   min={0}
                   suffix={spec.suffix || undefined}
-                  placeholder={kind === 'media' ? '9' : '8'}
+                  placeholder={kind === 'media' ? '9' : kind === 'estudio' ? '120' : '8'}
                   value={target}
                   onChange={(e) => setTarget(e.target.value)}
                 />

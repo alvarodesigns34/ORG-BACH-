@@ -12,6 +12,8 @@ import { describe, it } from 'node:test'
 import { createEmptyData } from '../src/data/defaults.ts'
 import type { AppData, Task } from '../src/domain/types.ts'
 import { formatClock, parseClock, receive, tick, ZERO_CLOCK } from '../src/sync/hlc.ts'
+import { courseRevision, decodeSyncMeta, encodeCourse } from '../src/storage/syncEnvelope.ts'
+import { reducer } from '../src/state/reducer.ts'
 import {
   acknowledge,
   buildPush,
@@ -46,6 +48,49 @@ function task(overrides: Partial<Task> = {}): Task {
 function withTasks(base: AppData, tasks: Task[]): AppData {
   return { ...base, tasks }
 }
+
+describe('guardado conjunto del curso y el cursor', () => {
+  it('conserva la cola embebida si falla la confirmación de la escritura separada', () => {
+    const base = createEmptyData()
+    const original = createMeta('usuario', 'a')
+    const prior = encodeCourse(base, original)
+    const edited = withTasks(base, [task()])
+    const pending = stampLocalChanges(original, base, edited, T0)
+    const saved = encodeCourse(edited, pending)
+    const oldSidecar = JSON.stringify({ revision: courseRevision(prior), meta: { ...original, cursor: 99 } })
+    assert.deepEqual(decodeSyncMeta(saved, oldSidecar), pending)
+    assert.equal(JSON.parse(saved).tasks[0].title, task().title)
+  })
+
+  it('acepta confirmaciones de la misma revisión y respeta un cierre de sesión', () => {
+    const base = createEmptyData()
+    const original = createMeta('usuario', 'a')
+    const stored = encodeCourse(base, original)
+    const checked = { ...original, cursor: 27 }
+    const confirmed = JSON.stringify({ revision: courseRevision(stored), meta: checked })
+    assert.deepEqual(decodeSyncMeta(stored, confirmed), checked)
+    assert.equal(decodeSyncMeta(encodeCourse(base, null), confirmed), null)
+    assert.deepEqual(decodeSyncMeta(JSON.stringify(base), JSON.stringify(original)), original)
+  })
+
+  it('conserva y marca como pendiente el vuelo reconciliado tras la fusión', () => {
+    const base = createEmptyData()
+    const flight = { from: 'MAD', to: 'BCN', distanceKm: 480, plannedMinutes: 48, seat: '07A' }
+    const start = (id: string) => {
+      const result = reducer(base, { type: 'session/start', session: flight })
+      return { ...result, sessions: [{ ...result.sessions[0], id, startedAt: '2026-11-17T10:00:00Z' }] }
+    }
+    const local = start('a')
+    const remote = start('z')
+    const lMeta = stampAll(createMeta('usuario', 'a'), local, { now: T0 })
+    const rMeta = stampAll(createMeta('usuario', 'z'), remote, { now: T0 })
+    const [row] = buildPush(remote, rMeta, [keyOf('sessions', 'z')])
+    const merged = mergeRemote(local, lMeta, [{ ...row, seq: 1 }], T0)
+    assert.deepEqual(merged.data.sessions.map((s) => [s.id, s.status]), [['a', 'en_vuelo'], ['z', 'cancelado']])
+    assert.ok(merged.meta.dirty.includes(keyOf('sessions', 'z')))
+    assert.equal(merged.data.tasks, local.tasks)
+  })
+})
 
 /** Servidor en memoria con la misma regla de fusión que `sync_push`. */
 class FakeServer {

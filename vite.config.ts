@@ -74,6 +74,7 @@ export default defineConfig({
         // Todo lo que sale del build, disponible sin conexión desde el primer
         // arranque online: JS, CSS, el HTML y las fuentes auto-alojadas.
         globPatterns: ['**/*.{js,css,html,svg,png}', 'sounds/megafonia.m4a', 'sounds/aviso.m4a'],
+        globIgnores: ['**/node_modules/**/*', '**/flightMap-*.{js,css}'],
         // Avisos push (resumen diario): el manejador vive en public/ y el
         // Service Worker generado lo importa. Así Workbox sigue gestionando
         // el caché y las versiones, y el push no hay que reescribirlo.
@@ -87,6 +88,15 @@ export default defineConfig({
         // Los ambientes del modo estudio (2–3 MB cada uno) no se precargan:
         // se guardan la primera vez que suenan y después funcionan sin red.
         runtimeCaching: [
+          {
+            urlPattern: ({ sameOrigin, url }) =>
+              sameOrigin && /\/assets\/(?:flightMap-|maplibre-gl-worker-)/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'orbita-motor-mapa-v1',
+              expiration: { maxEntries: 8, maxAgeSeconds: 30 * 24 * 60 * 60 },
+            },
+          },
           {
             urlPattern: ({ url }) => url.pathname.includes('/sounds/') && url.pathname.endsWith('.m4a'),
             handler: 'CacheFirst',

@@ -254,6 +254,7 @@ export function MobileNav({ current, badges }: MobileNavProps) {
                     ) : (
                       <a
                         href={hrefFor(tab.id)}
+                        aria-label={tab.id === 'calendario' ? 'Calendario' : undefined}
                         aria-current={isCurrent ? 'page' : undefined}
                         draggable={false}
                         onClick={(e) => {
@@ -477,7 +478,9 @@ function TabFace({
           </span>
         )}
       </span>
-      <span className="truncate max-w-full">{tab.label}</span>
+      <span className="truncate max-w-full">
+        {tab.id === 'calendario' ? <><span className="sm:hidden">Agenda</span><span className="hidden sm:inline">Calendario</span></> : tab.label}
+      </span>
     </span>
   )
 }

@@ -42,7 +42,7 @@ export const NAV_GROUPS: { id: NavItem['group']; label: string }[] = [
 ]
 
 /** Las cuatro secciones de la barra inferior en móvil; el resto va en «Más». */
-export const MOBILE_PRIMARY: RouteId[] = ['inicio', 'tareas', 'calendario', 'notas']
+export const MOBILE_PRIMARY: RouteId[] = ['inicio', 'tareas', 'calendario', 'estudio']
 
 /**
  * Color de cada sección en las listas con icono (hoja «Más», menú lateral),

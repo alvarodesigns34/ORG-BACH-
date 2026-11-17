@@ -98,7 +98,7 @@ export function SeatPicker({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: 0.22 } }}
-      className="study-veil absolute inset-0 z-20 flex items-center justify-center gap-[clamp(0.5rem,3vw,3rem)] pr-6"
+      className="study-veil study-seat-layout absolute inset-0 z-20"
     >
       {/* --- El avión: sube desde abajo y se desplaza para ver más filas --- */}
       <motion.div
@@ -106,9 +106,9 @@ export function SeatPicker({
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: '40%', opacity: 0, transition: { duration: 0.25 } }}
         transition={{ type: 'spring', visualDuration: 0.55, bounce: 0.14 }}
-        className="relative h-full shrink-0 plane-scroll"
+        className="relative shrink-0 plane-scroll"
       >
-        <div className="h-full overflow-y-auto no-scrollbar px-14 pt-8 pb-24">
+        <div className="study-seat-map h-full overflow-y-auto overscroll-contain no-scrollbar">
           <Fuselage
             taken={taken}
             selected={seat?.label ?? null}
@@ -126,7 +126,7 @@ export function SeatPicker({
         initial={{ x: 30, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ ...spring.smooth, delay: 0.08 }}
-        className="liquid w-[360px] shrink-0 rounded-[30px] max-h-[calc(100dvh-3rem)] flex flex-col"
+          className="liquid study-seat-form min-w-0 rounded-[30px] flex flex-col"
       >
         <div className="relative z-[2] flex flex-col min-h-0">
           <div className="flex items-center gap-2 px-4 pt-4">

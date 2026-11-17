@@ -74,7 +74,7 @@ export function GradesView() {
         }
         actions={
           <>
-            <Button variant="secondary" onClick={() => openCalculator(undefined)}>
+            <Button variant="secondary" aria-label="Calculadora de notas" onClick={() => openCalculator(undefined)}>
               <Calculator className="size-4" />
               <span className="hidden sm:inline">Calculadora</span>
             </Button>

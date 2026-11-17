@@ -10,7 +10,7 @@ import { describe, it } from 'node:test'
 
 import { DEFAULT_SCALE } from '../src/domain/grades.ts'
 import { goalProgress, type GoalContext } from '../src/domain/goals.ts'
-import type { Goal, Task } from '../src/domain/types.ts'
+import type { FocusSession, Goal, Task } from '../src/domain/types.ts'
 
 // Miércoles, para que la semana (lunes a domingo) tenga días antes y después.
 const TODAY = '2026-10-14'
@@ -70,6 +70,37 @@ describe('objetivos de tareas', () => {
     assert.equal(progress.current, 2)
     assert.equal(progress.label, '2 de 5')
   })
+})
+
+it('cuenta en la meta semanal solo minutos efectivos de la asignatura en el periodo', () => {
+  const flight = (date: string, extra: Partial<FocusSession> = {}): FocusSession => ({
+    id: date,
+    kind: 'vuelo',
+    from: 'MAD',
+    to: 'BCN',
+    distanceKm: 480,
+    plannedMinutes: 48,
+    seat: '07A',
+    startedAt: `${date}T09:00:00Z`,
+    endedAt: `${date}T10:00:00Z`,
+    createdAt: `${date}T09:00:00Z`,
+    status: 'aterrizado',
+    pausedMs: 60_000,
+    focusedMinutes: 30,
+    subjectId: 'mat',
+    ...extra,
+  })
+  const context = makeContext({ sessions: [
+    flight('2026-10-13'),
+    flight('2026-10-14', { focusedMinutes: 10, status: 'cancelado' }),
+    flight('2026-10-05'),
+    flight('2026-10-15'),
+    flight('2026-10-12', { subjectId: 'len' }),
+    flight('2026-10-13', { status: 'en_vuelo' }),
+  ] })
+  const progress = goalProgress(makeGoal({ kind: 'estudio', target: 60, subjectId: 'mat' }), context)
+  assert.equal(progress.current, 40)
+  assert.equal(progress.label, '40 min de 1 h')
 })
 
 describe('objetivos de media', () => {

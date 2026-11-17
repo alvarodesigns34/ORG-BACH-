@@ -132,15 +132,21 @@ export async function saveSnapshot(data: AppData, reason: SnapshotReason): Promi
 }
 
 let lastDaily: string | null = null
+let checkingDaily: string | null = null
 
 /** La copia del día, si aún no está hecha. Barata de llamar a menudo. */
 export async function dailySnapshot(data: AppData): Promise<void> {
   const day = todayISO()
-  if (lastDaily === day || isEmpty(data)) return
-  lastDaily = day
-  const all = await listSnapshots()
-  if (all.some((s) => s.reason === 'diaria' && s.day === day)) return
-  await saveSnapshot(data, 'diaria')
+  if (lastDaily === day || checkingDaily === day || isEmpty(data)) return
+  checkingDaily = day
+  try {
+    const all = await listSnapshots()
+    if (all.some((s) => s.reason === 'diaria' && s.day === day) || await saveSnapshot(data, 'diaria')) {
+      lastDaily = day
+    }
+  } finally {
+    if (checkingDaily === day) checkingDaily = null
+  }
 }
 
 /**

@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import 'maplibre-gl/dist/maplibre-gl.css'
+import { Orbit } from 'lucide-react'
 import '@/features/study/study.css'
 
 import {
   HOME_IATA,
   activeSession,
+  bearing,
   currentAirport,
   destinationsFor,
   distanceKm,
+  focusMinutes,
   inLayover,
   interpolate,
   kmFor,
@@ -19,8 +21,6 @@ import {
   nearestAirport,
   progress as flightProgress,
   remainingMs as flightRemaining,
-  MAX_MINUTES,
-  MIN_MINUTES,
   type Airport,
   type Destination,
 } from '@/domain/flights'
@@ -33,7 +33,7 @@ import { typing } from '@/layout/shortcuts'
 import { haptic } from '@/ui/motion'
 import { useToast } from '@/ui/Toast'
 import { AIRPORTS, AIRPORT_BY_IATA } from '@/features/study/airports'
-import { FlightMap, type Padding } from '@/features/study/flightMap'
+import type { Padding } from '@/features/study/flightMap'
 import { mapEdgeColor } from '@/features/study/mapStyle'
 import { BookingPanel, HomePanel, PANEL_WIDTH, SidePanel, type HomeTab } from '@/features/study/Panels'
 import { SeatPicker, type SeatChoice } from '@/features/study/SeatPicker'
@@ -41,11 +41,11 @@ import { BoardingPass, Takeoff } from '@/features/study/BoardingPass'
 import { FlightHud, LandedCard, LayoverCard, MapToolbar } from '@/features/study/FlightHud'
 import { beginFlightAudio } from '@/features/study/flightAudio'
 import { useNow, useResolvedTheme, useWakeLock } from '@/features/study/hooks'
+import { useStudyMap } from '@/features/study/useStudyMap'
 import { layoverPlan, useStudyPrefs } from '@/features/study/prefs'
 import {
   SOUNDS,
   chime,
-  playSound,
   preloadSound,
   setVolume,
   type SoundId,
@@ -56,13 +56,20 @@ type Stage = 'inicio' | 'reserva' | 'asiento' | 'tarjeta' | 'despegue' | 'vuelo'
 /** Hueco que deja la hoja lateral a la izquierda del mapa. */
 function panelPadding(): Padding {
   const wide = window.innerWidth >= 720
-  return { top: 80, right: 90, bottom: 80, left: wide ? PANEL_WIDTH + 70 : 32 }
+  return wide
+    ? { top: 80, right: 90, bottom: 80, left: PANEL_WIDTH + 70 }
+    : { top: 24, right: 38, bottom: 28, left: 38 }
 }
 
 const HUD_PADDING: Padding = { top: 110, right: 110, bottom: 200, left: 110 }
 const CENTER_PADDING: Padding = { top: 140, right: 140, bottom: 140, left: 140 }
 
 type Route2 = { from: Airport; to: Airport }
+
+function flightHeading(from: Airport, to: Airport, progress: number) {
+  const at = Math.min(0.995, Math.max(0, progress))
+  return bearing(interpolate(from, to, at), interpolate(from, to, at + 0.005))
+}
 
 /**
  * Modo estudio: cada sesión es un vuelo de verdad entre dos ciudades.
@@ -94,16 +101,25 @@ export default function StudyView() {
   const [seat, setSeat] = useState<SeatChoice | null>(null)
   const [passId, setPassId] = useState(() => newId('pase'))
   const [landedId, setLandedId] = useState<string | null>(null)
-  const [following, setFollowing] = useState(true)
+  const [following, setFollowing] = useState(false)
+  const [quick, setQuick] = useState(false)
+  const [examId, setExamId] = useState<string | undefined>()
+  const quickParam = route.params.get('despegar')
+  const landingParam = route.params.get('aterrizaje')
+  const cinematicStart = useRef(false)
   /** La cámara ya hizo el despegue de este vuelo. */
   const tookOff = useRef(false)
 
   // --- Destinos ---
   const candidates = useMemo(
-    () => (stage === 'reserva' ? destinationsFor(origin, AIRPORTS, minutes) : []),
+    () => (stage === 'reserva' ? destinationsFor(origin, AIRPORTS, minutes, 40, true) : []),
     [stage, origin, minutes],
   )
   const selected: Destination | null = useMemo(() => {
+    if (quick) {
+      const destination = destinationsFor(origin, AIRPORTS, minutes, 1)[0]
+      return destination ? { ...destination, minutes } : null
+    }
     if (destIata) {
       const airport = AIRPORT_BY_IATA.get(destIata)
       if (airport) {
@@ -112,7 +128,7 @@ export default function StudyView() {
       }
     }
     return candidates[0] ?? null
-  }, [destIata, candidates, origin])
+  }, [destIata, candidates, origin, minutes, quick])
 
   // --- Mapa ---
   const inCabin = stage === 'vuelo' || stage === 'despegue' || stage === 'aterrizado'
@@ -125,32 +141,11 @@ export default function StudyView() {
     }),
     [prefs.map, prefs.labels, prefs.globe, inCabin, theme],
   )
-  const container = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<FlightMap | null>(null)
-  const [mapReady, setMapReady] = useState(false)
-
-  useEffect(() => {
-    if (!container.current) return
-    const map = new FlightMap(container.current, look, origin)
-    map.onUserMove = () => setFollowing(false)
-    mapRef.current = map
-    setMapReady(true)
-    const onResize = () => map.resize()
-    window.addEventListener('resize', onResize)
-    return () => {
-      window.removeEventListener('resize', onResize)
-      map.destroy()
-      mapRef.current = null
-      // El ambiente no se para aquí: el vuelo sigue (y suena) fuera de esta
-      // vista. Lo apaga el controlador del vuelo al aterrizar o abandonar.
-    }
-    // El mapa se crea una vez; estilo y contenido cambian después.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => {
-    mapRef.current?.setLook(look)
-  }, [look])
+  const mapEnabled = !prefs.quiet && !quickParam && !(stage === 'despegue' && quick)
+  const { container, map, status: mapStatus, retry: retryMap } = useStudyMap(
+    mapEnabled, look, origin, prefs.globe ? 2.7 : 5.2, () => setFollowing(false),
+  )
+  const initialMap = useRef<typeof map>(null)
 
   // La barra de estado del iPad toma el color del mapa (no el gris claro de
   // la app) mientras dure el modo estudio; al salir se deja como estaba.
@@ -185,7 +180,7 @@ export default function StudyView() {
   useEffect(() => {
     if (active) {
       lastActive.current = active.id
-      if (stage !== 'vuelo' && stage !== 'despegue') setStage('vuelo')
+      if (stage !== 'vuelo') setStage('vuelo')
       return
     }
     const id = lastActive.current
@@ -201,9 +196,18 @@ export default function StudyView() {
     }
   }, [active, stage, landedId, data.sessions])
 
+  useEffect(() => {
+    if (!landingParam || active) return
+    const landed = data.sessions.find((s) => s.id === landingParam && s.status === 'aterrizado')
+    if (landed) {
+      setLandedId(landed.id)
+      setStage('aterrizado')
+    }
+  }, [landingParam, data.sessions, active])
+
   const flightFrom = sessionShown ? AIRPORT_BY_IATA.get(sessionShown.from) : undefined
   const flightTo = sessionShown ? AIRPORT_BY_IATA.get(sessionShown.to) : undefined
-  const now = useNow(stage === 'vuelo', 1000)
+  const now = useNow(stage === 'vuelo' && !!active && (!active.pausedAt || inLayover(active)), 1000)
   const prog = active ? flightProgress(active, now) : stage === 'aterrizado' ? 1 : 0
   const remaining = active ? flightRemaining(active, now) : 0
   const onLayover = !!active && inLayover(active)
@@ -238,8 +242,6 @@ export default function StudyView() {
   }, [stage, prefs.sound])
 
   // --- Cámara y contenido por etapa ---
-  const fitTimer = useRef<number | null>(null)
-
   const history = useMemo(() => {
     const out: Route2[] = []
     for (const s of data.sessions) {
@@ -252,8 +254,7 @@ export default function StudyView() {
   }, [data.sessions])
 
   useEffect(() => {
-    const map = mapRef.current
-    if (!map || !mapReady) return
+    if (!map) return
 
     if (stage === 'inicio') {
       map.setRange(null, 0)
@@ -263,7 +264,9 @@ export default function StudyView() {
       if (tab === 'resumen') {
         map.setHistory([])
         // Sobre la esfera, el planeta entero con tu ciudad: el punto de partida.
-        map.showPlace(origin, prefs.globe ? 2.7 : 5.2, panelPadding())
+        // Ya se creó con este encuadre. Evita pedir otro conjunto de teselas
+        // antes de mostrar el primero al abrir Estudio.
+        if (initialMap.current === map) map.showPlace(origin, prefs.globe ? 2.7 : 5.2, panelPadding())
       } else {
         map.setHistory(history)
         const points = history.flatMap((r) => [r.from, r.to])
@@ -284,10 +287,10 @@ export default function StudyView() {
         setMinutes(minutesFor(distanceKm(origin, airport)))
       })
       map.setRoute(origin, selected?.airport ?? null, 0, false)
-      if (fitTimer.current) window.clearTimeout(fitTimer.current)
-      fitTimer.current = window.setTimeout(() => {
+      const timer = window.setTimeout(() => {
         map.fitRange(origin, Math.max(kmFor(minutes), selected?.km ?? 0), panelPadding())
       }, 140)
+      return () => window.clearTimeout(timer)
     }
 
     if ((stage === 'asiento' || stage === 'tarjeta') && selected) {
@@ -296,12 +299,16 @@ export default function StudyView() {
       map.setRoute(origin, selected.airport, 0)
       map.fitRoute(origin, selected.airport, CENTER_PADDING)
     }
-  }, [stage, tab, mapReady, origin, minutes, candidates, selected, history, prefs.globe])
+  }, [stage, tab, map, origin, minutes, candidates, selected, history, prefs.globe])
+
+  useEffect(() => {
+    initialMap.current = map
+    tookOff.current = false
+  }, [map])
 
   // Vuelo: el avión avanza cada segundo; la cámara le sigue si se lo pides.
   useEffect(() => {
-    const map = mapRef.current
-    if (!map || !mapReady || !flightFrom || !flightTo) return
+    if (!map || !flightFrom || !flightTo) return
     if (stage !== 'vuelo' && stage !== 'aterrizado') return
     map.clearPins()
     map.setRange(null, 0)
@@ -309,22 +316,28 @@ export default function StudyView() {
     map.setRoute(flightFrom, flightTo, prog)
     const here = map.setPlane(flightFrom, flightTo, prog)
     if (!here) return
-    const zoom = Math.min(8, Math.max(4.2, map.routeZoom(flightFrom, flightTo, HUD_PADDING) + 1.4))
     if (stage === 'aterrizado') {
-      if (!tookOff.current) return
+      if (!tookOff.current) {
+        map.fitRoute(flightFrom, flightTo, HUD_PADDING, 0)
+        return
+      }
       tookOff.current = false
-      map.landing(flightTo, FlightMap.heading(flightFrom, flightTo, 0.99), { ...HUD_PADDING, bottom: 420 })
+      map.landing(flightTo, flightHeading(flightFrom, flightTo, 0.99), { ...HUD_PADDING, bottom: 420 })
       return
     }
     if (!tookOff.current) {
       tookOff.current = true
-      const heading = FlightMap.heading(flightFrom, flightTo, prog)
-      if (prog < 0.02) map.takeoff(here, zoom, heading)
-      else map.rejoin(here, heading, zoom, HUD_PADDING)
+      if (cinematicStart.current && prog < 0.02) {
+        const zoom = Math.min(8, Math.max(4.2, map.routeZoom(flightFrom, flightTo, HUD_PADDING) + 1.4))
+        map.takeoff(here, zoom, flightHeading(flightFrom, flightTo, prog))
+      } else map.fitRoute(flightFrom, flightTo, HUD_PADDING, 700)
+      cinematicStart.current = false
       return
     }
-    if (following) map.follow(here, FlightMap.heading(flightFrom, flightTo, prog))
-  }, [stage, mapReady, flightFrom, flightTo, prog, following])
+    if (following && !active?.pausedAt && !document.hidden) {
+      map.follow(here, flightHeading(flightFrom, flightTo, prog), undefined, 500)
+    }
+  }, [stage, map, flightFrom, flightTo, prog, following, active?.pausedAt])
 
   // Espacio pausa y reanuda el vuelo (iPad con teclado, ordenador).
   useEffect(() => {
@@ -346,16 +359,17 @@ export default function StudyView() {
 
   const leave = useCallback(() => navigate('inicio'), [navigate])
 
-  const startBooking = (preset?: number) => {
+  const startBooking = () => {
+    setQuick(false)
+    setExamId(undefined)
     setDestIata(null)
     setSeat(null)
     setPassId(newId('pase'))
-    if (preset) setMinutes(preset)
     setStage('reserva')
   }
 
   const random = () => {
-    const pool = destinationsFor(origin, AIRPORTS, minutes, 400).filter(
+    const pool = destinationsFor(origin, AIRPORTS, minutes, 400, true).filter(
       (d) => Math.abs(d.minutes - minutes) <= 25,
     )
     const pick = pool[Math.floor(Math.random() * pool.length)]
@@ -377,19 +391,15 @@ export default function StudyView() {
         : `${layoverCount} × ${plan.layoverMinutes} min`
 
   const takeoff = () => {
-    if (!selected || !seat) return
+    if (!selected || !seat || active) return
     // Dentro del toque: Safari no deja arrancar audio de otra forma.
-    beginFlightAudio(prefs, { ambient: false })
+    beginFlightAudio(prefs)
     chime('megafonia')
     haptic('success')
     setPrefs({ minutes: selected.minutes })
-    if (prefs.sound !== 'ninguno') {
-      const id = prefs.sound
-      // El ambiente entra cuando la megafonía ya ha dicho lo suyo.
-      window.setTimeout(() => playSound(id), 1600)
-    }
     tookOff.current = false
-    setFollowing(true)
+    cinematicStart.current = !quick
+    setFollowing(false)
     setLandedId(null)
     dispatch({
       type: 'session/start',
@@ -401,9 +411,12 @@ export default function StudyView() {
         seat: seat.seat,
         subjectId: seat.subjectId,
         taskId: seat.taskId,
+        examId,
         ...plan,
       },
     })
+    setQuick(false)
+    setExamId(undefined)
     setStage('vuelo')
   }
 
@@ -420,10 +433,10 @@ export default function StudyView() {
   const showFlight = (s: FocusSession) => {
     const from = AIRPORT_BY_IATA.get(s.from)
     const to = AIRPORT_BY_IATA.get(s.to)
-    if (!from || !to || !mapRef.current) return
+    if (!from || !to || !map) return
     haptic()
-    mapRef.current.setRoute(from, to, 1)
-    mapRef.current.fitRoute(from, to, panelPadding(), 900)
+    map.setRoute(from, to, 1)
+    map.fitRoute(from, to, panelPadding(), 900)
   }
 
   // --- Despegue rápido: `#/estudio?despegar=25` -----------------------------
@@ -431,47 +444,47 @@ export default function StudyView() {
   // del asistente («ponme 45 min de Mates con lluvia»). Deja el vuelo listo en
   // la pantalla de cabina: falta un toque, que además es el que Safari exige
   // para poder encender el sonido.
-  const [quick, setQuick] = useState(false)
-  const quickParam = route.params.get('despegar')
+  const quickSearch = route.params.toString()
   useEffect(() => {
-    if (!quickParam) return
-    const wantedSubject = route.params.get('asignatura')
-    const wantedTask = route.params.get('tarea')
-    const wantedSound = route.params.get('sonido')
+    const params = new URLSearchParams(quickSearch)
+    const duration = params.get('despegar')
+    if (!duration) return
     // El parámetro se consume: recargar no debe volver a preparar el vuelo.
-    navigate('estudio')
-    if (active) return
-    const wanted = Math.min(MAX_MINUTES, Math.max(MIN_MINUTES, Math.round(Number(quickParam))))
-    if (!Number.isFinite(wanted)) return
-    const pick = destinationsFor(origin, AIRPORTS, wanted)[0]
-    if (!pick) return
-    const subject = subjects.find((s) => s.id === wantedSubject)
-    const task = data.tasks.find((t) => t.id === wantedTask && t.status !== 'completada')
+    navigate('estudio', undefined, true)
+    const wanted = focusMinutes(Number(duration))
+    if (active || wanted === null) return
+    const exam = data.exams.find((e) => e.id === params.get('examen'))
+    const task = data.tasks.find((t) => t.id === params.get('tarea') && t.status !== 'completada')
+    const subject = subjects.find((s) => s.id === params.get('asignatura'))
+    const wantedSound = params.get('sonido')
     if (wantedSound === 'ninguno' || SOUNDS.some((x) => x.id === wantedSound)) {
       setPrefs({ sound: wantedSound as SoundId | 'ninguno' })
     }
-    setDestIata(pick.airport.iata)
-    setMinutes(pick.minutes)
+    setDestIata(null)
+    setMinutes(wanted)
     setPassId(newId('pase'))
     setLandedId(null)
+    setExamId(exam?.id)
     setSeat({
       // Ventanilla en la fila 7: el asiento de quien no quiere elegir.
       seat: '07A',
       cabin: 'Turista',
-      subjectId: subject?.id ?? task?.subjectId,
+      subjectId: exam?.subjectId ?? task?.subjectId ?? subject?.id,
       taskId: task?.id,
     })
     setQuick(true)
     setStage('despegue')
     // Solo reacciona al parámetro: el resto se lee en ese instante.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quickParam])
+  }, [quickSearch])
 
   const landedTask = sessionShown?.taskId
     ? data.tasks.find((t) => t.id === sessionShown.taskId)
     : undefined
   const activeTask = active?.taskId ? data.tasks.find((t) => t.id === active.taskId) : undefined
   const passTask = seat?.taskId ? data.tasks.find((t) => t.id === seat.taskId) : undefined
+  const quickExam = examId ? data.exams.find((e) => e.id === examId) : undefined
+  const flightExam = sessionShown?.examId ? data.exams.find((e) => e.id === sessionShown.examId) : undefined
   const isNewCity =
     !!sessionShown &&
     !data.sessions.some(
@@ -482,11 +495,35 @@ export default function StudyView() {
     stage === 'inicio' || stage === 'reserva' || stage === 'vuelo' || stage === 'aterrizado'
 
   return (
-    <div className="study-root fixed inset-0 z-[35] bg-canvas overflow-hidden text-ink">
+    <div
+      className="study-root fixed inset-0 z-[35] bg-canvas overflow-hidden text-ink"
+      data-stage={stage}
+      data-quiet={prefs.quiet ? 'true' : undefined}
+      data-cabin={inCabin ? 'true' : undefined}
+    >
       {/* El envoltorio fija el tamaño: MapLibre pone `position: relative` a
           su contenedor y, sin él, el mapa se quedaba con altura cero. */}
       <div className={`study-map absolute inset-0 ${active?.pausedAt ? 'is-paused' : ''}`}>
-        <div ref={container} className="size-full" aria-label="Mapa" role="region" />
+        <div className="study-map-placeholder" aria-hidden="true">
+          <Orbit className="size-12 stroke-[1.25]" />
+        </div>
+        <div
+          ref={container}
+          className="study-map-canvas size-full"
+          aria-label="Mapa interactivo"
+          role="region"
+          inert={!mapEnabled || mapStatus !== 'listo' || !showToolbar}
+        />
+        {mapEnabled && showToolbar && mapStatus !== 'listo' && (
+          <div className="study-map-status" role="status">
+            {mapStatus === 'cargando' ? 'Cargando cartografía…' : 'Mapa temporalmente no disponible'}
+            {mapStatus !== 'cargando' && (
+              <button type="button" className="font-semibold underline underline-offset-4" onClick={retryMap}>
+                Reintentar
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <AnimatePresence mode="wait">
@@ -501,6 +538,7 @@ export default function StudyView() {
               onTab={setTab}
               onExit={leave}
               onStart={startBooking}
+              onQuick={(duration) => navigate('estudio', { despegar: String(duration) })}
               onShowFlight={showFlight}
             />
           </SidePanel>
@@ -526,10 +564,9 @@ export default function StudyView() {
               onLayover={(patch) => setPrefs(patch)}
               onBack={() => setStage('inicio')}
               onBook={() => {
-                if (selected) {
-                  setDestIata(selected.airport.iata)
-                  setMinutes(selected.minutes)
-                }
+                if (!selected) return
+                setDestIata(selected.airport.iata)
+                setMinutes(selected.minutes)
                 setStage('asiento')
               }}
             />
@@ -579,21 +616,27 @@ export default function StudyView() {
             from={origin}
             to={selected.airport}
             minutes={selected.minutes}
-            onGo={() => {
-              setQuick(false)
-              takeoff()
-            }}
+            onGo={takeoff}
             onCancel={() => {
               // Un despegue rápido no pasó por la tarjeta: se vuelve al inicio.
               setStage(quick ? 'inicio' : 'tarjeta')
               setQuick(false)
+              setExamId(undefined)
             }}
             quick={
               quick && seat
                 ? {
                     subjects,
+                    tasks: data.tasks,
                     subjectId: seat.subjectId,
-                    onSubject: (id) => setSeat({ ...seat, subjectId: id, taskId: undefined }),
+                    taskId: seat.taskId,
+                    exam: quickExam,
+                    onMinutes: setMinutes,
+                    onSubject: (id) => {
+                      if (id !== seat.subjectId) setExamId(undefined)
+                      setSeat({ ...seat, subjectId: id, taskId: id === seat.subjectId ? seat.taskId : undefined })
+                    },
+                    onTask: (id) => setSeat({ ...seat, taskId: id }),
                   }
                 : undefined
             }
@@ -605,6 +648,8 @@ export default function StudyView() {
       <div data-theme={inCabin ? 'dark' : undefined} className="contents text-ink">
         {showToolbar && (
           <MapToolbar
+            mapVisible={!prefs.quiet}
+            onToggleMap={() => setPrefs({ quiet: !prefs.quiet })}
             map={prefs.map}
             labels={prefs.labels}
             sound={prefs.sound}
@@ -630,24 +675,23 @@ export default function StudyView() {
               if (stage === 'vuelo') beginFlightAudio({ ...prefs, lockCard: on })
             }}
             flight={
-              stage === 'vuelo' && flightFrom && flightTo
+              stage === 'vuelo' && mapStatus === 'listo' && map && flightFrom && flightTo
                 ? {
                     following,
                     onFollow: () => {
                       setFollowing(true)
-                      const map = mapRef.current
                       const here = map?.setPlane(flightFrom, flightTo, prog)
                       if (map && here) {
                         const zoom = Math.min(
                           8,
                           Math.max(4.2, map.routeZoom(flightFrom, flightTo, HUD_PADDING) + 1.4),
                         )
-                        map.rejoin(here, FlightMap.heading(flightFrom, flightTo, prog), zoom, HUD_PADDING)
+                        map.rejoin(here, flightHeading(flightFrom, flightTo, prog), zoom, HUD_PADDING)
                       }
                     },
                     onOverview: () => {
                       setFollowing(false)
-                      mapRef.current?.fitRoute(flightFrom, flightTo, HUD_PADDING, 900)
+                      map.fitRoute(flightFrom, flightTo, HUD_PADDING, 900)
                     },
                   }
                 : undefined
@@ -655,13 +699,12 @@ export default function StudyView() {
           />
         )}
 
-        {stage === 'vuelo' && active && flightFrom && flightTo && (
+        {stage === 'vuelo' && active && (
           <FlightHud
             session={active}
-            from={flightFrom}
-            to={flightTo}
             subject={active.subjectId ? subjectMap.get(active.subjectId) : undefined}
             task={activeTask}
+            exam={flightExam}
             layoverCity={layoverCity}
             layoverMarks={layoverMarks}
             breakMinutes={prefs.layover}
@@ -697,26 +740,28 @@ export default function StudyView() {
         </AnimatePresence>
 
         <AnimatePresence>
-          {stage === 'aterrizado' && sessionShown && flightTo && (
+        {stage === 'aterrizado' && sessionShown && (
             <LandedCard
               key="aterrizado"
               session={sessionShown}
-              to={flightTo}
+              city={flightTo?.city ?? sessionShown.to}
               subject={sessionShown.subjectId ? subjectMap.get(sessionShown.subjectId) : undefined}
               task={landedTask}
               isNewCity={isNewCity}
               onCompleteTask={() => {
                 if (landedTask && landedTask.status !== 'completada') {
                   haptic('success')
-                  dispatch({ type: 'task/toggle', id: landedTask.id })
+                  dispatch({ type: 'task/update', id: landedTask.id, patch: { status: 'completada' } })
                 }
               }}
               onAgain={() => {
                 setLandedId(null)
+                if (landingParam) navigate('estudio', undefined, true)
                 startBooking()
               }}
               onDone={() => {
                 setLandedId(null)
+                if (landingParam) navigate('estudio', undefined, true)
                 setStage('inicio')
               }}
             />

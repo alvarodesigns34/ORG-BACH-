@@ -6,16 +6,21 @@
  */
 
 import type { AppData } from '../domain/types.ts'
+import type { SyncMeta } from './merge.ts'
+
+export interface RemoteWrite {
+  data: AppData | null
+  meta: SyncMeta | null
+}
 
 export interface StoreBridge {
   getData(): AppData
   /**
    * Aplica un cambio que viene de fuera (servidor). `merge` recibe el estado
    * más reciente —con los cambios locales pendientes ya guardados— y devuelve
-   * el nuevo, o null si no hay nada que cambiar. No genera cambios locales:
-   * lo que llega del servidor no se vuelve a subir.
+   * el curso y los metadatos para guardarlos juntos, o null si no hay cambios.
    */
-  applyRemote(merge: (current: AppData) => AppData | null): boolean
+  applyRemote(merge: (current: AppData) => RemoteWrite | null): boolean
 }
 
 let current: StoreBridge | null = null

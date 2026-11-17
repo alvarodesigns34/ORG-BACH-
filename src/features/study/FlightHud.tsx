@@ -11,6 +11,8 @@ import {
   Wind,
   Coffee,
   Layers,
+  MapPin,
+  MapPinOff,
   LocateFixed,
   Pause,
   Plane,
@@ -23,9 +25,10 @@ import {
   X,
 } from 'lucide-react'
 
-import { formatFlightTime, type Airport } from '@/domain/flights'
+import { formatFlightTime } from '@/domain/flights'
 import { colorVar, quietVar } from '@/domain/palette'
-import type { FocusSession, Subject, Task } from '@/domain/types'
+import type { Exam, FocusSession, Subject, Task } from '@/domain/types'
+import { ConfirmDialog } from '@/ui/Modal'
 import { haptic, spring } from '@/ui/motion'
 import { Button, cx } from '@/ui/primitives'
 import type { MapKind } from './mapStyle'
@@ -34,7 +37,6 @@ import {
   SOUNDS,
   SOUND_CREDITS,
   loadingSound,
-  prefetchSounds,
   subscribeSound,
   type SoundId,
 } from './soundscape'
@@ -230,8 +232,6 @@ function SoundPanel({
   onLockCard: (on: boolean) => void
 }) {
   const loading = useSyncExternalStore(subscribeSound, loadingSound, () => null)
-  // Con el panel abierto se descargan todos: cambiar de ambiente es inmediato.
-  useEffect(() => prefetchSounds(), [])
   return (
     <>
       <p className="text-[0.9375rem] font-semibold mb-3">Sonido de fondo</p>
@@ -375,6 +375,8 @@ function SoundBars() {
 
 export function MapToolbar({
   map,
+  mapVisible,
+  onToggleMap,
   labels,
   globe,
   sound,
@@ -391,6 +393,8 @@ export function MapToolbar({
   flight,
 }: {
   map: MapKind
+  mapVisible: boolean
+  onToggleMap: () => void
   labels: boolean
   globe: boolean
   sound: SoundId | 'ninguno'
@@ -430,7 +434,7 @@ export function MapToolbar({
       initial={{ opacity: 0, x: 10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ ...spring.smooth, delay: 0.3 }}
-      className="absolute z-20 right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] flex items-start gap-3"
+      className="study-map-toolbar absolute z-20 right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] flex items-start gap-3"
     >
       <div className="relative">
         <AnimatePresence>
@@ -463,7 +467,7 @@ export function MapToolbar({
         </AnimatePresence>
       </div>
 
-      <div className="liquid rounded-full flex flex-col p-0.5">
+      <div className="study-map-buttons liquid rounded-full flex p-0.5">
         {flight && (
           <>
             <RoundButton label="Seguir al avión" onClick={flight.onFollow} active={flight.following}>
@@ -472,16 +476,25 @@ export function MapToolbar({
             <RoundButton label="Ver la ruta entera" onClick={flight.onOverview}>
               <Route className="size-[19px]" strokeWidth={2.2} />
             </RoundButton>
-            <span className="relative z-[2] mx-3 my-0.5 h-px bg-[var(--glass-edge)]" />
           </>
         )}
         <RoundButton
+          label={mapVisible ? 'Ocultar mapa y concentrarse' : 'Mostrar mapa'}
+          onClick={() => {
+            setOpen(null)
+            onToggleMap()
+          }}
+          active={!mapVisible}
+        >
+          {mapVisible ? <MapPin className="size-[19px]" /> : <MapPinOff className="size-[19px]" />}
+        </RoundButton>
+        {mapVisible && <RoundButton
           label="Estilo del mapa"
           expanded={open === 'mapa'}
           onClick={() => setOpen(open === 'mapa' ? null : 'mapa')}
         >
           <Layers className="size-[19px]" strokeWidth={2.2} />
-        </RoundButton>
+        </RoundButton>}
         <RoundButton
           label="Sonido"
           expanded={open === 'sonido'}
@@ -503,41 +516,19 @@ export function MapToolbar({
 // Vuelo
 // ---------------------------------------------------------------------------
 
-/** «1 h 05 min» con cifras grandes y unidades pequeñas; segundos al final. */
 function BigTime({ ms }: { ms: number }) {
   const total = Math.ceil(ms / 1000)
-  const unit = 'text-[1rem] font-semibold text-ink-3 ml-1'
-  if (total < 60) {
-    return (
-      <span className="numeral text-[2.5rem]">
-        {total}
-        <span className={unit}>s</span>
-      </span>
-    )
-  }
-  const minutes = Math.ceil(total / 60)
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  return (
-    <span className="numeral text-[2.5rem]">
-      {h > 0 && (
-        <>
-          {h}
-          <span className={cx(unit, 'mr-2.5')}>h</span>
-        </>
-      )}
-      {h > 0 ? String(m).padStart(2, '0') : m}
-      <span className={unit}>min</span>
-    </span>
-  )
+  const hours = Math.floor(total / 3600)
+  const minutes = String(Math.floor(total / 60) % 60).padStart(2, '0')
+  const seconds = String(total % 60).padStart(2, '0')
+  return <span className="study-clock numeral" role="timer">{hours ? `${hours}:` : ''}{minutes}:{seconds}</span>
 }
 
 export function FlightHud({
   session,
-  from,
-  to,
   subject,
   task,
+  exam,
   layoverCity,
   layoverMarks,
   breakMinutes,
@@ -550,10 +541,9 @@ export function FlightHud({
   onAbandon,
 }: {
   session: FocusSession
-  from: Airport
-  to: Airport
   subject?: Subject
   task?: Task
+  exam?: Exam
   layoverCity?: string
   /** Escalas programadas que quedan, como fracción del vuelo. */
   layoverMarks: number[]
@@ -569,6 +559,7 @@ export function FlightHud({
 }) {
   const paused = !!session.pausedAt
   const layoverPending = layoverMarks.length > 0
+  const [confirmAbandon, setConfirmAbandon] = useState(false)
 
   return (
     <>
@@ -590,13 +581,13 @@ export function FlightHud({
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ...spring.smooth, delay: 0.5 }}
-        className="absolute z-10 left-1/2 -translate-x-1/2 top-[max(1rem,env(safe-area-inset-top))] max-w-[calc(100vw-12rem)]"
+        className="study-flight-route absolute z-10"
       >
-        <div className="liquid rounded-full flex items-center gap-3 h-12 pl-5 pr-2">
+        <div className="liquid rounded-full flex items-center gap-2 h-12 pl-4 pr-2">
           <span className="relative z-[2] flex items-center gap-2 font-mono text-[0.9375rem] font-bold shrink-0">
-            {from.iata}
+            {session.from}
             <Plane className="size-3.5 rotate-45 text-ink-3" strokeWidth={2.4} />
-            {to.iata}
+            {session.to}
           </span>
           <span
             className="relative z-[2] inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[0.8125rem] font-semibold min-w-0"
@@ -607,7 +598,6 @@ export function FlightHud({
             }
           >
             <span className="truncate">{subject ? subject.name : 'Estudio libre'}</span>
-            {task && <span className="truncate font-medium opacity-80 max-w-[14rem]">· {task.title}</span>}
           </span>
         </div>
       </motion.div>
@@ -617,9 +607,9 @@ export function FlightHud({
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ...spring.smooth, delay: 0.6 }}
-        className="absolute z-10 left-1/2 -translate-x-1/2 bottom-[max(1.25rem,env(safe-area-inset-bottom))] w-[min(760px,calc(100vw-2rem))]"
+        className="study-flight-hud absolute z-10"
       >
-        <div className="liquid rounded-[30px] overflow-hidden">
+        <div className="study-flight-card rounded-[30px] overflow-hidden">
           <div className="relative z-[2] h-[3px] bg-[var(--glass-tint)]">
             <motion.div
               className="h-full bg-[#0a84ff]"
@@ -635,9 +625,9 @@ export function FlightHud({
               />
             ))}
           </div>
-          <div className="relative z-[2] grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-7 py-4">
-            <div>
-              <p className="text-[0.75rem] font-medium text-ink-3 mb-1.5">
+          <div className="study-flight-grid relative z-[2] grid items-center">
+            <div className="study-flight-clock">
+              <p className="text-sm font-medium text-ink-3 mb-1.5">
                 {session.layoverAt && session.pausedAt === session.layoverAt
                   ? 'En escala'
                   : paused
@@ -645,9 +635,10 @@ export function FlightHud({
                     : 'Tiempo restante'}
               </p>
               <BigTime ms={remainingMs} />
+              {(task || exam) && <p className="mt-1 text-sm text-ink-2 break-words">{task?.title ?? exam?.title}</p>}
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="study-flight-actions flex items-center justify-center gap-3">
               <button
                 type="button"
                 aria-label={paused ? 'Reanudar' : 'Pausar'}
@@ -670,16 +661,23 @@ export function FlightHud({
               >
                 <Coffee className="size-5" strokeWidth={2.2} />
               </button>
-              <HoldToAbandon onConfirm={onAbandon} />
+              <button
+                type="button"
+                aria-label="Abandonar vuelo"
+                onClick={() => setConfirmAbandon(true)}
+                className="pressable grid place-items-center size-12 rounded-full bg-[var(--glass-tint)] text-ink-2"
+              >
+                <X className="size-5" strokeWidth={2.4} />
+              </button>
             </div>
 
-            <div className="text-right">
+            <div className="study-flight-distance">
               <p className="text-[0.75rem] font-medium text-ink-3 mb-1.5">
                 {layoverPending && layoverCity
                   ? `${layoverMarks.length > 1 ? `${layoverMarks.length} escalas · ` : ''}próxima en ${layoverCity}`
                   : 'Distancia restante'}
               </p>
-              <span className="numeral text-[2.5rem]">
+              <span className="numeral text-[1.375rem]">
                 {Math.round(remainingKm).toLocaleString('es')}
                 <span className="text-[1rem] font-semibold text-ink-3 ml-1">km</span>
               </span>
@@ -687,82 +685,19 @@ export function FlightHud({
           </div>
         </div>
       </motion.div>
+      <ConfirmDialog
+        open={confirmAbandon}
+        onCancel={() => setConfirmAbandon(false)}
+        title="¿Terminar el vuelo antes de llegar?"
+        message="Se guardarán los minutos que ya hayas estudiado."
+        confirmLabel="Abandonar vuelo"
+        destructive
+        onConfirm={() => {
+          setConfirmAbandon(false)
+          onAbandon()
+        }}
+      />
     </>
-  )
-}
-
-/**
- * Abandonar exige mantener pulsado: un anillo se completa en 1,2 s. Soltar
- * antes no hace nada, así un toque sin querer no tira la sesión.
- */
-function HoldToAbandon({ onConfirm }: { onConfirm: () => void }) {
-  const [holding, setHolding] = useState(false)
-  const timer = useRef<number | null>(null)
-
-  const stop = () => {
-    setHolding(false)
-    if (timer.current) window.clearTimeout(timer.current)
-    timer.current = null
-  }
-  useEffect(() => stop, [])
-
-  return (
-    <div className="relative">
-      <AnimatePresence>
-        {holding && (
-          <motion.span
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 whitespace-nowrap text-[0.75rem] font-semibold text-danger"
-          >
-            Mantén para abandonar
-          </motion.span>
-        )}
-      </AnimatePresence>
-      <button
-        type="button"
-        aria-label="Mantén pulsado para abandonar el vuelo"
-        title="Mantén pulsado para abandonar"
-        onPointerDown={(e) => {
-          if (e.button !== 0) return
-          setHolding(true)
-          haptic()
-          timer.current = window.setTimeout(() => {
-            stop()
-            haptic('success')
-            onConfirm()
-          }, 1200)
-        }}
-        onPointerUp={stop}
-        onPointerLeave={stop}
-        onPointerCancel={stop}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && e.shiftKey) onConfirm()
-        }}
-        className="relative grid place-items-center size-12 rounded-full bg-[var(--glass-tint)] text-ink-2 touch-none select-none"
-      >
-        <svg viewBox="0 0 48 48" className="absolute inset-0 -rotate-90" aria-hidden>
-          <circle
-            cx="24"
-            cy="24"
-            r="22"
-            fill="none"
-            stroke="var(--c-danger)"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            pathLength={1}
-            strokeDasharray="1"
-            style={{
-              opacity: holding ? 1 : 0,
-              strokeDashoffset: holding ? 0 : 1,
-              transition: holding ? 'stroke-dashoffset 1.2s linear' : 'stroke-dashoffset 0.25s ease-out, opacity 0.2s',
-            }}
-          />
-        </svg>
-        <X className={cx('size-5 transition-colors', holding && 'text-danger')} strokeWidth={2.4} />
-      </button>
-    </div>
   )
 }
 
@@ -805,7 +740,7 @@ export function LayoverCard({
             {mm}:{ss}
           </p>
           <p className="text-[0.9375rem] text-ink-2 mt-2 leading-relaxed max-w-[18rem]">
-            Levántate, estira las piernas y bebe agua. El vuelo sigue solo al terminar, y te aviso aunque bloquees la pantalla.
+            Levántate, estira las piernas y bebe agua. El vuelo sigue solo al terminar, y puedes reanudar cuando quieras.
           </p>
           <Button className="mt-6" onClick={onResume}>
             Seguir volando ya
@@ -822,7 +757,7 @@ export function LayoverCard({
 
 export function LandedCard({
   session,
-  to,
+  city,
   subject,
   task,
   isNewCity,
@@ -831,7 +766,7 @@ export function LandedCard({
   onDone,
 }: {
   session: FocusSession
-  to: Airport
+  city: string
   subject?: Subject
   task?: Task
   isNewCity: boolean
@@ -873,13 +808,13 @@ export function LandedCard({
                 }}
               >
                 <span>
-                  <span className="block font-mono text-[0.875rem] font-black leading-none">{to.iata}</span>
+                  <span className="block font-mono text-[0.875rem] font-black leading-none">{session.to}</span>
                   <span className="block text-[0.5rem] font-bold uppercase tracking-wider mt-0.5">Nuevo sello</span>
                 </span>
               </motion.span>
             )}
           </div>
-          <h2 className="display text-[1.875rem] leading-tight mt-4">Bienvenido a {to.city}</h2>
+          <h2 className="display text-[1.875rem] leading-tight mt-4">Bienvenido a {city}</h2>
           <p className="text-[0.9375rem] text-ink-3 mt-1">Has aterrizado a las {landedAt}.</p>
 
           <div className="grid grid-cols-3 gap-2 mt-5">

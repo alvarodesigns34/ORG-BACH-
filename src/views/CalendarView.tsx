@@ -189,8 +189,8 @@ export function CalendarView() {
         }
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6">
-        <div className="lg:col-span-8">
+      <div className={cx('grid grid-cols-1 gap-5 md:gap-6', mode !== 'dia' && 'md:grid-cols-[minmax(0,1.65fr)_minmax(14rem,1fr)]')}>
+        <div className="min-w-0">
           {mode === 'mes' && (
             <MonthGrid
               cursor={cursor}
@@ -231,7 +231,7 @@ export function CalendarView() {
           )}
         </div>
 
-        <div className={cx('flex flex-col gap-6', mode === 'dia' ? 'lg:col-span-12' : 'lg:col-span-4')}>
+        <div className="min-w-0 flex flex-col gap-6">
           {mode !== 'dia' && (
             <DayPanel
               day={selected}

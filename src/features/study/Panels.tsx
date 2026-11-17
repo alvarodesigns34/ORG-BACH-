@@ -39,6 +39,7 @@ export function SidePanel({ children }: { children: ReactNode }) {
       exit={{ opacity: 0, x: -28, transition: { duration: 0.18 } }}
       transition={spring.smooth}
       className={cx(
+        'study-side-panel',
         'absolute z-10 left-[max(1rem,env(safe-area-inset-left))] top-[max(1rem,env(safe-area-inset-top))]',
         'bottom-[max(1rem,env(safe-area-inset-bottom))] w-[min(380px,calc(100vw-2rem))]',
       )}
@@ -94,6 +95,7 @@ export function HomePanel({
   onTab,
   onExit,
   onStart,
+  onQuick,
   onShowFlight,
 }: {
   origin: Airport
@@ -103,7 +105,8 @@ export function HomePanel({
   tab: HomeTab
   onTab: (tab: HomeTab) => void
   onExit: () => void
-  onStart: (minutes?: number) => void
+  onStart: () => void
+  onQuick: (minutes: number) => void
   onShowFlight: (session: FocusSession) => void
 }) {
   return (
@@ -125,7 +128,7 @@ export function HomePanel({
             { value: 'diario', label: 'Diario' },
             { value: 'pasaporte', label: 'Pasaporte' },
           ]}
-          className="flex-1 [&>button]:flex-1"
+          className="min-w-0 flex-1 [&>button]:flex-1"
         />
       </div>
 
@@ -139,7 +142,7 @@ export function HomePanel({
           className="flex-1 min-h-0 flex flex-col"
         >
           {tab === 'resumen' && (
-            <Summary origin={origin} sessions={sessions} subjects={subjects} today={today} onStart={onStart} />
+            <Summary origin={origin} sessions={sessions} subjects={subjects} today={today} onStart={onStart} onQuick={onQuick} />
           )}
           {tab === 'diario' && (
             <Logbook sessions={sessions} subjects={subjects} today={today} onShow={onShowFlight} />
@@ -157,12 +160,14 @@ function Summary({
   subjects,
   today,
   onStart,
+  onQuick,
 }: {
   origin: Airport
   sessions: FocusSession[]
   subjects: Map<string, Subject>
   today: string
-  onStart: (minutes?: number) => void
+  onStart: () => void
+  onQuick: (minutes: number) => void
 }) {
   const stats = useMemo(() => {
     const weekStart = new Date()
@@ -197,7 +202,7 @@ function Summary({
     <>
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar page-enter">
         <div className="px-6 pt-6">
-          <p className="text-[0.875rem] font-medium text-ink-3">Estás en</p>
+          <p className="eyebrow">Focus Flight</p>
           <h1 className="display text-[2.75rem] leading-[1.02] mt-0.5 tracking-[-0.03em]">{origin.city}</h1>
           <p className="mt-2 text-[0.875rem] text-ink-2 flex items-center gap-2">
             <span className="font-mono font-bold tracking-wide text-[0.8125rem] px-1.5 py-0.5 rounded-[6px] bg-[var(--glass-tint)]">
@@ -269,13 +274,13 @@ function Summary({
         )}
 
         <div className="px-4 mt-5 pb-4">
-          <p className="eyebrow px-2 mb-2">Despegue rápido</p>
+          <p className="eyebrow px-2 mb-2">Despegar ahora</p>
           <div className="grid grid-cols-4 gap-2">
             {QUICK.map((m) => (
               <button
                 key={m}
                 type="button"
-                onClick={() => onStart(m)}
+                onClick={() => onQuick(m)}
                 className="pressable h-14 rounded-[16px] bg-[var(--glass-tint)] hover:bg-[color-mix(in_srgb,var(--glass-tint)_100%,var(--c-ink)_4%)] flex flex-col items-center justify-center"
               >
                 <span className="numeral text-[1.0625rem]">{m < 60 ? m : m % 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}` : m / 60}</span>
@@ -283,19 +288,13 @@ function Summary({
               </button>
             ))}
           </div>
-          {!last && (
-            <p className="px-2 mt-4 text-[0.8125rem] text-ink-3 leading-relaxed">
-              Cada sesión es un vuelo a una ciudad real. El primero sale de Madrid; los siguientes,
-              de donde aterrices.
-            </p>
-          )}
         </div>
       </div>
 
       <div className="p-4 pt-2">
-        <Button variant="primary" size="lg" block onClick={() => onStart()}>
+        <Button variant="secondary" size="lg" block onClick={onStart}>
           <Plane className="size-[18px]" strokeWidth={2.4} />
-          Nuevo vuelo
+          Planear vuelo
         </Button>
       </div>
     </>

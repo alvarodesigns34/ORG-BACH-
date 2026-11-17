@@ -3,9 +3,10 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react
 import { useSettings, useStore } from '@/state/StoreProvider'
 import { StoreProvider } from '@/state/StoreProvider'
 import { useTaskSummary } from '@/state/selectors'
-import { useRoute, type Route, type RouteId } from '@/router'
+import { hrefFor, useRoute, type Route, type RouteId } from '@/router'
 import { AppShell, StorageBanner } from '@/layout/AppShell'
 import { BrandMark } from '@/layout/Brand'
+import { ErrorBoundary } from '@/ui/ErrorBoundary'
 import { TaskEditor } from '@/features/tasks/TaskEditor'
 import { ExamEditor } from '@/features/exams/ExamEditor'
 import { GradeEditor } from '@/features/grades/GradeEditor'
@@ -13,26 +14,32 @@ import { EventEditor } from '@/features/events/EventEditor'
 import { Onboarding } from '@/features/onboarding/Onboarding'
 import { DashboardView } from '@/views/DashboardView'
 import { TasksView } from '@/views/TasksView'
-import { CalendarView } from '@/views/CalendarView'
 import { SubjectsView } from '@/views/SubjectsView'
-import { SubjectDetailView } from '@/views/SubjectDetailView'
-import { GradesView } from '@/views/GradesView'
-import { ExamsView } from '@/views/ExamsView'
-import { StatsView } from '@/views/StatsView'
-import { GoalsView } from '@/views/GoalsView'
-import { SettingsView } from '@/views/SettingsView'
 
-// El modo estudio trae su propio mapa (MapLibre) y los aeropuertos: se
-// descarga solo al entrar, para que el resto de la app no cargue con él.
-const StudyView = lazy(() => import('@/views/StudyView'))
 import { Button } from '@/ui/primitives'
 import { LinkChoiceDialog, RecoveryDialog } from '@/features/account/Account'
 import { syncEngine } from '@/sync/engine'
 import { ToastProvider } from '@/ui/Toast'
 import { ChromeProvider, type CreateKind } from '@/layout/chrome'
-import { AssistantSheet } from '@/features/assistant/AssistantSheet'
 import { FlightController } from '@/features/study/FlightController'
 import { ShortcutsSheet, useKeyboardShortcuts } from '@/layout/shortcuts'
+
+const StudyView = lazy(() => import('@/views/StudyView'))
+const CalendarView = lazy(() => import('@/views/CalendarView').then((m) => ({ default: m.CalendarView })))
+
+const SubjectDetailView = lazy(() => import('@/views/SubjectDetailView').then((m) => ({ default: m.SubjectDetailView })))
+
+const GradesView = lazy(() => import('@/views/GradesView').then((m) => ({ default: m.GradesView })))
+
+const ExamsView = lazy(() => import('@/views/ExamsView').then((m) => ({ default: m.ExamsView })))
+
+const StatsView = lazy(() => import('@/views/StatsView').then((m) => ({ default: m.StatsView })))
+
+const GoalsView = lazy(() => import('@/views/GoalsView').then((m) => ({ default: m.GoalsView })))
+
+const SettingsView = lazy(() => import('@/views/SettingsView').then((m) => ({ default: m.SettingsView })))
+
+const AssistantSheet = lazy(() => import('@/features/assistant/AssistantSheet').then((m) => ({ default: m.AssistantSheet })))
 
 export function App() {
   return (
@@ -62,7 +69,11 @@ function Shell() {
 
   const openCreate = useCallback((kind: CreateKind = 'tarea') => setCreating(kind), [])
   const [assistantOpen, setAssistantOpen] = useState(false)
-  const openAssistant = useCallback(() => setAssistantOpen(true), [])
+  const [assistantLoaded, setAssistantLoaded] = useState(false)
+  const openAssistant = useCallback(() => {
+    setAssistantLoaded(true)
+    setAssistantOpen(true)
+  }, [])
   const hasSubjects = data.subjects.length > 0
   const chrome = useMemo(
     () => ({ openCreate, openAssistant, hasSubjects }),
@@ -88,7 +99,7 @@ function Shell() {
       setCreating(createParam as CreateKind)
     }
     const params = Object.fromEntries([...route.params].filter(([k]) => k !== 'crear'))
-    navigate(route.id, Object.keys(params).length ? params : undefined)
+    navigate(route.id, Object.keys(params).length ? params : undefined, true)
     // Solo reacciona al parámetro.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createParam])
@@ -141,7 +152,11 @@ function Shell() {
           restoreScroll={![...route.params.keys()].some((k) => k !== 'id')}
           badges={badges}
         >
-          {renderRoute(route, data.subjects.length)}
+          <ErrorBoundary fallback={<RouteFailure study={route.id === 'estudio'} />}>
+            <Suspense fallback={<RouteLoading study={route.id === 'estudio'} />}>
+              {renderRoute(route, data.subjects.length)}
+            </Suspense>
+          </ErrorBoundary>
         </AppShell>
       </ChromeProvider>
 
@@ -149,7 +164,18 @@ function Shell() {
       <ExamEditor open={creating === 'examen'} onClose={closeCreate} />
       <GradeEditor open={creating === 'nota'} onClose={closeCreate} />
       <EventEditor open={creating === 'evento'} onClose={closeCreate} />
-      <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} />
+      {assistantLoaded && (
+        <ErrorBoundary fallback={assistantOpen && (
+          <div className="fixed inset-x-4 bottom-24 z-[70] mx-auto max-w-sm rounded-3xl bg-surface p-5 shadow-xl" role="alert">
+            <p className="mb-3">El asistente no está disponible. Puedes seguir usando el curso.</p>
+            <Button onClick={() => { setAssistantOpen(false); setAssistantLoaded(false) }}>Cerrar</Button>
+          </div>
+        )}>
+          <Suspense fallback={assistantOpen && <AssistantLoading onClose={() => setAssistantOpen(false)} />}>
+            <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} />
+          </Suspense>
+        </ErrorBoundary>
+      )}
       {/* El vuelo sigue (escalas, aterrizaje, sonido, pantalla de bloqueo)
           aunque se salga del modo estudio. */}
       <FlightController />
@@ -167,11 +193,7 @@ function renderRoute(route: Route, subjectCount: number) {
     case 'calendario':
       return <CalendarView />
     case 'estudio':
-      return (
-        <Suspense fallback={<StudyLoading />}>
-          <StudyView />
-        </Suspense>
-      )
+      return <StudyView />
     case 'asignaturas': {
       const id = route.params.get('id')
       return id ? <SubjectDetailView subjectId={id} /> : <SubjectsView />
@@ -192,23 +214,32 @@ function renderRoute(route: Route, subjectCount: number) {
   }
 }
 
-/**
- * Mientras se descarga el modo estudio (mapa y aeropuertos), en lugar de
- * una pantalla vacía: el color del mapa y la marca latiendo.
- */
-function StudyLoading() {
+function RouteFailure({ study }: { study: boolean }) {
   return (
-    <div
-      role="status"
-      aria-label="Cargando el modo estudio"
-      className="fixed inset-0 z-[35] grid place-items-center bg-[#e6e3dc] dark:bg-[#2e3036]"
-    >
+    <div className="mx-auto max-w-lg px-6 py-24 text-center" role="alert">
+      <h1 className="display text-3xl">{study ? 'Estudio no pudo abrirse' : 'Esta vista no está disponible'}</h1>
+      <p className="my-4 text-ink-2">Tus datos siguen guardados en Órbita.</p>
+      <a className="font-semibold text-accent" href={hrefFor('inicio')}>Volver a Inicio</a>
+    </div>
+  )
+}
+
+function RouteLoading({ study }: { study: boolean }) {
+  return (
+    <div role="status" className="grid min-h-[48dvh] place-items-center px-6">
       <div className="flex flex-col items-center gap-4 animate-fade">
-        <span className="animate-[pulse-soft_1.6s_var(--ease-std)_infinite]">
-          <BrandMark size={64} />
-        </span>
-        <span className="text-[0.875rem] font-medium text-ink-3">Preparando el mapa…</span>
+        <BrandMark size={52} />
+        <span className="text-sm font-medium text-ink-2">{study ? 'Abriendo Estudio…' : 'Cargando vista…'}</span>
       </div>
+    </div>
+  )
+}
+
+function AssistantLoading({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-x-4 bottom-24 z-[70] mx-auto flex max-w-sm items-center justify-between gap-4 rounded-3xl bg-surface p-4 shadow-xl">
+      <span role="status" className="text-sm text-ink-2">Abriendo el asistente…</span>
+      <Button size="sm" onClick={onClose}>Cerrar</Button>
     </div>
   )
 }

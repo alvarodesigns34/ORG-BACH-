@@ -11,8 +11,8 @@
   background:
     linear-gradient(180deg, rgb(255 255 255 / 0.5), transparent 40%),
     color-mix(in srgb, var(--c-surface) 90%, transparent);
-  -webkit-backdrop-filter: blur(36px) saturate(170%);
-  backdrop-filter: blur(36px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(135%);
+  backdrop-filter: blur(20px) saturate(135%);
   box-shadow:
     inset 0 0 0 0.5px rgb(0 0 0 / 0.08),
     inset 0 1px 0 rgb(255 255 255 / 0.9),
@@ -38,8 +38,8 @@
      tarjeta de embarque, el panel) se recorta contra el mapa. Con el velo
      claro de antes, todo era un mismo blanco. */
   background: rgb(44 44 52 / 0.34);
-  -webkit-backdrop-filter: blur(16px) saturate(110%);
-  backdrop-filter: blur(16px) saturate(110%);
+  -webkit-backdrop-filter: blur(10px) saturate(110%);
+  backdrop-filter: blur(10px) saturate(110%);
 }
 [data-theme='dark'] .study-veil {
   background: rgb(0 0 0 / 0.45);
@@ -470,5 +470,229 @@
   }
   to {
     height: 100%;
+  }
+}
+
+/* La cabina y los controles se pueden usar mientras llega el mapa. */
+.study-root {
+  --study-sky: #dce7f3;
+  --study-halo: #f4f8ff;
+  --study-orbit: #42699b;
+}
+[data-theme='dark'] .study-root,
+.study-root[data-cabin='true'] {
+  --study-sky: #07101e;
+  --study-halo: #15395a;
+  --study-orbit: #92b6ec;
+}
+.study-map-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--study-orbit);
+  background:
+    radial-gradient(ellipse at 66% 28%, var(--study-halo), transparent 63%),
+    var(--study-sky);
+}
+.study-map-placeholder::before {
+  content: '';
+  position: absolute;
+  width: min(54vw, 720px);
+  aspect-ratio: 1;
+  border: 1px solid color-mix(in srgb, var(--study-orbit) 18%, transparent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 24px color-mix(in srgb, var(--study-orbit) 5%, transparent);
+  transform: rotate(-21deg) scaleY(.48);
+}
+.study-map-canvas {
+  position: relative;
+  opacity: 0;
+  transition: opacity 240ms ease-out;
+}
+.study-map-status {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: .5rem .75rem;
+  width: max-content;
+  max-width: calc(100% - 2rem);
+  padding: .48rem .85rem;
+  border-radius: 1rem;
+  background: var(--c-surface);
+  color: var(--c-ink-2);
+  font-size: .8125rem;
+  text-align: center;
+}
+.study-root[data-stage='vuelo'] .study-map-status {
+  bottom: auto;
+  top: 22%;
+}
+.study-root[data-quiet='true'] .study-map-placeholder svg {
+  opacity: .25;
+}
+.study-root:not([data-stage='vuelo']) .study-map-buttons {
+  flex-direction: column;
+}
+.study-flight-route {
+  left: 50%;
+  top: max(1rem, env(safe-area-inset-top));
+  width: max-content;
+  max-width: calc(100vw - 22rem);
+  translate: -50% 0;
+}
+.study-flight-hud {
+  left: 50%;
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  width: min(720px, calc(100vw - 2rem));
+  translate: -50% 0;
+}
+.study-flight-card {
+  background: var(--c-surface);
+  border: 1px solid color-mix(in srgb, var(--c-ink) 12%, transparent);
+  box-shadow: 0 18px 56px rgb(0 0 0 / .24);
+}
+.study-clock {
+  font-size: clamp(2.75rem, 8vw, 4rem);
+  line-height: 1;
+  letter-spacing: -.065em;
+}
+.study-flight-grid {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+}
+.study-flight-distance {
+  text-align: right;
+}
+.study-seat-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 420px) minmax(0, 360px);
+  justify-content: center;
+  align-items: center;
+  gap: clamp(.75rem, 3vw, 2.5rem);
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+}
+.study-seat-layout .plane-scroll {
+  height: 100%;
+  min-height: 0;
+}
+.study-seat-map {
+  padding: 1rem clamp(.5rem, 4vw, 2.5rem) 3rem;
+}
+.study-seat-form {
+  max-height: calc(100dvh - 2rem);
+}
+.study-pass-layout {
+  justify-content: safe center;
+  padding: max(4.5rem, calc(env(safe-area-inset-top) + 3.25rem))
+    max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+}
+.study-takeoff {
+  padding-block: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-bottom));
+  background: radial-gradient(ellipse at 50% 15%, #122845, #070c16 68%);
+  color-scheme: dark;
+}
+.study-quick-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: .5rem;
+  align-items: center;
+  min-height: 48px;
+  padding: .25rem .75rem;
+  border: 1px solid rgb(255 255 255 / .13);
+  border-radius: 14px;
+  background: rgb(255 255 255 / .06);
+  color: #d8e4f4;
+  font-size: .875rem;
+}
+.study-quick-field > :is(input, select) {
+  min-width: 0;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 .25rem;
+  color: #fff;
+  font-size: 1rem;
+}
+.study-quick-field option { background: #111c2c; }
+
+@media (max-width: 719px) {
+  .study-root { --study-map-height: clamp(11rem, 33dvh, 19rem); }
+  .study-root:is([data-stage='inicio'], [data-stage='reserva']) .study-map {
+    bottom: auto;
+    height: var(--study-map-height);
+  }
+  .study-root .study-side-panel {
+    left: max(.5rem, env(safe-area-inset-left));
+    right: max(.5rem, env(safe-area-inset-right));
+    top: calc(var(--study-map-height) - .75rem);
+    bottom: max(.5rem, env(safe-area-inset-bottom));
+    width: auto;
+  }
+  .study-root:not([data-stage='vuelo']) .study-map-buttons { flex-direction: row; }
+  .study-flight-route {
+    left: max(1rem, env(safe-area-inset-left));
+    top: calc(max(1rem, env(safe-area-inset-top)) + 3.5rem);
+    max-width: calc(100vw - 2rem);
+    translate: none;
+  }
+  .study-flight-grid {
+    grid-template-columns: 1fr;
+    text-align: center;
+    gap: .8rem;
+    padding: 1rem;
+  }
+  .study-flight-distance {
+    text-align: center;
+  }
+  .study-flight-distance > * {
+    display: inline;
+    margin-inline: .22rem;
+  }
+  .study-seat-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(8rem, 1fr) auto;
+    align-items: stretch;
+    gap: .65rem;
+    overflow-y: auto;
+  }
+  .study-seat-form {
+    max-height: min(27rem, 57dvh);
+    overflow-y: auto;
+  }
+  .study-seat-map {
+    width: min(100%, 23rem);
+    margin: auto;
+    padding: .4rem 0 1.5rem;
+  }
+}
+
+@media (max-width: 719px) and (max-height: 540px) {
+  .study-root { --study-map-height: 8.75rem; }
+  .study-flight-grid {
+    grid-template-columns: minmax(0, 1fr) auto;
+    text-align: left;
+  }
+  .study-flight-distance { display: none; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .study-root .liquid,
+  .study-root [data-theme='dark'] .liquid {
+    background: var(--c-surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .study-veil {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }

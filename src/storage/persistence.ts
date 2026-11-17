@@ -14,6 +14,8 @@
 import { createEmptyData, SCHEMA_VERSION, STORAGE_KEY } from '../data/defaults.ts'
 import { DEFAULT_SETTINGS } from '../data/defaults.ts'
 import type { AppData } from '../domain/types.ts'
+import type { SyncMeta } from '../sync/merge.ts'
+import { encodeCourse } from './syncEnvelope.ts'
 import {
   parseActivity,
   parseSession,
@@ -259,9 +261,9 @@ export function load(): LoadOutcome {
   }
 }
 
-export function save(data: AppData): { ok: true } | { ok: false; error: string } {
+export function save(data: AppData, syncMeta?: SyncMeta | null): { ok: true } | { ok: false; error: string } {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    localStorage.setItem(STORAGE_KEY, encodeCourse(data, syncMeta))
     return { ok: true }
   } catch (error) {
     const quota =

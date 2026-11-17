@@ -10,6 +10,7 @@
  */
 
 import type { FeatureCollection } from 'geojson'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import {
   Map as MapLibreMap,
   Marker,
@@ -25,7 +26,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 
 setWorkerUrl(workerUrl)
 
-import { buildStyle, type MapLookOptions } from './mapStyle'
+import { buildStyle, MAP_LABEL_LAYERS, type MapLookOptions } from './mapStyle'
 import {
   arc,
   bearing,
@@ -37,6 +38,7 @@ import {
 } from '@/domain/flights'
 
 export type { MapLookOptions }
+export type MapStatus = 'cargando' | 'listo' | 'sin_cartografia' | 'no_disponible'
 
 /** Colores de lo que se dibuja encima, según el mapa de debajo. */
 function inkFor(look: MapLookOptions) {
@@ -90,7 +92,10 @@ export class FlightMap {
   readonly map: MapLibreMap
   private look: MapLookOptions
   private ready = false
-  private queue: (() => void)[] = []
+  private loadTimeout = 0
+  private revealFrame = 0
+  private hasTiles = false
+  private routeKey = ''
 
   // Lo dibujado, para volver a ponerlo si cambia el estilo.
   private range: [number, number][] | null = null
@@ -107,18 +112,23 @@ export class FlightMap {
   /** El usuario ha movido el mapa a mano: deja de seguir al avión. */
   onUserMove: (() => void) | null = null
 
-  constructor(container: HTMLElement, look: MapLookOptions, center: LatLon) {
+  constructor(
+    container: HTMLElement,
+    look: MapLookOptions,
+    center: LatLon,
+    zoom: number,
+    private onStatus: (status: MapStatus) => void,
+  ) {
     this.look = look
     container.classList.toggle('is-globe', look.globe)
     // El mapa aparece con un fundido cuando ya tiene teselas, no como un
     // lienzo gris que se va rellenando a trozos.
     container.style.opacity = '0'
-    container.style.transition = 'opacity 700ms cubic-bezier(0.2, 0, 0, 1)'
     this.map = new MapLibreMap({
       container,
       style: buildStyle(look),
       center: ll(center),
-      zoom: 4.6,
+      zoom,
       attributionControl: { compact: true },
       // Estudio, no navegación: sin girar ni inclinar con dos dedos.
       dragRotate: false,
@@ -130,19 +140,33 @@ export class FlightMap {
     this.map.touchZoomRotate.disableRotation()
     // Para inspeccionar la cámara desde las pruebas del navegador.
     if (import.meta.env.DEV) (window as unknown as { __flightMap?: FlightMap }).__flightMap = this
-    const reveal = () => {
-      container.style.opacity = '1'
-    }
-    this.map.once('load', reveal)
-    // Sin red, las teselas no llegan: a los 2,5 s se muestra igualmente.
-    window.setTimeout(reveal, 2500)
     this.map.on('style.load', () => {
       this.addLayers()
       this.ready = true
-      const pending = this.queue
-      this.queue = []
-      for (const run of pending) run()
     })
+    this.map.on('sourcedata', (event) => {
+      if (this.hasTiles || event.sourceDataType !== 'content' || !event.tile?.hasData?.()) return
+      if (event.source.type !== 'vector' && event.source.type !== 'raster') return
+      this.hasTiles = true
+      window.clearTimeout(this.loadTimeout)
+      this.revealFrame = window.requestAnimationFrame(() => {
+        container.style.opacity = '1'
+        this.onStatus('listo')
+      })
+    })
+    this.map.on('error', () => {
+      // Una tesela puede fallar sin invalidar las demás. El plazo permite
+      // que llegue el resto antes de mostrar el estado de conexión.
+      if (!navigator.onLine && !this.hasTiles) this.onStatus('sin_cartografia')
+    })
+    this.map.on('webglcontextlost', () => {
+      this.hasTiles = false
+      window.cancelAnimationFrame(this.revealFrame)
+      container.style.opacity = '0'
+      this.onStatus('no_disponible')
+    })
+    this.map.on('webglcontextrestored', () => this.waitForTiles())
+    this.waitForTiles()
     for (const event of ['dragstart', 'wheel', 'touchstart'] as const) {
       this.map.on(event, (e: unknown) => {
         if ((e as { originalEvent?: Event }).originalEvent) this.onUserMove?.()
@@ -151,7 +175,17 @@ export class FlightMap {
   }
 
   destroy(): void {
+    window.clearTimeout(this.loadTimeout)
+    window.cancelAnimationFrame(this.revealFrame)
     this.map.remove()
+  }
+
+  private waitForTiles(): void {
+    window.clearTimeout(this.loadTimeout)
+    this.onStatus(navigator.onLine ? 'cargando' : 'sin_cartografia')
+    this.loadTimeout = window.setTimeout(() => {
+      if (!this.hasTiles) this.onStatus('sin_cartografia')
+    }, 5000)
   }
 
   resize(): void {
@@ -160,18 +194,23 @@ export class FlightMap {
 
   setLook(look: MapLookOptions): void {
     if (sameLook(look, this.look)) return
+    if (sameLook({ ...look, labels: this.look.labels }, this.look) && this.ready) {
+      for (const id of MAP_LABEL_LAYERS) {
+        this.map.setLayoutProperty(id, 'visibility', look.labels ? 'visible' : 'none')
+      }
+      this.look = look
+      return
+    }
     const flat = !look.globe && this.look.globe
     this.look = look
     this.ready = false
+    this.hasTiles = false
+    window.cancelAnimationFrame(this.revealFrame)
+    this.waitForTiles()
     this.map.getContainer().classList.toggle('is-globe', look.globe)
     this.map.setStyle(buildStyle(look), { diff: false })
     // En plano no se inclina la cámara: se endereza si venía de la esfera.
     if (flat) this.map.jumpTo({ pitch: 0, bearing: 0 })
-  }
-
-  private whenReady(run: () => void) {
-    if (this.ready) run()
-    else this.queue.push(run)
   }
 
   private addLayers() {
@@ -243,8 +282,9 @@ export class FlightMap {
 
   /** Todas las rutas voladas, finas, para el diario y el pasaporte. */
   setHistory(routes: { from: LatLon; to: LatLon }[]): void {
+    if (routes.length === 0 && this.history.length === 0) return
     this.history = routes.map((r) => arc(r.from, r.to, 0, 1, 48))
-    this.whenReady(() => this.source('history')?.setData(this.historyData()))
+    if (this.ready) this.source('history')?.setData(this.historyData())
   }
 
   /** Encuadra un conjunto de puntos (el pasaporte entero). */
@@ -303,8 +343,9 @@ export class FlightMap {
   }
 
   setRange(origin: LatLon | null, km: number): void {
+    if (!origin && !this.range) return
     this.range = origin && km > 0 ? circle(origin, km) : null
-    this.whenReady(() => this.source('range')?.setData(this.rangeData()))
+    if (this.ready) this.source('range')?.setData(this.rangeData())
   }
 
   /** Destinos posibles como cápsulas con el código del aeropuerto. */
@@ -340,7 +381,9 @@ export class FlightMap {
       }
       const el = marker.getElement()
       const isSelected = d.airport.iata === selected
-      el.querySelector('.fm-pin')?.classList.toggle('is-selected', isSelected)
+      const pin = el.querySelector('.fm-pin')
+      pin?.classList.toggle('is-selected', isSelected)
+      pin?.setAttribute('aria-pressed', String(isSelected))
       el.style.zIndex = isSelected ? '3' : '1'
       const city = el.querySelector('.fm-pin-city')
       if (city) city.textContent = isSelected ? d.airport.city : ''
@@ -357,6 +400,10 @@ export class FlightMap {
    * `progress` = 0, toda discontinua.
    */
   setRoute(origin: LatLon | null, dest: Airport | null, progress = 0, label = true): void {
+    const fraction = Math.floor(Math.min(1, Math.max(0, progress)) * 200) / 200
+    const key = origin && dest ? `${origin.lon}:${origin.lat}:${dest.iata}:${fraction}:${label}` : ''
+    if (key === this.routeKey) return
+    this.routeKey = key
     if (!label) {
       this.destMarker?.remove()
       this.destMarker = null
@@ -367,7 +414,7 @@ export class FlightMap {
       this.destMarker?.remove()
       this.destMarker = null
     } else {
-      const p = Math.min(1, Math.max(0, progress))
+      const p = fraction
       this.routeDone = p > 0 ? arc(origin, dest, 0, p) : []
       this.routeTodo = p < 1 ? arc(origin, dest, p, 1) : []
       if (!label) {
@@ -385,10 +432,10 @@ export class FlightMap {
         this.destMarker.getElement().textContent = dest.iata
       }
     }
-    this.whenReady(() => {
+    if (this.ready) {
       this.source('route-done')?.setData(this.lineData(this.routeDone))
       this.source('route-todo')?.setData(this.lineData(this.routeTodo))
-    })
+    }
   }
 
   /** El avión en la fracción `progress` de la ruta, apuntando hacia donde va. */
@@ -467,12 +514,6 @@ export class FlightMap {
     })
     if (!camera) return
     this.move({ ...camera, ...FlightMap.LEVEL, duration }, duration > 1000)
-  }
-
-  /** Rumbo del avión en `progress`, para que la cámara mire hacia donde va. */
-  static heading(origin: LatLon, dest: LatLon, progress: number): number {
-    const p = Math.min(0.995, Math.max(0, progress))
-    return bearing(interpolate(origin, dest, p), interpolate(origin, dest, p + 0.005))
   }
 
   /**

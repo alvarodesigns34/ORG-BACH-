@@ -552,19 +552,6 @@ export function playSound(id: SoundId): void {
   else start(c, id, (out) => playStreaming(c, id, out))
 }
 
-/**
- * Descarga (sin decodificar) los ambientes para que cambiar de uno a otro
- * sea instantáneo: quedan en la caché del navegador / Service Worker.
- */
-export function prefetchSounds(): void {
-  for (const s of SOUNDS) {
-    if (s.id === 'marron' || fetched.has(s.id)) continue
-    fetched.add(s.id)
-    void fetch(soundUrl(s.id)).then((r) => r.blob()).catch(() => fetched.delete(s.id))
-  }
-}
-const fetched = new Set<SoundId>()
-
 function fadeOutCurrent() {
   if (!ctx || !current) return
   const { gain: g, stop } = current

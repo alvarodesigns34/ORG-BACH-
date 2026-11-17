@@ -15,6 +15,8 @@ import {
   Mic,
   Minus,
   NotebookPen,
+  Orbit,
+  PlaneTakeoff,
   Plus,
   SlidersHorizontal,
   Sparkles,
@@ -33,6 +35,7 @@ import {
   toDay,
 } from '@/domain/dates'
 import { formatGrade, numeralTone } from '@/domain/grades'
+import { activeSession, focusMinutes } from '@/domain/flights'
 import { colorVar, quietVar } from '@/domain/palette'
 import { classesOn, dayStatus, formatMinutes } from '@/domain/schedule'
 import { gradeTimeline } from '@/domain/stats'
@@ -44,7 +47,7 @@ import {
   type Subject,
   type Task,
 } from '@/domain/types'
-import { hrefFor } from '@/router'
+import { hrefFor, studyHref } from '@/router'
 import { useDispatch, useSettings, useStore, useToday } from '@/state/StoreProvider'
 import {
   useAlerts,
@@ -147,6 +150,7 @@ function useClock(): Date {
  */
 export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
   const settings = useSettings()
+  const { data } = useStore()
   const dispatch = useDispatch()
   const today = useToday()
   const { openAssistant } = useChrome()
@@ -208,6 +212,9 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
 
   const firstName = settings.userName.split(' ')[0]
   const nextExam = exams.find((e) => e.date >= today)
+  const nextTask = summary.today[0]
+  const flying = activeSession(data.sessions)
+  const suggestedMinutes = focusMinutes(nextTask?.estimatedMinutes ?? 25) ?? 25
 
   // Una frase que resume el día, bajo el saludo.
   const brief = useMemo(() => {
@@ -272,23 +279,26 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
         compactTitle="Inicio"
       />
 
-      {/* --- Asistente: lo primero a mano, como la barra de Spotlight --- */}
-      <button
-        type="button"
-        onClick={openAssistant}
-        disabled={editing}
-        className="pressable liquid w-full flex items-center gap-3 pl-5 pr-2 h-14 mb-4 text-left rounded-full disabled:opacity-50"
-      >
-        <span className="relative z-[2] flex-1 text-[1rem] text-ink-3 truncate">
-          Pregúntame o dime qué apuntar…
-        </span>
-        <span className="relative z-[2] grid place-items-center size-10 rounded-full bg-accent-fill text-white shrink-0 shadow-[inset_0_1px_0_rgb(255_255_255/0.3),0_4px_12px_rgb(0_113_227/0.35)]">
-          <Mic className="size-5" strokeWidth={2.3} />
-        </span>
-      </button>
-
       {/* --- Vuelo en curso del modo estudio --- */}
       <FlightBanner />
+
+      {!flying && !editing && (
+        <section className="home-focus mb-4" aria-labelledby="inicio-estudio">
+          <div aria-hidden="true" className="home-focus-art"><Orbit /></div>
+          <div className="relative min-w-0">
+            <p className="home-focus-label">Focus Flight</p>
+            <h2 id="inicio-estudio" className="display text-[1.6rem] leading-tight sm:text-[2rem]">Tu próximo bloque</h2>
+            <p className="home-focus-detail break-words">{nextTask?.title ?? (nextExam ? `Preparar ${nextExam.title}` : 'Estudio libre')}</p>
+          </div>
+          <a
+            href={studyHref({ minutes: suggestedMinutes, taskId: nextTask?.id, examId: nextTask ? undefined : nextExam?.id })}
+            className="home-focus-action pressable relative inline-flex items-center justify-center gap-2"
+          >
+            <PlaneTakeoff className="size-4" aria-hidden="true" />
+            Estudiar {suggestedMinutes} min
+          </a>
+        </section>
+      )}
 
       {/* --- Recordatorio de copia, solo sin cuenta y de tarde en tarde --- */}
       <BackupNudge />
@@ -324,7 +334,11 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
         </p>
       )}
 
-      <div className="flex justify-center mt-7">
+      <div className="flex flex-wrap justify-center gap-2 mt-7">
+        {!editing && <Button size="sm" onClick={openAssistant}>
+          <Mic className="size-3.5" aria-hidden="true" />
+          Asistente
+        </Button>}
         <Button
           size="sm"
           onClick={() => {

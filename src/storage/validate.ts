@@ -262,7 +262,7 @@ export function parseGoal(raw: unknown): Goal | null {
   return {
     id: raw.id,
     title: isText(raw.title) && raw.title.trim() ? raw.title : 'Objetivo',
-    kind: oneOf('media', 'tareas', 'manual')(raw.kind) ? raw.kind : 'manual',
+    kind: oneOf('media', 'tareas', 'estudio', 'manual')(raw.kind) ? raw.kind : 'manual',
     scope: oneOf('diario', 'semanal', 'trimestral', 'anual')(raw.scope) ? raw.scope : 'semanal',
     target: raw.target,
     manualProgress: optNum(raw.manualProgress),
@@ -412,6 +412,7 @@ export function parseSession(raw: unknown): FocusSession | null {
     seat: isText(raw.seat) && raw.seat.length <= 4 ? raw.seat : '01A',
     subjectId: optId(raw.subjectId),
     taskId: optId(raw.taskId),
+    examId: optId(raw.examId),
     status,
     startedAt: raw.startedAt,
     pausedMs: isNum(raw.pausedMs) && raw.pausedMs >= 0 ? raw.pausedMs : 0,

@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ChevronLeft, Plane, PlaneTakeoff } from 'lucide-react'
 
-import { barcode, formatFlightTime, type Airport } from '@/domain/flights'
-import { colorVar, quietVar } from '@/domain/palette'
-import type { Subject, Task } from '@/domain/types'
+import { barcode, focusMinutes, formatFlightTime, MAX_MINUTES, MIN_MINUTES, type Airport } from '@/domain/flights'
+import { colorVar } from '@/domain/palette'
+import type { Exam, Subject, Task } from '@/domain/types'
 import { haptic, spring } from '@/ui/motion'
 import { Button, IconButton } from '@/ui/primitives'
 
@@ -44,12 +44,14 @@ export function BoardingPass({
   onBoard: () => void
 }) {
   const [torn, setTorn] = useState(false)
+  const boardingTimer = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(boardingTimer.current), [])
 
   const board = () => {
     if (torn) return
     setTorn(true)
     haptic('success')
-    window.setTimeout(onBoard, reduced() ? 0 : 900)
+    boardingTimer.current = window.setTimeout(onBoard, reduced() ? 0 : 700)
   }
 
   const date = new Date().toLocaleDateString('es', { day: '2-digit', month: 'short' })
@@ -59,7 +61,7 @@ export function BoardingPass({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: 0.25 } }}
-      className="study-veil absolute inset-0 z-20 flex flex-col items-center justify-center gap-6"
+      className="study-veil study-pass-layout absolute inset-0 z-20 flex flex-col items-center gap-4 overflow-y-auto overscroll-contain"
     >
       <div className="absolute left-[max(1rem,env(safe-area-inset-left))] top-[max(1rem,env(safe-area-inset-top))]">
         <IconButton label="Cambiar asiento" onClick={onBack} className="liquid" disabled={torn}>
@@ -71,7 +73,7 @@ export function BoardingPass({
         initial={{ y: 140, opacity: 0, rotate: -2 }}
         animate={{ y: 0, opacity: 1, rotate: 0 }}
         transition={spring.smooth}
-        className="w-[380px] drop-shadow-[0_30px_60px_rgb(0_0_0/0.25)]"
+        className="w-[min(380px,100%)] shrink-0 drop-shadow-[0_20px_40px_rgb(0_0_0/0.22)]"
       >
         {/* Cuerpo */}
         <div className="pass-body relative rounded-t-[26px] bg-surface overflow-hidden">
@@ -170,7 +172,7 @@ export function BoardingPass({
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: torn ? 0 : 1, y: 0 }}
         transition={{ ...spring.smooth, delay: torn ? 0 : 0.18 }}
-        className="w-[380px]"
+        className="w-[min(380px,100%)] shrink-0"
       >
         <Button variant="primary" size="lg" block onClick={board} disabled={torn}>
           <PlaneTakeoff className="size-[18px]" strokeWidth={2.3} />
@@ -232,36 +234,40 @@ export function Takeoff({
    */
   quick?: {
     subjects: Subject[]
+    tasks: Task[]
     subjectId?: string
+    taskId?: string
+    exam?: Exam
+    onMinutes: (minutes: number) => void
     onSubject: (id: string | undefined) => void
+    onTask: (id: string | undefined) => void
   }
 }) {
+  const pending = quick?.tasks.filter((task) => task.status !== 'completada' && task.subjectId === quick.subjectId)
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: 0.7 } }}
-      className="absolute inset-0 z-30 grid place-items-center bg-[#050608]/92 backdrop-blur-xl text-white"
+      className="study-takeoff absolute inset-0 z-30 grid place-items-center overflow-y-auto overscroll-contain text-white"
     >
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ ...spring.smooth, delay: 0.2 }}
-        className="flex flex-col items-center text-center px-6"
+        className="flex w-full max-w-[440px] flex-col items-center text-center px-6"
       >
-        <p className="flex items-center gap-3 font-mono text-[0.9375rem] font-bold tracking-[0.2em] text-white/55">
+        <p className="flex items-center gap-3 font-mono text-[0.9375rem] font-bold tracking-[0.2em] text-white/65">
           {from.iata}
           <Plane className="size-3.5 rotate-45" strokeWidth={2.4} />
           {to.iata}
         </p>
         {quick && (
-          <p className="mt-2 text-[0.9375rem] text-white/55">
-            {to.city} · {formatFlightTime(minutes)}
-          </p>
+          <p className="mt-2 text-[0.9375rem] text-white/65">{to.city}</p>
         )}
 
         {/* Luces de pista que se encienden hacia delante. */}
-        <div aria-hidden className="flex gap-3 mt-10 mb-10">
+        <div aria-hidden className="flex gap-3 my-7">
           {Array.from({ length: 11 }, (_, i) => (
             <span
               key={i}
@@ -271,52 +277,53 @@ export function Takeoff({
           ))}
         </div>
 
-        <p className="text-[1.75rem] font-semibold leading-snug tracking-[-0.02em]">
-          Puertas cerradas.
-          <br />
-          <span className="text-white/60">Listos para despegar.</span>
-        </p>
+        <h1 className="display text-[1.9rem] leading-tight">{quick ? 'Despegar ahora' : 'Listos para despegar'}</h1>
 
-        {quick && quick.subjects.length > 0 && (
-          <div
-            role="radiogroup"
-            aria-label="Qué vas a estudiar"
-            data-theme="dark"
-            className="mt-8 flex flex-wrap justify-center gap-1.5 max-w-[34rem]"
-          >
-            {[undefined, ...quick.subjects].map((subject) => {
-              const active = quick.subjectId === subject?.id
-              return (
-                <button
-                  key={subject?.id ?? 'libre'}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => {
-                    haptic()
-                    quick.onSubject(subject?.id)
-                  }}
-                  className="pressable h-9 px-3.5 rounded-full text-[0.8125rem] font-semibold transition-colors"
-                  style={
-                    active
-                      ? subject
-                        ? { background: quietVar(subject.color), color: colorVar(subject.color) }
-                        : { background: '#fff', color: '#000' }
-                      : { background: 'rgb(255 255 255 / 0.1)', color: 'rgb(255 255 255 / 0.7)' }
-                  }
-                >
-                  {subject ? subject.shortName || subject.name : 'Estudio libre'}
-                </button>
-              )
-            })}
+        {quick && (
+          <div className="study-quick-fields mt-5 grid w-full gap-3 text-left">
+            {quick.exam && <p className="text-sm text-[#a9cafa]">Preparar {quick.exam.title}</p>}
+            <label className="study-quick-field">
+              <span>Minutos de concentración</span>
+              <input
+                key={minutes}
+                type="number"
+                inputMode="numeric"
+                min={MIN_MINUTES}
+                max={MAX_MINUTES}
+                defaultValue={minutes}
+                onBlur={(event) => {
+                  const value = focusMinutes(event.currentTarget.valueAsNumber) ?? minutes
+                  event.currentTarget.value = String(value)
+                  quick.onMinutes(value)
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') event.currentTarget.blur()
+                }}
+              />
+            </label>
+            <label className="study-quick-field">
+              <span>Asignatura</span>
+              <select value={quick.subjectId ?? ''} onChange={(event) => quick.onSubject(event.target.value || undefined)}>
+                <option value="">Estudio libre</option>
+                {quick.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}
+              </select>
+            </label>
+            {!!pending?.length && (
+              <label className="study-quick-field">
+                <span>Tarea</span>
+                <select value={quick.taskId ?? ''} onChange={(event) => quick.onTask(event.target.value || undefined)}>
+                  <option value="">Sin tarea vinculada</option>
+                  {pending.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}
+                </select>
+              </label>
+            )}
           </div>
         )}
 
         <button
           type="button"
           onClick={onGo}
-          autoFocus
-          className="pressable mt-10 h-14 px-12 rounded-full bg-white text-black text-[1.0625rem] font-semibold shadow-[0_10px_40px_rgb(255_255_255/0.15)]"
+          className="pressable mt-6 w-full min-h-14 px-6 rounded-full bg-white text-black text-[1.0625rem] font-semibold shadow-[0_10px_40px_rgb(255_255_255/0.15)]"
         >
           Despegar
         </button>

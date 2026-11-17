@@ -136,7 +136,10 @@ export function SnapshotsSheet({ open, onClose }: { open: boolean; onClose: () =
     // Lo de ahora también se guarda, por si la restauración era un error.
     await saveSnapshot(data, 'antes-restaurar')
     // Pasa por el mismo validador que una importación.
-    replaceAndSave(migrateWithReport(snap).data)
+    if (!replaceAndSave(migrateWithReport(snap).data)) {
+      toast({ text: 'La copia no se pudo guardar. Tu curso actual sigue abierto.' })
+      return
+    }
     onClose()
     toast({ text: `Restaurada la copia del ${when(meta.at)}` })
   }

@@ -32,7 +32,7 @@ import { DigestSection } from '@/features/notifications/DigestCard'
 import { useSync } from '@/sync/useSync'
 import { SnapshotsSheet } from '@/features/backup/Backups'
 import { exportBackup } from '@/storage/backup'
-import { saveSnapshot } from '@/storage/snapshots'
+import { listSnapshots, saveSnapshot } from '@/storage/snapshots'
 import { ListGroup, ListRow, RowInput, RowNumber, RowSelect, RowSwitch } from '@/ui/list'
 import { ConfirmDialog } from '@/ui/Modal'
 import { cx } from '@/ui/primitives'
@@ -78,6 +78,15 @@ export function SettingsView({ section }: { section?: string | null }) {
     if (await exportBackup(data)) setNotice({ tone: 'ok', text: 'Copia guardada correctamente.' })
   }
   const [snapshotsOpen, setSnapshotsOpen] = useState(false)
+  const [lastSnapshot, setLastSnapshot] = useState<number>()
+  useEffect(() => {
+    if (snapshotsOpen) return
+    let cancelled = false
+    void listSnapshots().then(([snapshot]) => {
+      if (!cancelled) setLastSnapshot(snapshot?.at)
+    })
+    return () => { cancelled = true }
+  }, [snapshotsOpen])
 
   // --- Importar ---
   // Se lee y se valida el archivo, pero NO se aplica todavía: importar borra
@@ -86,20 +95,24 @@ export function SettingsView({ section }: { section?: string | null }) {
   // además decir cuántas asignaturas y notas van a entrar, que es lo que
   // permite darse cuenta de que uno se ha equivocado de copia.
   const importFile = async (file: File) => {
-    const text = await file.text()
-    const result = storage.importJSON(text)
-    if (!result.ok) {
-      setNotice({ tone: 'danger', text: result.error })
-      return
+    try {
+      const result = storage.importJSON(await file.text())
+      if (!result.ok) setNotice({ tone: 'danger', text: result.error })
+      else setPendingImport(result)
+    } catch {
+      setNotice({ tone: 'danger', text: 'No se pudo leer el archivo. Selecciona otra copia o vuelve a intentarlo.' })
     }
-    setPendingImport(result)
   }
 
   const applyImport = async () => {
     if (!pendingImport) return
     // Lo de ahora se guarda como copia automática: importar se puede deshacer.
     await saveSnapshot(data, 'antes-importar')
-    replaceAndSave(pendingImport.data)
+    if (!replaceAndSave(pendingImport.data)) {
+      setPendingImport(null)
+      setNotice({ tone: 'danger', text: 'La copia no se pudo guardar. Tu curso actual sigue abierto.' })
+      return
+    }
     setNotice(
       pendingImport.warning
         ? { tone: 'warn', text: `Datos importados. ${pendingImport.warning}` }
@@ -306,7 +319,9 @@ export function SettingsView({ section }: { section?: string | null }) {
             icon={History}
             tint="#30b158"
             label="Copias automáticas"
-            detail="Una al día, y antes de importar o borrar"
+            detail={lastSnapshot
+              ? `Última copia: ${new Date(lastSnapshot).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })}`
+              : 'Una al día, y antes de importar o borrar'}
             onClick={() => setSnapshotsOpen(true)}
           />
           <ListRow
@@ -365,8 +380,9 @@ export function SettingsView({ section }: { section?: string | null }) {
           setConfirmReset(false)
           // Por si era un error: queda en «Copias automáticas».
           await saveSnapshot(data, 'antes-borrar')
-          storage.resetAll()
-          replaceAndSave(createEmptyData())
+          if (!replaceAndSave(createEmptyData())) {
+            setNotice({ tone: 'danger', text: 'No se pudo iniciar un curso vacío. Tus datos siguen abiertos.' })
+          }
         }}
         title="Borrar todos los datos"
         message={

@@ -8,6 +8,7 @@ import { IconButton, cx } from '@/ui/primitives'
 import { TopBar, useScrolledPast, type BackLink } from './chrome'
 import { MobileNav } from './MobileNav'
 import { Sidebar } from './Sidebar'
+import { NAV_ITEMS } from './navigation'
 
 interface AppShellProps {
   current: RouteId
@@ -114,19 +115,40 @@ export function AppShell({
   children,
 }: AppShellProps) {
   useScrollMemory(screenKey, restoreScroll)
+  const main = useRef<HTMLElement>(null)
+  const immersive = current === 'estudio'
+  useEffect(() => {
+    const title = NAV_ITEMS.find(({ id }) => id === current)?.label
+    document.title = current === 'inicio' || !title ? 'Órbita' : `${title} · Órbita`
+  }, [current])
+  useLayoutEffect(() => {
+    if (immersive || document.activeElement === document.body) main.current?.focus({ preventScroll: true })
+  }, [screenKey, immersive])
   return (
     <div className="relative isolate min-h-dvh">
+      <a
+        href="#contenido"
+        className="skip-link"
+        onClick={(event) => {
+          event.preventDefault()
+          main.current?.focus()
+        }}
+      >
+        Saltar al contenido
+      </a>
       {/* Luz ambiente con el color del contexto: lo que refracta el cristal. */}
       <div aria-hidden className="ambient" />
-      <Sidebar current={current} badges={badges} />
+      <div inert={immersive}><Sidebar current={current} badges={badges} /></div>
 
       <div className="min-w-0 flex flex-col min-h-dvh lg:pl-[calc(272px+0.75rem+max(0.75rem,env(safe-area-inset-left)))]">
-        <StorageBanner />
+        <div inert={immersive}><StorageBanner /></div>
 
         <main
           id="contenido"
+          ref={main}
+          tabIndex={-1}
           className={cx(
-            'flex-1 min-w-0',
+            'flex-1 min-w-0 outline-none',
             'pt-[env(safe-area-inset-top)] lg:pt-0',
             // Hueco inferior para que la barra flotante no tape nada.
             'pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-16',
@@ -138,7 +160,7 @@ export function AppShell({
         </main>
       </div>
 
-      <MobileNav current={current} badges={badges} />
+      <div inert={immersive}><MobileNav current={current} badges={badges} /></div>
     </div>
   )
 }

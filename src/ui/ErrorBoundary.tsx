@@ -5,6 +5,7 @@ import { Button } from './primitives'
 
 interface Props {
   children: ReactNode
+  fallback?: ReactNode
 }
 
 interface State {
@@ -43,6 +44,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (!this.state.error) return this.props.children
+    if (this.props.fallback !== undefined) return this.props.fallback
 
     return (
       <div className="min-h-dvh grid place-items-center px-6 bg-canvas text-ink pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
@@ -52,8 +54,7 @@ export class ErrorBoundary extends Component<Props, State> {
             La pantalla se ha caído. Tus datos siguen en el navegador.
           </h1>
           <p className="text-[0.875rem] text-ink-2 leading-relaxed">
-            Exporta una copia antes de recargar. Si el error se repite, empieza de cero desde
-            Ajustes después de guardar esa copia.
+            Puedes recargar para volver a intentarlo o descargar una copia de tu curso.
           </p>
           <p className="text-[0.75rem] text-ink-3 font-mono break-all">
             {this.state.error.message}

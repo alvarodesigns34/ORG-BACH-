@@ -1,15 +1,13 @@
 /**
  * Relojes y cola de pendientes de la sincronización, en `localStorage`.
  *
- * Viven aparte del curso (`bachillerato-os:v1`) para no tocar su formato: la
- * copia exportable sigue siendo exactamente la de siempre.
- *
- * Toda lectura/escritura es síncrona y se hace en el mismo turno que el
- * guardado del curso, así que no hay ventana en la que uno quede escrito y
- * el otro no.
+ * El curso guarda sus relojes al cambiar. Las confirmaciones del servidor
+ * se guardan aparte, vinculadas a la revisión exacta que se confirmó.
  */
 
 import type { AppData } from '../domain/types.ts'
+import { STORAGE_KEY } from '../data/defaults.ts'
+import { courseRevision, decodeSyncMeta } from '../storage/syncEnvelope.ts'
 import { newNodeId } from './hlc.ts'
 import { stampLocalChanges, type SyncMeta } from './merge.ts'
 
@@ -21,11 +19,7 @@ export const LOCAL_CHANGE_EVENT = 'bachillerato-os:local-change'
 
 export function loadMeta(): SyncMeta | null {
   try {
-    const raw = localStorage.getItem(META_KEY)
-    if (!raw) return null
-    const meta = JSON.parse(raw) as SyncMeta
-    if (meta?.v !== 1 || typeof meta.userId !== 'string' || !meta.records) return null
-    return meta
+    return decodeSyncMeta(localStorage.getItem(STORAGE_KEY), localStorage.getItem(META_KEY))
   } catch {
     return null
   }
@@ -33,7 +27,9 @@ export function loadMeta(): SyncMeta | null {
 
 export function saveMeta(meta: SyncMeta | null): boolean {
   try {
-    if (meta) localStorage.setItem(META_KEY, JSON.stringify(meta))
+    const revision = courseRevision(localStorage.getItem(STORAGE_KEY))
+    if (revision) localStorage.setItem(META_KEY, JSON.stringify({ revision, meta }))
+    else if (meta) localStorage.setItem(META_KEY, JSON.stringify(meta))
     else localStorage.removeItem(META_KEY)
     return true
   } catch {
@@ -58,13 +54,13 @@ export function nodeId(): string {
  * Registra un cambio local ya guardado. Sin cuenta vinculada no hace nada:
  * quien no usa la sincronización no paga ningún coste.
  */
-export function trackLocalChange(prev: AppData, next: AppData): void {
+export function metaForLocalChange(prev: AppData, next: AppData): SyncMeta | null {
   const meta = loadMeta()
-  if (!meta) return
-  const stamped = stampLocalChanges(meta, prev, next)
-  if (stamped === meta) return
-  saveMeta(stamped)
-  if (stamped.dirty.length > 0 && typeof window !== 'undefined') {
+  return meta ? stampLocalChanges(meta, prev, next) : null
+}
+
+export function notifyLocalChange(meta: SyncMeta | null): void {
+  if (meta?.dirty.length && typeof window !== 'undefined') {
     window.dispatchEvent(new Event(LOCAL_CHANGE_EVENT))
   }
 }

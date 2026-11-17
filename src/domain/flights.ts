@@ -153,6 +153,12 @@ export const KM_PER_MINUTE = 10
 export const MIN_MINUTES = 15
 export const MAX_MINUTES = 240
 
+export function focusMinutes(value: number): number | null {
+  return Number.isFinite(value)
+    ? Math.min(MAX_MINUTES, Math.max(MIN_MINUTES, Math.round(value)))
+    : null
+}
+
 export function minutesFor(km: number): number {
   return Math.max(1, Math.round(km / KM_PER_MINUTE))
 }
@@ -184,13 +190,16 @@ export function destinationsFor(
   airports: Airport[],
   minutes: number,
   limit = 40,
+  bookable = false,
 ): Destination[] {
   const all: Destination[] = []
   for (const airport of airports) {
     if (airport.iata === origin.iata) continue
     const km = distanceKm(origin, airport)
     if (km < 60) continue
-    all.push({ airport, km, minutes: minutesFor(km) })
+    const duration = minutesFor(km)
+    if (bookable && (duration < MIN_MINUTES || duration > MAX_MINUTES)) continue
+    all.push({ airport, km, minutes: duration })
   }
 
   // Al final, sin límite: lo más cercano al tiempo pedido, aunque quede lejos
@@ -245,7 +254,27 @@ export function remainingMs(session: FocusSession, now: number): number {
 
 /** El vuelo en el aire ahora mismo, si lo hay (uno como mucho). */
 export function activeSession(sessions: FocusSession[]): FocusSession | undefined {
-  return sessions.find((s) => s.status === 'en_vuelo')
+  let first: FocusSession | undefined
+  for (const session of sessions) {
+    if (session.status !== 'en_vuelo') continue
+    const order = first ? Date.parse(session.startedAt) - Date.parse(first.startedAt) : -1
+    if (!first || order < 0 || (order === 0 && session.id < first.id)) first = session
+  }
+  return first
+}
+
+/** Conserva todos los registros sin contar dos veces intervalos solapados. */
+export function reconcileActiveFlights(sessions: FocusSession[]): FocusSession[] {
+  const winner = activeSession(sessions)
+  if (!winner || !sessions.some((s) => s !== winner && s.status === 'en_vuelo')) return sessions
+  return sessions.map((s) => s === winner || s.status !== 'en_vuelo' ? s : {
+    ...s,
+    status: 'cancelado',
+    endedAt: s.startedAt,
+    focusedMinutes: 0,
+    pausedAt: undefined,
+    layoverEndsAt: undefined,
+  })
 }
 
 /** Minutos realmente estudiados en una sesión cerrada. */

@@ -21,6 +21,7 @@ import type { ExpressionSpecification, StyleSpecification } from 'maplibre-gl'
 
 export type MapKind = 'minimal' | 'relieve' | 'satelite'
 export type MapTone = 'light' | 'dark'
+export const MAP_LABEL_LAYERS = ['mar', 'ciudad', 'pais'] as const
 
 export interface MapLookOptions {
   kind: MapKind
@@ -193,10 +194,11 @@ export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): Style
     },
   })
 
-  if (labels) {
+  {
     const text = onImagery ? '#ffffff' : p.label
     const strong = onImagery ? '#ffffff' : p.labelStrong
     const halo = onImagery ? 'rgba(0,0,0,0.55)' : p.halo
+    const visibility = labels ? 'visible' : 'none'
     layers.push(
       {
         id: 'mar',
@@ -205,6 +207,7 @@ export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): Style
         'source-layer': 'water_name',
         filter: ['==', ['geometry-type'], 'Point'],
         layout: {
+          visibility,
           'text-field': NAME,
           'text-font': ['Noto Sans Italic'],
           'text-size': ['interpolate', ['linear'], ['zoom'], 2, 10, 6, 13],
@@ -230,6 +233,7 @@ export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): Style
           ['all', ['==', ['get', 'class'], 'town'], ['>=', ['zoom'], 8]],
         ],
         layout: {
+          visibility,
           'text-field': NAME,
           'text-font': ['Noto Sans Regular'],
           'text-size': ['interpolate', ['linear'], ['zoom'], 3, 10, 6, 12, 10, 15],
@@ -246,6 +250,7 @@ export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): Style
         maxzoom: 8,
         filter: ['==', ['get', 'class'], 'country'],
         layout: {
+          visibility,
           'text-field': NAME,
           'text-font': ['Noto Sans Bold'],
           'text-size': ['interpolate', ['linear'], ['zoom'], 2, 10, 5, 14],

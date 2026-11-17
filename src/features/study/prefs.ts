@@ -19,6 +19,8 @@ export interface StudyPrefs {
   labels: boolean
   /** Mapa como esfera (3D) o plano (2D). */
   globe: boolean
+  /** Oculta el mapa y libera el renderizador al concentrarse. */
+  quiet: boolean
   sound: SoundId | 'ninguno'
   volume: number
   keepAwake: boolean
@@ -41,6 +43,7 @@ const DEFAULTS: StudyPrefs = {
   map: 'minimal',
   labels: true,
   globe: true,
+  quiet: false,
   sound: 'cabina',
   volume: 0.7,
   keepAwake: true,

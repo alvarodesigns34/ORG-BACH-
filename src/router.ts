@@ -50,6 +50,20 @@ export function hrefFor(id: RouteId, params?: Record<string, string>): string {
   return `#/${id}${query ? `?${query}` : ''}`
 }
 
+export function studyHref({ minutes = 25, subjectId, taskId, examId }: {
+  minutes?: number
+  subjectId?: string
+  taskId?: string
+  examId?: string
+} = {}): string {
+  return hrefFor('estudio', {
+    despegar: String(minutes),
+    ...(subjectId ? { asignatura: subjectId } : {}),
+    ...(taskId ? { tarea: taskId } : {}),
+    ...(examId ? { examen: examId } : {}),
+  })
+}
+
 export function useRoute() {
   const [hash, setHash] = useState(() => window.location.hash)
 
@@ -61,8 +75,13 @@ export function useRoute() {
 
   const route = useMemo(() => parse(hash), [hash])
 
-  const navigate = useCallback((id: RouteId, params?: Record<string, string>) => {
-    window.location.hash = hrefFor(id, params).slice(1)
+  const navigate = useCallback((id: RouteId, params?: Record<string, string>, replace = false) => {
+    const hash = hrefFor(id, params)
+    if (hash === window.location.hash) return
+    if (replace) {
+      window.history.replaceState(window.history.state, '', hash)
+      window.dispatchEvent(new Event('hashchange'))
+    } else window.location.hash = hash
   }, [])
 
   return { route, navigate }

@@ -61,7 +61,10 @@ export function DurationRuler({
     const el = scroller.current
     if (!el || !ready.current || value === emitted.current) return
     emitted.current = value
-    el.scrollTo({ top: (value - min) * PX, behavior: 'smooth' })
+    // Un preset o destino cambia el valor de una vez. Un desplazamiento
+    // animado emitiría de vuelta valores intermedios como si fueran del dedo.
+    el.scrollTop = (value - min) * PX
+    lastTick.current = Math.floor(value / 5)
   }, [value, min])
 
   const onScroll = () => {
@@ -105,12 +108,15 @@ export function DurationRuler({
         aria-valuetext={label(value)}
         onKeyDown={(event) => {
           const step = event.shiftKey ? 15 : 5
-          if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+          if (event.key === 'ArrowUp' || event.key === 'ArrowRight') {
             event.preventDefault()
             onChange(Math.min(max, value + step))
-          } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+          } else if (event.key === 'ArrowDown' || event.key === 'ArrowLeft') {
             event.preventDefault()
             onChange(Math.max(min, value - step))
+          } else if (event.key === 'Home' || event.key === 'End') {
+            event.preventDefault()
+            onChange(event.key === 'Home' ? min : max)
           }
         }}
         className="ruler h-full overflow-y-auto no-scrollbar overscroll-contain rounded-[14px] outline-none"

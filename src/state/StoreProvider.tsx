@@ -16,7 +16,7 @@ import type { AppData, DateISO, ThemePreference } from '@/domain/types'
 import * as storage from '@/storage/persistence'
 import { dailySnapshot, requestPersistence } from '@/storage/snapshots'
 import { registerStore } from '@/sync/bridge'
-import { trackLocalChange } from '@/sync/metaStore'
+import { metaForLocalChange, notifyLocalChange, saveMeta } from '@/sync/metaStore'
 import { reducer, type Action } from './reducer'
 
 /**
@@ -46,7 +46,7 @@ interface StoreValue {
   /** Descarta la copia ilegible y deja seguir con el alta. */
   acknowledgeCorruptStorage: () => void
   /** Sustituye el curso y lo escribe YA, sin el debounce de 350 ms. */
-  replaceAndSave: (data: AppData) => void
+  replaceAndSave: (data: AppData) => boolean
 }
 
 const StoreContext = createContext<StoreValue | null>(null)
@@ -100,17 +100,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   latest.current = data
 
   const persist = useCallback((snapshot: AppData): boolean => {
-    const result = storage.save(snapshot)
+    const meta = metaForLocalChange(lastPersisted.current, snapshot)
+    const result = storage.save(snapshot, meta)
     if (result.ok) {
-      // Con cuenta vinculada, lo que ha cambiado desde el último guardado se
-      // anota para subirlo. Va DESPUÉS de escribir el curso: si el guardado
-      // falla, el siguiente intento vuelve a comparar desde el mismo punto.
-      trackLocalChange(lastPersisted.current, snapshot)
       lastPersisted.current = snapshot
       if (snapshotTimer.current) clearTimeout(snapshotTimer.current)
       snapshotTimer.current = setTimeout(() => void dailySnapshot(latest.current), 4000)
       pendingWrite.current = false
       setStorageNotice(null)
+      notifyLocalChange(meta)
       return true
     }
     // El fallo no borra el pendiente: hay que reintentar al ocultar la
@@ -215,20 +213,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const replaceAndSave = useCallback(
     (next: AppData) => {
-      writesFrozen.current = false
+      const wasFrozen = writesFrozen.current
       if (timer.current) {
         clearTimeout(timer.current)
         timer.current = null
       }
+      if (!persist(next)) {
+        writesFrozen.current = wasFrozen
+        pendingWrite.current = latest.current !== lastPersisted.current
+        return false
+      }
+      writesFrozen.current = false
+      latest.current = next
       dispatch({ type: 'data/replace', data: next })
-      persist(next)
+      return true
     },
     [persist],
   )
 
   // --- Sincronización ---------------------------------------------------
   // El motor pide el estado y entrega lo que llega del servidor. Lo remoto se
-  // escribe sin pasar por `trackLocalChange`: no es un cambio de este
+  // escribe sin marcarlo como edición local: no es un cambio de este
   // dispositivo y no hay que volver a subirlo.
   useEffect(() => {
     registerStore({
@@ -244,13 +249,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           }
           if (!persist(latest.current)) return false
         }
-        const next = merge(latest.current)
-        if (!next || next === latest.current) return true
-        const result = storage.save(next)
-        if (!result.ok) setStorageNotice({ level: 'error', text: result.error })
+        const update = merge(latest.current)
+        if (!update) return true
+        const { data: next, meta } = update
+        if (!next || next === latest.current) return saveMeta(meta)
+        const result = storage.save(next, meta)
+        if (!result.ok) {
+          setStorageNotice({ level: 'error', text: result.error })
+          return false
+        }
         lastPersisted.current = next
         latest.current = next
         dispatch({ type: 'data/replace', data: next })
+        setStorageNotice(null)
         return true
       },
     })

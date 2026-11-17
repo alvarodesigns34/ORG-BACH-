@@ -268,6 +268,7 @@ export function useGoalsProgress(): { goal: Goal; progress: GoalProgress }[] {
   return useMemo(() => {
     const context: GoalContext = {
       tasks: data.tasks,
+      sessions: data.sessions,
       subjects: data.subjects,
       results,
       globalAverage: average,
@@ -288,6 +289,7 @@ export function useGoalsProgress(): { goal: Goal; progress: GoalProgress }[] {
       .map((goal) => ({ goal, progress: goalProgress(goal, context) }))
   }, [
     data.tasks,
+    data.sessions,
     data.subjects,
     data.goals,
     results,

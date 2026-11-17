@@ -17,6 +17,7 @@ import {
   distanceKm,
   elapsedMs,
   formatFlightTime,
+  focusMinutes,
   inLayover,
   interpolate,
   landingAt,
@@ -31,6 +32,7 @@ import {
   minutesFor,
   progress,
   remainingMs,
+  reconcileActiveFlights,
   type AirportRow,
 } from '../src/domain/flights.ts'
 import { reducer } from '../src/state/reducer.ts'
@@ -58,6 +60,29 @@ function session(overrides: Partial<FocusSession> = {}): FocusSession {
 }
 
 const at = (iso: string) => Date.parse(iso)
+
+describe('inicio rápido y vuelos concurrentes', () => {
+  it('mantiene la duración exacta dentro del rango y rechaza valores inválidos', () => {
+    assert.equal(focusMinutes(45), 45)
+    assert.equal(focusMinutes(50), 50)
+    assert.equal(focusMinutes(5), 15)
+    assert.equal(focusMinutes(300), 240)
+    assert.equal(focusMinutes(Number.NaN), null)
+    assert.equal(focusMinutes(Infinity), null)
+  })
+
+  it('resuelve simultáneos de forma determinista y conserva el registro cancelado', () => {
+    const first = session({ id: 'a' })
+    const duplicate = session({ id: 'z', to: 'OPO' })
+    for (const input of [[duplicate, first], [first, duplicate]]) {
+      const reconciled = reconcileActiveFlights(input)
+      assert.equal(reconciled.find((item) => item.status === 'en_vuelo'), first)
+      assert.equal(reconciled.find((item) => item.id === duplicate.id)?.status, 'cancelado')
+      assert.equal(reconciled.find((item) => item.id === duplicate.id)?.focusedMinutes, 0)
+      assert.equal(reconcileActiveFlights(reconciled), reconciled)
+    }
+  })
+})
 
 describe('geografía', () => {
   it('Madrid–Barcelona son unos 483 km y 48 minutos', () => {

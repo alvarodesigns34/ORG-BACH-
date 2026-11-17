@@ -34,6 +34,7 @@ import {
   mergeRemote,
   stampAll,
   type RemoteRow,
+  type SyncMeta,
 } from './merge.ts'
 import { LOCAL_CHANGE_EVENT, loadMeta, nodeId, saveMeta } from './metaStore.ts'
 
@@ -220,7 +221,7 @@ class SyncEngine {
     try {
       const client = await getClient()
       const store = await storeBridge()
-      store.applyRemote(() => null) // guarda cualquier cambio a medias antes de decidir
+      if (!store.applyRemote(() => null)) throw new Error('Guarda los cambios locales antes de sincronizar.')
       const { count, error } = await client
         .from('sync_records')
         .select('id', { count: 'exact', head: true })
@@ -233,10 +234,14 @@ class SyncEngine {
 
       if (count === 0) {
         // Cuenta vacía: este dispositivo la inaugura con todo lo que tiene.
-        saveMeta(stampAll(createMeta(userId, nodeId()), local))
+        if (!saveMeta(stampAll(createMeta(userId, nodeId()), local))) {
+          throw new Error('No se pudo guardar la vinculación de este dispositivo.')
+        }
       } else if (!hasContent(local)) {
         // Dispositivo nuevo y sin datos: solo hay que descargar.
-        saveMeta(createMeta(userId, nodeId()))
+        if (!saveMeta(createMeta(userId, nodeId()))) {
+          throw new Error('No se pudo guardar la vinculación de este dispositivo.')
+        }
       } else {
         // Hay datos a ambos lados: decide el alumno (ver resolveLink).
         this.set({ phase: 'needs-choice' })
@@ -263,9 +268,13 @@ class SyncEngine {
     if (!userId || this.status.phase !== 'needs-choice') return
     const store = await storeBridge()
     if (choice === 'merge') {
-      saveMeta(
+      const saved = saveMeta(
         stampAll(createMeta(userId, nodeId()), store.getData(), { settingsClock: ZERO_CLOCK }),
       )
+      if (!saved) {
+        this.set({ error: 'No se pudo guardar la vinculación de este dispositivo.' })
+        return
+      }
       this.subscribeRealtime(userId)
       this.set({ phase: 'syncing' })
       this.kick()
@@ -276,14 +285,15 @@ class SyncEngine {
       exportJSON(store.getData()),
       `orbita-antes-de-sincronizar-${today()}.json`,
     )
-    saveMeta(createMeta(userId, nodeId()))
     this.set({ phase: 'syncing' })
     try {
-      await this.pull({ replaceLocal: true })
+      await this.pull({ replaceLocal: true, linkMeta: createMeta(userId, nodeId()) })
       this.subscribeRealtime(userId)
       this.kick()
     } catch (error) {
-      this.fail(error, () => this.kick())
+      // Reintentar como descarga normal podría mezclar cursos después de que
+      // el alumno eligiera expresamente sustituir el local.
+      this.set({ phase: 'needs-choice', error: describeAuthError(error) })
     }
   }
 
@@ -346,9 +356,9 @@ class SyncEngine {
     this.retryDelay = Math.min(this.retryDelay * 2, 5 * 60_000)
   }
 
-  private async pull(options: { replaceLocal?: boolean } = {}) {
+  private async pull(options: { replaceLocal?: boolean; linkMeta?: SyncMeta } = {}) {
     const userId = this.userId
-    const meta = loadMeta()
+    const meta = options.linkMeta ?? loadMeta()
     if (!userId || !meta || meta.userId !== userId) return
     const client = await getClient()
     const store = await storeBridge()
@@ -373,14 +383,15 @@ class SyncEngine {
 
     // Se fusiona todo de una vez: aplicar a medias podría dejar, por ejemplo,
     // notas cuya asignatura llega en la página siguiente.
-    store.applyRemote((current) => {
-      const latest = loadMeta()
+    if (this.userId !== userId) return
+    const applied = store.applyRemote((current) => {
+      const latest = options.linkMeta ?? loadMeta()
       if (!latest || latest.userId !== userId) return null
       const base = options.replaceLocal ? createEmptyData() : current
       const result = mergeRemote(base, latest, rows)
-      saveMeta(result.meta)
-      return result.changed || options.replaceLocal ? result.data : null
+      return { data: result.changed || options.replaceLocal ? result.data : null, meta: result.meta }
     })
+    if (!applied) throw new Error('Los cambios remotos siguen pendientes porque el curso no se pudo guardar.')
   }
 
   private async push() {
@@ -388,11 +399,11 @@ class SyncEngine {
     if (!userId) return
     const client = await getClient()
     const store = await storeBridge()
-    store.applyRemote(() => null) // asegura que los relojes cubren lo último tecleado
+    if (!store.applyRemote(() => null)) throw new Error('Guarda los cambios locales antes de sincronizar.')
 
     for (let round = 0; round < 25; round++) {
       const meta = loadMeta()
-      if (!meta || meta.userId !== userId || meta.dirty.length === 0) break
+      if (this.userId !== userId || !meta || meta.userId !== userId || meta.dirty.length === 0) break
       const keys = meta.dirty.slice(0, PUSH_BATCH)
       const batch = buildPush(store.getData(), meta, keys)
       const sent = new Set(batch.map((r) => keyOf(r.collection, r.id)))
@@ -401,13 +412,15 @@ class SyncEngine {
         if (error) throw error
       }
       const after = loadMeta()
-      if (!after) break
+      if (this.userId !== userId || !after || after.userId !== userId) break
       // Lo que no se pudo construir (registro inexistente) sale de la cola.
       const cleaned = {
         ...after,
         dirty: after.dirty.filter((k) => !keys.includes(k) || sent.has(k)),
       }
-      saveMeta(acknowledge(cleaned, batch))
+      if (!saveMeta(acknowledge(cleaned, batch))) {
+        throw new Error('No se pudo confirmar el envío. Los cambios se volverán a sincronizar.')
+      }
       this.refreshPending()
     }
   }
@@ -496,9 +509,10 @@ class SyncEngine {
     this.teardownRealtime()
     await client.auth.signOut({ scope: 'local' })
     if (wipeLocal) {
-      saveMeta(null)
       const store = await storeBridge()
-      store.applyRemote(() => createEmptyData())
+      if (!store.applyRemote(() => ({ data: createEmptyData(), meta: null }))) {
+        throw new Error('La sesión se cerró, pero no se pudo retirar la copia local.')
+      }
     }
     this.userId = null
     this.set({ phase: 'signed-out', email: null, pending: loadMeta()?.dirty.length ?? 0 })

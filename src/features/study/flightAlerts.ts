@@ -69,19 +69,19 @@ export function composeAlerts(
 }
 
 const signature = (sessionId: string, alerts: Alert[]) =>
-  alerts.length === 0 ? '' : `${sessionId}|${alerts.map((a) => `${a.kind}@${a.at.slice(0, 19)}`).join(',')}`
+  alerts.length === 0 ? '' : JSON.stringify([sessionId, alerts])
 
-let cachedToken: string | null = null
+let cachedToken: { account: string; token: string } | null = null
 
-async function post(sessionId: string, alerts: Alert[], keepalive: boolean): Promise<boolean> {
+async function post(account: string, sessionId: string, alerts: Alert[], keepalive: boolean): Promise<boolean> {
   // Al ocultarse la página no hay tiempo de esperar a refrescar el token:
   // se usa el último conocido y `keepalive` deja terminar la petición.
-  let token = keepalive ? cachedToken : null
+  let token = keepalive && cachedToken?.account === account ? cachedToken.token : null
   if (!token) {
     token = await syncEngine.accessToken().catch(() => null)
-    cachedToken = token
   }
-  if (!token) return false
+  if (!token || syncEngine.getStatus().email !== account) return false
+  cachedToken = { account, token }
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/schedule_flight_alerts`, {
       method: 'POST',
@@ -110,60 +110,67 @@ export function useFlightAlerts(
 ): void {
   const live = useRef({ active, city, enabled })
   live.current = { active, city, enabled }
-  /** Lo último que el servidor tiene programado (firma) y de qué vuelo. */
-  const sent = useRef<{ sessionId: string; signature: string } | null>(null)
-  const timer = useRef<number | null>(null)
+  type Schedule = { account: string; sessionId: string; signature: string; alerts: Alert[]; keepalive: boolean }
+  const confirmed = useRef<Schedule | null>(null)
+  const requesting = useRef<Schedule | null>(null)
+  const desired = useRef<Schedule | null>(null)
 
   useEffect(() => {
-    if (!SYNC_AVAILABLE) return
-    // Sin vuelo y sin nada programado no hay nada que vigilar.
-    if (!live.current.active && !sent.current?.signature) return
+    if (!SYNC_AVAILABLE || (!live.current.active && !confirmed.current?.signature && !requesting.current)) return
+    let closed = false
 
-    const sync = (keepalive = false) => {
-      const { active: session, city: destination, enabled: on } = live.current
-      if (!syncEngine.getStatus().email) return
-      const visible = document.visibilityState === 'visible'
-      const alerts = session && on ? composeAlerts(session, Date.now(), destination, visible) : []
-      const sessionId = session?.id ?? sent.current?.sessionId
-      if (!sessionId) return
-      const next = signature(sessionId, alerts)
-      // Sin nada programado y nada que programar: ni una petición.
-      if (next === (sent.current?.signature ?? '')) return
-      const before = sent.current
-      sent.current = { sessionId, signature: next }
-      void post(sessionId, alerts, keepalive).then((ok) => {
-        // Si falló, se olvida lo «enviado» para reintentarlo en la próxima vuelta.
-        if (!ok && sent.current?.signature === next) sent.current = before
+    const flush = () => {
+      if (closed || requesting.current || !desired.current) return
+      const request = desired.current
+      const previous = confirmed.current
+      if (request.signature === (previous?.account === request.account ? previous.signature : '')) return
+      requesting.current = request
+      void post(request.account, request.sessionId, request.alerts, request.keepalive).then((ok) => {
+        if (ok) confirmed.current = request
+        requesting.current = null
+        // Una edición posterior espera a que termine la anterior. Si falló,
+        // la siguiente señal de conexión o el temporizador permite reintentar.
+        if (desired.current !== request) flush()
       })
     }
 
-    const soon = () => {
-      if (timer.current) window.clearTimeout(timer.current)
-      timer.current = window.setTimeout(() => sync(), 700)
-    }
-    const onVisibility = () => {
-      if (timer.current) window.clearTimeout(timer.current)
-      sync(document.visibilityState === 'hidden')
+    const sync = (keepalive = false) => {
+      const { active: session, city: destination, enabled: on } = live.current
+      const account = syncEngine.getStatus().email
+      if (!account) return
+      const previous = requesting.current ?? confirmed.current
+      const sessionId = session?.id ?? (previous?.account === account ? previous.sessionId : undefined)
+      if (!sessionId) return
+      const visible = document.visibilityState === 'visible'
+      const alerts = session && on ? composeAlerts(session, Date.now(), destination, visible) : []
+      const next = signature(sessionId, alerts)
+      if (desired.current?.account !== account || desired.current.signature !== next || (keepalive && !desired.current.keepalive)) {
+        desired.current = { account, sessionId, signature: next, alerts, keepalive }
+      }
+      flush()
     }
 
-    soon()
-    // Cada pocos segundos: retira el aviso que está a punto de ocurrir con la
-    // app a la vista y reintenta lo que no llegó.
+    const onVisibility = () => sync(document.visibilityState === 'hidden')
+    const onOnline = () => sync()
+    const initial = window.setTimeout(() => sync(), 250)
     const interval = window.setInterval(() => sync(), 5000)
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('pagehide', onVisibility)
+    window.addEventListener('online', onOnline)
     return () => {
-      if (timer.current) window.clearTimeout(timer.current)
+      closed = true
+      window.clearTimeout(initial)
       window.clearInterval(interval)
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('pagehide', onVisibility)
+      window.removeEventListener('online', onOnline)
     }
-    // Se reprograma cuando cambia algo del vuelo que mueva sus horas.
   }, [
     active?.id,
     active?.status,
     active?.pausedAt,
     active?.pausedMs,
+    active?.layoverEndsAt,
     active?.layoversDone,
     active?.plannedMinutes,
     city,

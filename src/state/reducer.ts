@@ -9,7 +9,7 @@
 import { newId } from '../domain/id.ts'
 import { nowISO } from '../domain/dates.ts'
 import { deriveShortName } from '../domain/palette.ts'
-import { advance, layoverPoints, layoversTaken } from '../domain/flights.ts'
+import { advance, layoverPoints, layoversTaken, reconcileActiveFlights } from '../domain/flights.ts'
 import { applyManualOrder } from '../domain/tasks.ts'
 import type {
   ActivityEntry,
@@ -62,6 +62,7 @@ export type Action =
         | 'seat'
         | 'subjectId'
         | 'taskId'
+        | 'examId'
         | 'layoverMinutes'
         | 'layoverEvery'
       >
@@ -69,6 +70,7 @@ export type Action =
       route?: string
     }
   | { type: 'session/pause'; id: ID }
+  | { type: 'session/reconcile' }
   | { type: 'session/resume'; id: ID }
   /**
    * Empieza una escala ahora. Sin `minutes` es la siguiente programada; con
@@ -337,6 +339,11 @@ export function reducer(state: AppData, action: Action): AppData {
     }
 
     // --- Modo estudio ---
+
+    case 'session/reconcile': {
+      const sessions = reconcileActiveFlights(state.sessions)
+      return sessions === state.sessions ? state : { ...state, sessions }
+    }
 
     case 'session/start': {
       // Un solo vuelo en el aire: el otro dispositivo pudo despegar antes.

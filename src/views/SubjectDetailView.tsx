@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
-import { CalendarPlus, ListChecks, Pencil, Plus } from 'lucide-react'
+import { CalendarPlus, ListChecks, Pencil, PlaneTakeoff, Plus } from 'lucide-react'
 
 import { formatGrade, formatPercent, numeralTone } from '@/domain/grades'
 import { colorVar } from '@/domain/palette'
 import { isDone, sortTasks } from '@/domain/tasks'
 import { termName, type Exam, type GradeEntry, type Task } from '@/domain/types'
-import { hrefFor } from '@/router'
+import { hrefFor, studyHref } from '@/router'
 import { useSettings, useStore, useToday } from '@/state/StoreProvider'
 import { useSubjectResults } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
@@ -112,10 +112,16 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
           .filter(Boolean)
           .join(' · ')}
         actions={
-          <Button onClick={() => setEditingSubject(true)}>
-            <Pencil className="size-4" />
-            Editar
-          </Button>
+          <>
+            <a href={studyHref({ subjectId, taskId: tasks[0]?.id, minutes: tasks[0]?.estimatedMinutes })} className="study-action-link">
+              <PlaneTakeoff className="size-4" aria-hidden="true" />
+              Estudiar
+            </a>
+            <Button onClick={() => setEditingSubject(true)}>
+              <Pencil className="size-4" />
+              Editar
+            </Button>
+          </>
         }
       />
 
