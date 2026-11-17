@@ -145,8 +145,10 @@ export class FlightMap {
       this.ready = true
     })
     this.map.on('sourcedata', (event) => {
-      if (this.hasTiles || event.sourceDataType !== 'content' || !event.tile?.hasData?.()) return
-      if (event.source.type !== 'vector' && event.source.type !== 'raster') return
+      // MapLibre 6 incluye la tesela y su coordenada al cargarla. El subtipo
+      // «content» se usa para cambios de fuente y puede faltar en ese evento.
+      if (this.hasTiles || !event.coord || !event.tile?.hasData?.()) return
+      if (event.source?.type !== 'vector' && event.source?.type !== 'raster') return
       this.hasTiles = true
       window.clearTimeout(this.loadTimeout)
       this.revealFrame = window.requestAnimationFrame(() => {
