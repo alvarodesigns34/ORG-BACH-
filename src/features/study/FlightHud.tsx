@@ -30,7 +30,7 @@ import { colorVar, quietVar } from '@/domain/palette'
 import type { Exam, FocusSession, Subject, Task } from '@/domain/types'
 import { ConfirmDialog } from '@/ui/Modal'
 import { haptic, spring } from '@/ui/motion'
-import { Button, cx } from '@/ui/primitives'
+import { Button, CountUp, cx } from '@/ui/primitives'
 import type { MapKind } from './mapStyle'
 import type { StudyAppearance } from './prefs'
 import {
@@ -686,11 +686,20 @@ export function FlightHud({
                 onClick={onPause}
                 className="pressable grid place-items-center size-14 rounded-full bg-ink text-canvas shadow-[0_6px_20px_rgb(0_0_0/0.25)]"
               >
-                {paused ? (
-                  <Play className="size-6 translate-x-px" fill="currentColor" strokeWidth={0} />
-                ) : (
-                  <Pause className="size-6" fill="currentColor" strokeWidth={0} />
-                )}
+                {/* El icono cambia con un pequeño giro de escala, como en Música. */}
+                <motion.span
+                  key={paused ? 'play' : 'pause'}
+                  initial={{ scale: 0.6, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={spring.snappy}
+                  className="grid place-items-center"
+                >
+                  {paused ? (
+                    <Play className="size-6 translate-x-px" fill="currentColor" strokeWidth={0} />
+                  ) : (
+                    <Pause className="size-6" fill="currentColor" strokeWidth={0} />
+                  )}
+                </motion.span>
               </button>
               <button
                 type="button"
@@ -719,7 +728,8 @@ export function FlightHud({
                   : 'Distancia restante'}
               </p>
               <span className="numeral text-[1.375rem]">
-                {Math.round(remainingKm).toLocaleString('es')}
+                {/* Los km bajan deslizándose cada segundo, no a saltos. */}
+                <CountUp value={Math.round(remainingKm)} format={(v) => Math.round(v ?? 0).toLocaleString('es')} />
                 <span className="text-[1rem] font-semibold text-ink-3 ml-1">km</span>
               </span>
             </div>
