@@ -37,7 +37,11 @@ export interface StudyPrefs {
   lockCard: boolean
   /** Avisar con una notificación al aterrizar y al terminar una escala. */
   alerts: boolean
+  /** Apariencia de Estudio: la de la app, o clara u oscura siempre. */
+  appearance: StudyAppearance
 }
+
+export type StudyAppearance = 'auto' | 'claro' | 'oscuro'
 
 const DEFAULTS: StudyPrefs = {
   map: 'minimal',
@@ -53,6 +57,7 @@ const DEFAULTS: StudyPrefs = {
   focus: 50,
   lockCard: false,
   alerts: true,
+  appearance: 'auto',
 }
 
 const KEY = 'org-bach:estudio'

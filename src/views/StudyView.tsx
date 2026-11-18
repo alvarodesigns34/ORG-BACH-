@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m as motion } from 'motion/react'
 import { Orbit } from 'lucide-react'
 import '@/features/study/study.css'
@@ -26,21 +26,22 @@ import {
 } from '@/domain/flights'
 import { newId } from '@/domain/id'
 import type { FocusSession } from '@/domain/types'
-import { useDispatch, useStore, useToday } from '@/state/StoreProvider'
+import { setThemeOverride, useDispatch, useSettings, useStore, useToday } from '@/state/StoreProvider'
 import { useSubjectMap, useSubjects } from '@/state/selectors'
 import { useRoute } from '@/router'
 import { typing } from '@/layout/shortcuts'
-import { haptic } from '@/ui/motion'
+import { haptic, useMediaQuery } from '@/ui/motion'
 import { useToast } from '@/ui/Toast'
 import { AIRPORTS, AIRPORT_BY_IATA } from '@/features/study/airports'
 import type { Padding } from '@/features/study/flightMap'
 import { mapEdgeColor } from '@/features/study/mapStyle'
 import { BookingPanel, HomePanel, PANEL_WIDTH, SidePanel, type HomeTab } from '@/features/study/Panels'
 import { SeatPicker, type SeatChoice } from '@/features/study/SeatPicker'
+import { StudyHome } from '@/features/study/StudyHome'
 import { BoardingPass, Takeoff } from '@/features/study/BoardingPass'
 import { FlightHud, LandedCard, LayoverCard, MapToolbar } from '@/features/study/FlightHud'
 import { beginFlightAudio } from '@/features/study/flightAudio'
-import { useNow, useResolvedTheme, useWakeLock } from '@/features/study/hooks'
+import { useNow, useWakeLock } from '@/features/study/hooks'
 import { useStudyMap } from '@/features/study/useStudyMap'
 import { layoverPlan, useStudyPrefs } from '@/features/study/prefs'
 import {
@@ -59,6 +60,14 @@ function panelPadding(): Padding {
   return wide
     ? { top: 80, right: 90, bottom: 80, left: PANEL_WIDTH + 70 }
     : { top: 24, right: 38, bottom: 28, left: 38 }
+}
+
+/** Entrada sin hoja: la ciudad algo a la derecha de los controles. */
+function homePadding(): Padding {
+  const wide = window.innerWidth >= 720
+  return wide
+    ? { top: 120, right: 120, bottom: 120, left: 300 }
+    : { top: 200, right: 38, bottom: 260, left: 38 }
 }
 
 const HUD_PADDING: Padding = { top: 110, right: 110, bottom: 200, left: 110 }
@@ -87,7 +96,8 @@ export default function StudyView() {
   const { route, navigate } = useRoute()
   const subjects = useSubjects()
   const subjectMap = useSubjectMap()
-  const theme = useResolvedTheme()
+  const settings = useSettings()
+  const systemDark = useMediaQuery('(prefers-color-scheme: dark)')
   const [prefs, setPrefs] = useStudyPrefs()
 
   const active = activeSession(data.sessions)
@@ -96,6 +106,8 @@ export default function StudyView() {
 
   const [stage, setStage] = useState<Stage>(active ? 'vuelo' : 'inicio')
   const [tab, setTab] = useState<HomeTab>('resumen')
+  /** Hoja de actividad (resumen, diario, pasaporte) abierta sobre la entrada. */
+  const [activity, setActivity] = useState(false)
   const [minutes, setMinutes] = useState(prefs.minutes)
   const [destIata, setDestIata] = useState<string | null>(null)
   const [seat, setSeat] = useState<SeatChoice | null>(null)
@@ -131,15 +143,22 @@ export default function StudyView() {
   }, [destIata, candidates, origin, minutes, quick])
 
   // --- Mapa ---
-  const inCabin = stage === 'vuelo' || stage === 'despegue' || stage === 'aterrizado'
+  // Apariencia propia de Estudio: clara u oscura de principio a fin (también
+  // en cabina), o la de la app. Se impone a toda la página mientras se está
+  // aquí, para que hojas y menús que se abran encima vayan a juego.
+  const appDark = settings.theme === 'dark' || (settings.theme === 'system' && systemDark)
+  const tone: 'light' | 'dark' =
+    prefs.appearance === 'claro' ? 'light' : prefs.appearance === 'oscuro' ? 'dark' : appDark ? 'dark' : 'light'
+  useLayoutEffect(() => setThemeOverride(tone), [tone])
+  useLayoutEffect(() => () => setThemeOverride(null), [])
   const look = useMemo(
     () => ({
       kind: prefs.map,
-      tone: inCabin ? ('dark' as const) : theme,
+      tone,
       labels: prefs.labels,
       globe: prefs.globe,
     }),
-    [prefs.map, prefs.labels, prefs.globe, inCabin, theme],
+    [prefs.map, prefs.labels, prefs.globe, tone],
   )
   const mapEnabled = !prefs.quiet && !quickParam && !(stage === 'despegue' && quick)
   const { container, map, status: mapStatus, retry: retryMap } = useStudyMap(
@@ -154,7 +173,7 @@ export default function StudyView() {
     look,
     stage === 'vuelo' || stage === 'aterrizado'
       ? 'cielo'
-      : stage === 'inicio' && tab === 'resumen'
+      : stage === 'inicio' && (!activity || tab === 'resumen')
         ? 'espacio'
         : 'suelo',
   )
@@ -170,21 +189,15 @@ export default function StudyView() {
     for (const m of metas) m.setAttribute('content', edgeColor)
     const html = document.documentElement
     const body = document.body
-    const prev = {
-      html: html.style.backgroundColor,
-      body: body.style.backgroundColor,
-      scheme: html.style.colorScheme,
-    }
+    const prev = { html: html.style.backgroundColor, body: body.style.backgroundColor }
     html.style.backgroundColor = edgeColor
     body.style.backgroundColor = edgeColor
-    if (inCabin) html.style.colorScheme = 'dark'
     return () => {
       metas.forEach((m, i) => before[i] !== null && m.setAttribute('content', before[i]!))
       html.style.backgroundColor = prev.html
       body.style.backgroundColor = prev.body
-      html.style.colorScheme = prev.scheme
     }
-  }, [edgeColor, inCabin])
+  }, [edgeColor])
 
   // --- Sesión en el aire (también si despegó en otro dispositivo) ---
   // Las escalas y el aterrizaje los aplica el controlador del vuelo, que vive
@@ -276,12 +289,12 @@ export default function StudyView() {
       map.clearPins()
       map.setPlane(null, null, 0)
       map.setRoute(null, null)
-      if (tab === 'resumen') {
+      if (!activity || tab === 'resumen') {
         map.setHistory([])
         // Sobre la esfera, el planeta entero con tu ciudad: el punto de partida.
         // Ya se creó con este encuadre. Evita pedir otro conjunto de teselas
         // antes de mostrar el primero al abrir Estudio.
-        if (initialMap.current === map) map.showPlace(origin, prefs.globe ? 2.7 : 5.2, panelPadding())
+        if (initialMap.current === map) map.showPlace(origin, prefs.globe ? 2.7 : 5.2, activity ? panelPadding() : homePadding())
       } else {
         map.setHistory(history)
         const points = history.flatMap((r) => [r.from, r.to])
@@ -314,7 +327,7 @@ export default function StudyView() {
       map.setRoute(origin, selected.airport, 0)
       map.fitRoute(origin, selected.airport, CENTER_PADDING)
     }
-  }, [stage, tab, map, origin, minutes, candidates, selected, history, prefs.globe])
+  }, [stage, tab, activity, map, origin, minutes, candidates, selected, history, prefs.globe])
 
   useEffect(() => {
     initialMap.current = map
@@ -515,7 +528,8 @@ export default function StudyView() {
       style={{ backgroundColor: edgeColor }}
       data-stage={stage}
       data-quiet={prefs.quiet ? 'true' : undefined}
-      data-cabin={inCabin ? 'true' : undefined}
+      data-tone={tone}
+      data-activity={activity ? 'true' : undefined}
     >
       {/* El envoltorio fija el tamaño: MapLibre pone `position: relative` a
           su contenedor y, sin él, el mapa se quedaba con altura cero. */}
@@ -542,8 +556,27 @@ export default function StudyView() {
         )}
       </div>
 
-      <AnimatePresence mode="wait">
+      <AnimatePresence>
         {stage === 'inicio' && (
+          <StudyHome
+            key="entrada"
+            origin={origin}
+            subjects={subjectMap}
+            today={today}
+            hidden={activity}
+            onExit={leave}
+            onActivity={(next) => {
+              setTab(next)
+              setActivity(true)
+            }}
+            onStart={startBooking}
+            onQuick={(duration) => navigate('estudio', { despegar: String(duration) })}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence mode="wait">
+        {stage === 'inicio' && activity && (
           <SidePanel key="inicio">
             <HomePanel
               origin={origin}
@@ -552,9 +585,7 @@ export default function StudyView() {
               today={today}
               tab={tab}
               onTab={setTab}
-              onExit={leave}
-              onStart={startBooking}
-              onQuick={(duration) => navigate('estudio', { despegar: String(duration) })}
+              onClose={() => setActivity(false)}
               onShowFlight={showFlight}
             />
           </SidePanel>
@@ -660,8 +691,7 @@ export default function StudyView() {
         )}
       </AnimatePresence>
 
-      {/* En cabina el mapa es nocturno: los controles, también. */}
-      <div data-theme={inCabin ? 'dark' : undefined} className="contents text-ink">
+      <div className="contents text-ink">
         {showToolbar && (
           <MapToolbar
             mapVisible={!prefs.quiet}
@@ -685,6 +715,8 @@ export default function StudyView() {
               setVolume(v)
             }}
             onKeepAwake={(on) => setPrefs({ keepAwake: on })}
+            appearance={prefs.appearance}
+            onAppearance={(value) => setPrefs({ appearance: value })}
             lockCard={prefs.lockCard}
             onLockCard={(on) => {
               setPrefs({ lockCard: on })
@@ -793,7 +825,7 @@ export default function StudyView() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[5] pointer-events-none bg-black/12"
+            className="study-pause-veil absolute inset-0 z-[5] pointer-events-none"
           />
         )}
       </AnimatePresence>

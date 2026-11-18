@@ -339,10 +339,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }
 
-function applyTheme(preference: ThemePreference) {
-  const dark =
+let lastPreference: ThemePreference = 'system'
+let override: 'light' | 'dark' | null = null
+
+/**
+ * Apariencia impuesta por una pantalla a pantalla completa (Estudio tiene la
+ * suya: claro u oscuro aunque la app vaya en el otro). `null` la quita y
+ * vuelve a la de Ajustes. El tema de la app no cambia.
+ */
+export function setThemeOverride(tone: 'light' | 'dark' | null): void {
+  override = tone
+  applyTheme(lastPreference)
+}
+
+/** El tema de la app según Ajustes y el sistema, sin la apariencia impuesta. */
+export function appIsDark(preference: ThemePreference = lastPreference): boolean {
+  return (
     preference === 'dark' ||
     (preference === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  )
+}
+
+function applyTheme(preference: ThemePreference) {
+  lastPreference = preference
+  const dark = override ? override === 'dark' : appIsDark(preference)
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
   const color = dark ? '#000000' : '#F2F2F7'
   for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {

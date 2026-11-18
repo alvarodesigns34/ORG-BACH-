@@ -32,6 +32,7 @@ import { ConfirmDialog } from '@/ui/Modal'
 import { haptic, spring } from '@/ui/motion'
 import { Button, cx } from '@/ui/primitives'
 import type { MapKind } from './mapStyle'
+import type { StudyAppearance } from './prefs'
 import {
   CHIME_CREDIT,
   SOUNDS,
@@ -45,7 +46,7 @@ import {
 // Piezas
 // ---------------------------------------------------------------------------
 
-function RoundButton({
+export function RoundButton({
   label,
   onClick,
   children,
@@ -121,7 +122,7 @@ function Popover({ children, className }: { children: ReactNode; className?: str
       exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.14 } }}
       transition={spring.snappy}
       style={{ transformOrigin: '100% 0%' }}
-      className={cx('liquid absolute right-0 top-0 rounded-[26px] p-4', className)}
+      className={cx('liquid liquid-thick absolute right-0 top-0 rounded-[26px] p-4', className)}
     >
       <div className="relative z-[2]">{children}</div>
     </motion.div>
@@ -129,6 +130,12 @@ function Popover({ children, className }: { children: ReactNode; className?: str
 }
 
 /** Estilo del mapa: tres miniaturas y el interruptor de nombres. */
+const APPEARANCE: { id: StudyAppearance; label: string; title: string }[] = [
+  { id: 'auto', label: 'Auto', title: 'Como el resto de la app' },
+  { id: 'claro', label: 'Claro', title: 'Siempre claro, también en vuelo' },
+  { id: 'oscuro', label: 'Oscuro', title: 'Siempre oscuro, también en vuelo' },
+]
+
 function MapStylePanel({
   map,
   labels,
@@ -136,6 +143,8 @@ function MapStylePanel({
   onMap,
   onLabels,
   onGlobe,
+  appearance,
+  onAppearance,
 }: {
   map: MapKind
   labels: boolean
@@ -143,6 +152,8 @@ function MapStylePanel({
   onMap: (kind: MapKind) => void
   onLabels: (on: boolean) => void
   onGlobe: (on: boolean) => void
+  appearance: StudyAppearance
+  onAppearance: (value: StudyAppearance) => void
 }) {
   return (
     <>
@@ -203,7 +214,31 @@ function MapStylePanel({
           )
         })}
       </div>
-      <div className="flex items-center justify-between mt-4 pt-3.5 border-t border-[var(--glass-edge)]">
+      <div className="flex items-center justify-between gap-3 mt-4 pt-3.5 border-t border-[var(--glass-edge)]">
+        <span className="text-[0.875rem] font-medium">Apariencia</span>
+        <div role="radiogroup" aria-label="Apariencia de Estudio" className="flex p-0.5 rounded-full bg-[var(--glass-tint)]">
+          {APPEARANCE.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              role="radio"
+              aria-checked={appearance === o.id}
+              title={o.title}
+              onClick={() => {
+                haptic()
+                onAppearance(o.id)
+              }}
+              className={cx(
+                'h-7 px-3 rounded-full text-[0.75rem] font-semibold transition-colors',
+                appearance === o.id ? 'bg-surface text-ink shadow-[0_1px_3px_rgb(0_0_0/0.15)]' : 'text-ink-3',
+              )}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center justify-between mt-3 pt-3.5 border-t border-[var(--glass-edge)]">
         <span className="text-[0.875rem] font-medium">Nombres de lugares</span>
         <Switch checked={labels} onChange={onLabels} label="Nombres de lugares" />
       </div>
@@ -390,8 +425,12 @@ export function MapToolbar({
   onKeepAwake,
   lockCard,
   onLockCard,
+  appearance,
+  onAppearance,
   flight,
 }: {
+  appearance: StudyAppearance
+  onAppearance: (value: StudyAppearance) => void
   map: MapKind
   mapVisible: boolean
   onToggleMap: () => void
@@ -447,6 +486,8 @@ export function MapToolbar({
                 onMap={onMap}
                 onLabels={onLabels}
                 onGlobe={onGlobe}
+                appearance={appearance}
+                onAppearance={onAppearance}
               />
             </Popover>
           )}
@@ -609,7 +650,7 @@ export function FlightHud({
         transition={{ ...spring.smooth, delay: 0.6 }}
         className="study-flight-hud absolute z-10"
       >
-        <div className="study-flight-card rounded-[30px] overflow-hidden">
+        <div className="study-flight-card liquid rounded-[30px] overflow-hidden">
           <div className="relative z-[2] h-[3px] bg-[var(--glass-tint)]">
             <motion.div
               className="h-full bg-[#0a84ff]"
@@ -725,7 +766,7 @@ export function LayoverCard({
       transition={spring.smooth}
       className="absolute z-20 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(400px,calc(100vw-2rem))]"
     >
-      <div className="liquid rounded-[32px] p-7 text-center">
+      <div className="liquid liquid-thick rounded-[32px] p-7 text-center">
         <div className="relative z-[2] flex flex-col items-center">
           <span
             className="tile grid place-items-center size-12 rounded-[15px] text-white"
@@ -787,7 +828,7 @@ export function LandedCard({
       transition={{ ...spring.smooth, delay: 0.5 }}
       className="absolute z-20 left-1/2 -translate-x-1/2 bottom-[max(1.5rem,env(safe-area-inset-bottom))] w-[min(460px,calc(100vw-2rem))]"
     >
-      <div className="liquid rounded-[32px] p-6">
+      <div className="liquid liquid-thick rounded-[32px] p-6">
         <div className="relative z-[2]">
           <div className="flex items-start justify-between">
             <span
