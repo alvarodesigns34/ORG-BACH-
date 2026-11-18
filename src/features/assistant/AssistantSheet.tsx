@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -10,7 +11,9 @@ import {
   ArrowUp,
   BookOpen,
   CalendarDays,
+  ChevronLeft,
   CircleCheck,
+  History,
   GraduationCap,
   ListChecks,
   ListTree,
@@ -38,16 +41,27 @@ import {
 import {
   askAssistant,
   canRecord,
+  fetchFreeChatAllowed,
   MAX_RECORDING_MS,
   startRecording,
   type AssistantReply,
   type Recording,
 } from '@/assistant/client'
 import {
+  conversationTitle,
+  currentConversation,
+  deleteConversation,
+  EMPTY_STORE,
   historyForModel,
-  loadConversation,
-  saveConversation,
+  loadConversations,
+  openConversation,
+  saveConversations,
+  shouldStartFresh,
+  startNew,
+  updateCurrent,
   type ChatMessage,
+  type Conversation,
+  type ConversationStore,
 } from '@/assistant/conversation'
 import { newId } from '@/domain/id'
 import { hrefFor } from '@/router'
@@ -57,6 +71,8 @@ import { Modal } from '@/ui/Modal'
 import { Button, IconButton, cx } from '@/ui/primitives'
 
 type Phase = 'idle' | 'recording' | 'thinking'
+
+const NO_MESSAGES: ChatMessage[] = []
 
 const SUGGESTIONS: { group: string; items: string[] }[] = [
   {
@@ -117,10 +133,22 @@ type Input = { text?: string; audio?: { data: string; mimeType: string } }
  * mismo tema («muévelo al viernes») sin empezar de cero.
  *
  * La IA solo propone acciones; se aplican con la misma lógica que la interfaz
- * y cada respuesta se puede deshacer por separado. La charla se guarda en el
- * dispositivo hasta que empiezas una nueva.
+ * y cada respuesta se puede deshacer por separado.
+ *
+ * Las conversaciones se guardan en el dispositivo. Al abrirlo después de un
+ * rato (FRESH_AFTER_MS sin mensajes) empieza una nueva; las anteriores quedan
+ * en el historial para retomarlas.
  */
-export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function AssistantSheet({
+  open,
+  onClose,
+  start,
+}: {
+  open: boolean
+  onClose: () => void
+  /** Cómo se ha abierto: «voice» empieza a dictar nada más abrirse. */
+  start?: { mode: 'text' | 'voice'; at: number }
+}) {
   const { data, today, replaceAndSave } = useStore()
   const sync = useSync()
   const account = sync.email ?? ''
@@ -129,20 +157,55 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
   const latest = useRef(data)
   latest.current = data
 
-  const [messages, setMessages] = useState<ChatMessage[]>(() =>
-    account ? loadConversation(account) : [],
+  const [store, setStore] = useState<ConversationStore>(() =>
+    account ? loadConversations(account, () => newId('chat')) : EMPTY_STORE,
   )
+  const current = currentConversation(store)
+  const messages = current?.messages ?? NO_MESSAGES
   const messagesRef = useRef(messages)
   messagesRef.current = messages
+
+  // Charla libre: solo si el servidor la permite a esta cuenta. La respuesta
+  // se recuerda para que el interruptor no aparezca de golpe al abrir.
+  const [freeAllowed, setFreeAllowed] = useState(() => readFreeAllowed(account))
+  /** Modo de la próxima conversación nueva (la abierta manda si la hay). */
+  const [nextMode, setNextMode] = useState<'libre' | undefined>()
+  const freeMode = (current ? current.mode : nextMode) === 'libre' && freeAllowed
+  const modeRef = useRef(nextMode)
+  modeRef.current = nextMode
+
+  /** Cambia los mensajes de la conversación abierta (la crea si es nueva). */
+  const setMessages = useCallback(
+    (next: ChatMessage[] | ((list: ChatMessage[]) => ChatMessage[])) =>
+      setStore((store) =>
+        updateCurrent(store, next, () => newId('chat'), Date.now(), modeRef.current),
+      ),
+    [],
+  )
   const [loadedFor, setLoadedFor] = useState(account)
   if (loadedFor !== account) {
-    // Cambio de cuenta: cada una tiene su propia conversación.
+    // Cambio de cuenta: cada una tiene sus propias conversaciones.
     setLoadedFor(account)
-    setMessages(account ? loadConversation(account) : [])
+    setStore(account ? loadConversations(account, () => newId('chat')) : EMPTY_STORE)
+    setFreeAllowed(readFreeAllowed(account))
+    setNextMode(undefined)
   }
   useEffect(() => {
-    if (account) saveConversation(account, messages)
-  }, [account, messages])
+    if (!open || !signedIn) return
+    let live = true
+    void fetchFreeChatAllowed().then((allowed) => {
+      if (!live || allowed === null) return
+      setFreeAllowed(allowed)
+      writeFreeAllowed(account, allowed)
+    })
+    return () => {
+      live = false
+    }
+  }, [open, signedIn, account])
+  useEffect(() => {
+    if (account) saveConversations(account, store)
+  }, [account, store])
+  const [showHistory, setShowHistory] = useState(false)
 
   const [review, setReview] = useState<{
     answer: AssistantReply
@@ -173,6 +236,19 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
   }, [open])
 
   useEffect(() => () => { pending.current?.abort() }, [account])
+
+  // Al abrir: si la conversación abierta lleva un rato parada, empieza una
+  // nueva (la anterior queda en el historial).
+  const wasOpen = useRef(false)
+  useLayoutEffect(() => {
+    if (open && !wasOpen.current && shouldStartFresh(store)) {
+      // Conversación nueva, y en el modo normal: la charla libre se elige.
+      setStore(startNew)
+      setNextMode(undefined)
+    }
+    if (open && !wasOpen.current) setShowHistory(false)
+    wasOpen.current = open
+  }, [open])
 
   // Siempre a la vista lo último de la conversación.
   useLayoutEffect(() => {
@@ -255,7 +331,7 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
     try {
       const answer = await askAssistant({
         ...input,
-        context: buildContext(latest.current, today),
+        ...(freeMode ? { mode: 'libre' as const } : { context: buildContext(latest.current, today) }),
         history,
         signal: controller.signal,
       })
@@ -341,6 +417,18 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
     }
   }
 
+  // Abierto desde el botón del micrófono: empieza a dictar directamente.
+  const startedFor = useRef(0)
+  useEffect(() => {
+    if (!open || !start || start.at === startedFor.current) return
+    startedFor.current = start.at
+    if (start.mode === 'voice' && canRecord() && phase === 'idle' && !review) {
+      setShowHistory(false)
+      void startVoice()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, start])
+
   const cancelVoice = () => {
     recording.current?.cancel()
     recording.current = null
@@ -375,15 +463,42 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
     if (replaceAndSave(applyUndo(latest.current, message.undo))) patchMessage(message.id, { undone: true })
   }
 
-  const newConversation = () => {
+  const stopEverything = () => {
     pending.current?.abort()
     recording.current?.cancel()
     recording.current = null
     setPhase('idle')
-    setMessages([])
     setReview(null)
+    lastInput.current = null
+  }
+
+  const setFreeMode = (on: boolean) => {
+    if (on === freeMode) return
+    stopEverything()
+    // Cada conversación es de un modo: cambiarlo empieza otra.
+    setStore(startNew)
+    setNextMode(on ? 'libre' : undefined)
+    setShowHistory(false)
+    field.current?.focus()
+  }
+
+  const newConversation = () => {
+    stopEverything()
+    setStore(startNew)
+    setShowHistory(false)
     setText('')
     field.current?.focus()
+  }
+
+  const resume = (id: string) => {
+    if (id !== store.currentId) stopEverything()
+    setStore((current) => openConversation(current, id))
+    setShowHistory(false)
+  }
+
+  const remove = (id: string) => {
+    if (id === store.currentId) stopEverything()
+    setStore((current) => deleteConversation(current, id))
   }
 
   const pendingReview = review?.account === account ? review : null
@@ -440,18 +555,38 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
       onClose={onClose}
       title="Asistente"
       size="md"
-      description="Al enviar, el asistente recibe tu mensaje y el contexto necesario de tu curso."
+      description={
+        freeMode
+          ? 'Charla libre: el asistente solo recibe esta conversación, no los datos de tu curso.'
+          : 'Al enviar, el asistente recibe tu mensaje y el contexto necesario de tu curso.'
+      }
       headerAction={
-        messages.length > 0 && (
-          <IconButton
-            label="Nueva conversación"
-            size="sm"
-            variant="secondary"
-            onClick={newConversation}
-          >
-            <SquarePen className="size-[17px]" strokeWidth={2.2} />
-          </IconButton>
-        )
+        <div className="flex items-center gap-2">
+          {store.conversations.length > 0 && (
+            <IconButton
+              label={showHistory ? 'Volver a la conversación' : 'Conversaciones anteriores'}
+              size="sm"
+              variant="secondary"
+              onClick={() => setShowHistory((v) => !v)}
+            >
+              {showHistory ? (
+                <ChevronLeft className="size-[18px]" strokeWidth={2.4} />
+              ) : (
+                <History className="size-[17px]" strokeWidth={2.2} />
+              )}
+            </IconButton>
+          )}
+          {(messages.length > 0 || showHistory) && (
+            <IconButton
+              label="Nueva conversación"
+              size="sm"
+              variant="secondary"
+              onClick={newConversation}
+            >
+              <SquarePen className="size-[17px]" strokeWidth={2.2} />
+            </IconButton>
+          )}
+        </div>
       }
       footer={
         <div className="w-full">
@@ -521,9 +656,20 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
         </div>
       }
     >
+      {showHistory ? (
+        <HistoryList
+          conversations={store.conversations}
+          currentId={store.currentId}
+          onOpen={resume}
+          onDelete={remove}
+        />
+      ) : (
       <div className="flex flex-col gap-3 min-h-[46dvh]" aria-live="polite">
+        {freeAllowed && (
+          <ModeSwitch free={freeMode} onChange={setFreeMode} disabled={phase === 'recording'} />
+        )}
         {messages.length === 0 ? (
-          <Welcome onPick={(t) => void send({ text: t })} />
+          freeMode ? <FreeWelcome /> : <Welcome onPick={(t) => void send({ text: t })} />
         ) : (
           messages.map((m) => <Bubble key={m.id} message={m} onUndo={() => undo(m)} />)
         )}
@@ -565,7 +711,164 @@ export function AssistantSheet({ open, onClose }: { open: boolean; onClose: () =
         )}
         <div ref={end} />
       </div>
+      )}
     </Modal>
+  )
+}
+
+const FREE_KEY = 'bachillerato-os:assistant-free'
+
+function readFreeAllowed(account: string): boolean {
+  if (!account) return false
+  try {
+    return localStorage.getItem(`${FREE_KEY}:${account}`) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeFreeAllowed(account: string, allowed: boolean) {
+  try {
+    if (allowed) localStorage.setItem(`${FREE_KEY}:${account}`, '1')
+    else localStorage.removeItem(`${FREE_KEY}:${account}`)
+  } catch {
+    // Sin almacenamiento: se vuelve a preguntar al abrir.
+  }
+}
+
+/** Curso (con tus datos) o charla libre (cualquier tema, sin tus datos). */
+function ModeSwitch({
+  free,
+  onChange,
+  disabled,
+}: {
+  free: boolean
+  onChange: (free: boolean) => void
+  disabled?: boolean
+}) {
+  const options = [
+    { free: false, label: 'Mi curso' },
+    { free: true, label: 'Charla libre' },
+  ]
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Modo del asistente"
+      className="self-center grid grid-cols-2 p-[3px] rounded-full bg-fill text-[0.8125rem] font-semibold"
+    >
+      {options.map((option) => (
+        <button
+          key={option.label}
+          type="button"
+          role="radio"
+          aria-checked={free === option.free}
+          disabled={disabled}
+          onClick={() => onChange(option.free)}
+          className={cx(
+            'pressable px-3.5 h-8 rounded-full transition-colors duration-200',
+            free === option.free
+              ? 'bg-surface text-ink shadow-[0_1px_3px_rgb(0_0_0/0.1)]'
+              : 'text-ink-3',
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function FreeWelcome() {
+  return (
+    <div className="flex items-center gap-3 pt-1 animate-fade">
+      <span className="grid place-items-center size-11 rounded-full bg-accent-quiet text-accent shrink-0">
+        <Sparkles className="size-5" />
+      </span>
+      <p className="text-[0.9375rem] text-ink-2">
+        Pregúntame lo que quieras, de cualquier tema. En este modo no veo tus tareas, exámenes ni
+        notas, y no cambio nada en la app.
+      </p>
+    </div>
+  )
+}
+
+const dayFormat = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' })
+const timeFormat = new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' })
+
+function when(at: number, now = Date.now()): string {
+  const date = new Date(at)
+  const today = new Date(now)
+  const yesterday = new Date(now - 86_400_000)
+  const same = (a: Date, b: Date) => a.toDateString() === b.toDateString()
+  if (same(date, today)) return `Hoy, ${timeFormat.format(date)}`
+  if (same(date, yesterday)) return `Ayer, ${timeFormat.format(date)}`
+  return dayFormat.format(date)
+}
+
+/** Conversaciones guardadas en este dispositivo, la más reciente arriba. */
+function HistoryList({
+  conversations,
+  currentId,
+  onOpen,
+  onDelete,
+}: {
+  conversations: Conversation[]
+  currentId: string | null
+  onOpen: (id: string) => void
+  onDelete: (id: string) => void
+}) {
+  const [confirming, setConfirming] = useState<string | null>(null)
+  return (
+    <div className="flex flex-col gap-2 min-h-[46dvh] animate-fade">
+      <p className="text-[0.75rem] font-semibold text-ink-3 px-1">
+        Conversaciones anteriores · se guardan solo en este dispositivo
+      </p>
+      <ul className="flex flex-col gap-1.5">
+        {conversations.map((c) => {
+          const replies = c.messages.filter((m) => m.role === 'user').length
+          return (
+            <li key={c.id} className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => onOpen(c.id)}
+                aria-current={c.id === currentId ? 'true' : undefined}
+                className={cx(
+                  'pressable flex-1 min-w-0 text-left rounded-[16px] px-3.5 py-2.5',
+                  c.id === currentId ? 'bg-accent-quiet' : 'bg-fill',
+                )}
+              >
+                <span className="block text-[0.9375rem] text-ink truncate">{conversationTitle(c)}</span>
+                <span className="block text-[0.75rem] text-ink-3 tabular-nums">
+                  {c.mode === 'libre' && 'Charla libre · '}
+                  {when(c.updatedAt)} · {replies} {replies === 1 ? 'mensaje' : 'mensajes'}
+                </span>
+              </button>
+              {confirming === c.id ? (
+                <Button
+                  size="sm"
+                  variant="dangerFill"
+                  onClick={() => {
+                    setConfirming(null)
+                    onDelete(c.id)
+                  }}
+                >
+                  Borrar
+                </Button>
+              ) : (
+                <IconButton
+                  label="Borrar conversación"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setConfirming(c.id)}
+                >
+                  <Trash2 className="size-[17px] text-ink-3" strokeWidth={2.2} />
+                </IconButton>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }
 

@@ -199,7 +199,10 @@ export interface AssistantReply {
 export async function askAssistant(input: {
   text?: string
   audio?: { data: string; mimeType: string }
-  context: AssistantContext
+  /** Resumen del curso. En la charla libre no se manda. */
+  context?: AssistantContext
+  /** «libre»: charla de cualquier tema, sin datos del curso ni acciones. */
+  mode?: 'libre'
   /** Mensajes anteriores de la conversación, para seguir el mismo tema. */
   history: HistoryTurn[]
   signal?: AbortSignal
@@ -218,7 +221,8 @@ export async function askAssistant(input: {
       body: JSON.stringify({
         text: input.text,
         audio: input.audio,
-        context: input.context,
+        context: input.mode === 'libre' ? undefined : input.context,
+        mode: input.mode,
         history: input.history,
       }),
       signal: input.signal,
@@ -238,5 +242,30 @@ export async function askAssistant(input: {
     heard: body.heard ?? '',
     actions: Array.isArray(body.actions) ? body.actions : [],
     remaining: body.remaining,
+  }
+}
+
+/**
+ * ¿Puede esta cuenta usar la charla libre? Lo decide el servidor. Ante
+ * cualquier fallo (sin red, sin sesión) responde null: no se sabe.
+ */
+export async function fetchFreeChatAllowed(): Promise<boolean | null> {
+  try {
+    const token = await syncEngine.accessToken()
+    if (!token) return null
+    const res = await fetch(ASSISTANT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        apikey: SUPABASE_KEY,
+      },
+      body: JSON.stringify({ capabilities: true }),
+    })
+    if (!res.ok) return null
+    const body = (await res.json().catch(() => ({}))) as { freeChat?: unknown }
+    return body.freeChat === true
+  } catch {
+    return null
   }
 }

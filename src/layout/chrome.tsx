@@ -15,6 +15,7 @@ import {
   ListChecks,
   Mic,
   NotebookPen,
+  Sparkles,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -34,8 +35,8 @@ export type CreateKind = 'tarea' | 'examen' | 'nota' | 'evento'
 interface Chrome {
   /** Abre el editor de lo que se pida; sin argumento, una tarea. */
   openCreate: (kind?: CreateKind) => void
-  /** Abre el asistente de voz. */
-  openAssistant: () => void
+  /** Abre el asistente; con «voice», empieza a dictar directamente. */
+  openAssistant: (mode?: 'text' | 'voice') => void
   /** Hay asignaturas: exámenes y notas necesitan una. */
   hasSubjects: boolean
 }
@@ -202,7 +203,7 @@ export function TopBar({
             )}
           </AnimatePresence>
 
-          <ChromeActions className="chrome-controls pointer-events-auto" />
+          <ChromeActions className="chrome-controls pointer-events-auto" compact={collapsed} />
         </div>
       </div>
     </>,
@@ -210,8 +211,25 @@ export function TopBar({
   )
 }
 
-/** Asistente y avatar, arriba a la derecha. Crear va abajo, junto al pulgar. */
-export function ChromeActions({ className }: { className?: string }) {
+/** Fondo del icono del asistente: el azul de la app con un brillo arriba. */
+export const ASSISTANT_FILL =
+  'linear-gradient(180deg, rgb(255 255 255 / 0.32), transparent 60%), linear-gradient(135deg, var(--c-accent-fill), #7d5cff)'
+
+/**
+ * Asistente y avatar, arriba a la derecha. Crear va abajo, junto al pulgar.
+ *
+ * El asistente es una cápsula con nombre, no un micrófono suelto: se le
+ * escribe o se le habla. Cuando el título pequeño ocupa el centro de la barra,
+ * la cápsula se encoge a su icono para dejarle sitio.
+ */
+export function ChromeActions({
+  className,
+  compact,
+}: {
+  className?: string
+  /** Solo el icono (el título pequeño está a la vista). */
+  compact?: boolean
+}) {
   const { openAssistant } = useChrome()
   return (
     <div className={cx('flex items-center gap-2', className)}>
@@ -221,12 +239,75 @@ export function ChromeActions({ className }: { className?: string }) {
           haptic()
           openAssistant()
         }}
-        aria-label="Asistente"
-        className="pressable liquid relative grid place-items-center size-10 rounded-full text-accent"
+        aria-label="Asistente: escribe o habla"
+        className={cx(
+          'pressable liquid relative flex items-center h-10 rounded-full text-accent',
+          'transition-[padding] duration-300 ease-[var(--spring)]',
+          compact ? 'px-[3px]' : 'pl-[3px] pr-3.5',
+        )}
       >
-        <Mic className="relative z-[2] size-[19px]" strokeWidth={2.3} />
+        <span
+          className="relative z-[2] grid place-items-center size-[34px] rounded-full text-white shrink-0"
+          style={{ background: ASSISTANT_FILL }}
+        >
+          <Sparkles className="size-[17px]" strokeWidth={2.2} />
+        </span>
+        <span
+          aria-hidden
+          className={cx(
+            'relative z-[2] overflow-hidden whitespace-nowrap text-[0.9375rem] font-semibold',
+            'transition-[max-width,opacity,margin] duration-300 ease-[var(--spring)]',
+            compact ? 'max-w-0 opacity-0 ml-0' : 'max-w-[6.5rem] opacity-100 ml-2',
+          )}
+        >
+          Asistente
+        </span>
       </button>
       <AccountAvatar size={40} />
+    </div>
+  )
+}
+
+/**
+ * Acceso al asistente en la barra lateral (iPad en horizontal y ordenador).
+ * Parece un campo de texto, porque se le escribe; el micrófono de la derecha
+ * lo abre ya dictando.
+ */
+export function AssistantLauncher() {
+  const { openAssistant } = useChrome()
+  return (
+    <div className="relative flex items-center h-[3.25rem] rounded-[20px] bg-[var(--glass-tint)] shadow-[inset_0_0_0_0.5px_var(--glass-edge)]">
+      <button
+        type="button"
+        onClick={() => openAssistant('text')}
+        aria-label="Asistente: escríbele lo que quieras apuntar o preguntar"
+        className="pressable flex-1 min-w-0 flex items-center gap-2.5 h-full pl-1.5 pr-1 rounded-[20px] text-left"
+      >
+        <span
+          className="grid place-items-center size-10 rounded-[14px] text-white shrink-0 shadow-[0_4px_12px_rgb(94_92_230/0.28)]"
+          style={{ background: ASSISTANT_FILL }}
+        >
+          <Sparkles className="size-[19px]" strokeWidth={2.2} />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[0.9375rem] font-semibold text-ink leading-tight">
+            Asistente
+          </span>
+          <span className="block text-[0.75rem] text-ink-3 truncate">Escribe o habla</span>
+        </span>
+        <kbd className="ml-auto text-[0.6875rem] font-semibold text-ink-3 tabular-nums rounded-[5px] bg-fill px-1.5 py-px">
+          A
+        </kbd>
+      </button>
+      <button
+        type="button"
+        onClick={() => openAssistant('voice')}
+        aria-label="Dictar al asistente"
+        title="Dictar"
+        className="pressable grid place-items-center size-10 mr-1.5 rounded-full bg-surface text-accent shrink-0 shadow-[0_1px_3px_rgb(0_0_0/0.08)]"
+      >
+        <Mic className="size-[18px]" strokeWidth={2.3} />
+      </button>
     </div>
   )
 }

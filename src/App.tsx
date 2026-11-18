@@ -71,7 +71,10 @@ function Shell() {
   const openCreate = useCallback((kind: CreateKind = 'tarea') => setCreating(kind), [])
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [assistantLoaded, setAssistantLoaded] = useState(false)
-  const openAssistant = useCallback(() => {
+  const [assistantStart, setAssistantStart] = useState<{ mode: 'text' | 'voice'; at: number }>()
+  const openAssistant = useCallback((mode?: unknown) => {
+    // Sin argumento (o con el evento de un onClick), se abre para escribir.
+    setAssistantStart({ mode: mode === 'voice' ? 'voice' : 'text', at: Date.now() })
     setAssistantLoaded(true)
     setAssistantOpen(true)
   }, [])
@@ -185,7 +188,11 @@ function Shell() {
           </div>
         )}>
           <Suspense fallback={assistantOpen && <AssistantLoading onClose={() => setAssistantOpen(false)} />}>
-            <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} />
+            <AssistantSheet
+              open={assistantOpen}
+              start={assistantStart}
+              onClose={() => setAssistantOpen(false)}
+            />
           </Suspense>
         </ErrorBoundary>
       )}

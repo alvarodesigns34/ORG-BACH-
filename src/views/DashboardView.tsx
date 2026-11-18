@@ -12,7 +12,6 @@ import {
   GripHorizontal,
   History,
   ListChecks,
-  Mic,
   Minus,
   NotebookPen,
   Orbit,
@@ -335,8 +334,8 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
       )}
 
       <div className="flex flex-wrap justify-center gap-2 mt-7">
-        {!editing && <Button size="sm" onClick={openAssistant}>
-          <Mic className="size-3.5" aria-hidden="true" />
+        {!editing && <Button size="sm" onClick={() => openAssistant()}>
+          <Sparkles className="size-3.5" aria-hidden="true" />
           Asistente
         </Button>}
         <Button

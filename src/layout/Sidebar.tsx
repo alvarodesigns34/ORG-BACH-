@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { m as motion } from 'motion/react'
-import { Mic, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 
 import { courseLine } from '@/data/defaults'
 import { useSettings } from '@/state/StoreProvider'
@@ -8,7 +8,7 @@ import { hrefFor, type RouteId } from '@/router'
 import { SyncBadge } from '@/features/account/SyncBadge'
 import { spring } from '@/ui/motion'
 import { cx } from '@/ui/primitives'
-import { AccountAvatar, CREATE_ITEMS, useChrome } from './chrome'
+import { AccountAvatar, AssistantLauncher, CREATE_ITEMS, useChrome } from './chrome'
 import { BrandMark, BrandWordmark } from './Brand'
 import { NAV_GROUPS, NAV_ITEMS, NAV_TINTS, tintFill } from './navigation'
 
@@ -25,7 +25,7 @@ interface SidebarProps {
  */
 export function Sidebar({ current, badges }: SidebarProps) {
   const settings = useSettings()
-  const { openAssistant, openCreate, hasSubjects } = useChrome()
+  const { openCreate, hasSubjects } = useChrome()
   const indicator = useActiveIndicator(current)
 
   return (
@@ -52,9 +52,10 @@ export function Sidebar({ current, badges }: SidebarProps) {
           </a>
         </div>
 
-        {/* --- Crear --- */}
+        {/* --- Asistente y crear --- */}
         <div className="px-4 pb-4">
-          <div className="flex gap-2">
+          <AssistantLauncher />
+          <div className="flex gap-2 mt-2">
             <button
               type="button"
               onClick={() => openCreate('tarea')}
@@ -65,15 +66,6 @@ export function Sidebar({ current, badges }: SidebarProps) {
               <kbd className="ml-auto text-[0.6875rem] font-semibold opacity-75 tabular-nums rounded-[5px] bg-white/20 px-1.5 py-px">
                 C
               </kbd>
-            </button>
-            <button
-              type="button"
-              onClick={openAssistant}
-              aria-label="Asistente"
-              title="Asistente"
-              className="pressable grid place-items-center size-11 rounded-full bg-fill text-accent shrink-0"
-            >
-              <Mic className="size-[18px]" strokeWidth={2.3} />
             </button>
           </div>
           <div className="grid grid-cols-3 gap-2 mt-2">
