@@ -21,7 +21,7 @@ import {
   Pencil,
   Plane,
   RotateCcw,
-  Sparkles,
+  Sparkle,
   SquarePen,
   Target,
   Trash2,
@@ -527,7 +527,7 @@ export function AssistantSheet({
       <Modal open={open} onClose={onClose} title="Asistente" size="sm">
         <div className="flex flex-col items-center text-center gap-4 py-4">
           <span className="grid place-items-center size-16 rounded-full bg-accent-quiet text-accent">
-            <Sparkles className="size-7" />
+            <Sparkle className="size-7" strokeWidth={1.9} />
           </span>
           <p className="text-[0.9375rem] text-ink-2 max-w-[32ch]">
             Dile qué apuntar o pregúntale por tu curso, y lo hace por ti. Para usarlo, inicia sesión
@@ -782,7 +782,7 @@ function FreeWelcome() {
   return (
     <div className="flex items-center gap-3 pt-1 animate-fade">
       <span className="grid place-items-center size-11 rounded-full bg-accent-quiet text-accent shrink-0">
-        <Sparkles className="size-5" />
+        <Sparkle className="size-5" strokeWidth={1.9} />
       </span>
       <p className="text-[0.9375rem] text-ink-2">
         Pregúntame lo que quieras, de cualquier tema. En este modo no veo tus tareas, exámenes ni
@@ -877,7 +877,7 @@ function Welcome({ onPick }: { onPick: (text: string) => void }) {
     <div className="flex flex-col gap-5 pt-1 animate-fade">
       <div className="flex items-center gap-3">
         <span className="grid place-items-center size-11 rounded-full bg-accent-quiet text-accent shrink-0">
-          <Sparkles className="size-5" />
+          <Sparkle className="size-5" strokeWidth={1.9} />
         </span>
         <p className="text-[0.9375rem] text-ink-2">
           Dime qué apuntar o pregúntame por tu curso. Puedes seguir hablando del mismo tema:

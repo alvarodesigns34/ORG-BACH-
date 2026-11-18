@@ -18,6 +18,7 @@ import {
   PlaneTakeoff,
   Plus,
   SlidersHorizontal,
+  Sparkle,
   Sparkles,
   Target,
   TriangleAlert,
@@ -335,7 +336,7 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
 
       <div className="flex flex-wrap justify-center gap-2 mt-7">
         {!editing && <Button size="sm" onClick={() => openAssistant()}>
-          <Sparkles className="size-3.5" aria-hidden="true" />
+          <Sparkle className="size-3.5" strokeWidth={2.1} aria-hidden="true" />
           Asistente
         </Button>}
         <Button

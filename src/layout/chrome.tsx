@@ -15,7 +15,7 @@ import {
   ListChecks,
   Mic,
   NotebookPen,
-  Sparkles,
+  Sparkle,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -211,9 +211,13 @@ export function TopBar({
   )
 }
 
-/** Fondo del icono del asistente: el azul de la app con un brillo arriba. */
-export const ASSISTANT_FILL =
-  'linear-gradient(180deg, rgb(255 255 255 / 0.32), transparent 60%), linear-gradient(135deg, var(--c-accent-fill), #7d5cff)'
+/**
+ * Icono del asistente: un solo destello de trazo fino, en el color de la app.
+ * Sin fondo ni degradado, como el resto de iconos de la interfaz.
+ */
+export function AssistantIcon({ className }: { className?: string }) {
+  return <Sparkle className={className} strokeWidth={1.9} aria-hidden />
+}
 
 /**
  * Asistente y avatar, arriba a la derecha. Crear va abajo, junto al pulgar.
@@ -243,21 +247,18 @@ export function ChromeActions({
         className={cx(
           'pressable liquid relative flex items-center h-10 rounded-full text-accent',
           'transition-[padding] duration-300 ease-[var(--spring)]',
-          compact ? 'px-[3px]' : 'pl-[3px] pr-3.5',
+          compact ? 'px-0' : 'pl-0 pr-3.5',
         )}
       >
-        <span
-          className="relative z-[2] grid place-items-center size-[34px] rounded-full text-white shrink-0"
-          style={{ background: ASSISTANT_FILL }}
-        >
-          <Sparkles className="size-[17px]" strokeWidth={2.2} />
+        <span className="relative z-[2] grid place-items-center size-10 shrink-0">
+          <AssistantIcon className="size-[19px]" />
         </span>
         <span
           aria-hidden
           className={cx(
             'relative z-[2] overflow-hidden whitespace-nowrap text-[0.9375rem] font-semibold',
             'transition-[max-width,opacity,margin] duration-300 ease-[var(--spring)]',
-            compact ? 'max-w-0 opacity-0 ml-0' : 'max-w-[6.5rem] opacity-100 ml-2',
+            compact ? 'max-w-0 opacity-0 ml-0' : 'max-w-[6.5rem] opacity-100 -ml-1',
           )}
         >
           Asistente
@@ -283,11 +284,8 @@ export function AssistantLauncher() {
         aria-label="Asistente: escríbele lo que quieras apuntar o preguntar"
         className="pressable flex-1 min-w-0 flex items-center gap-2.5 h-full pl-1.5 pr-1 rounded-[20px] text-left"
       >
-        <span
-          className="grid place-items-center size-10 rounded-[14px] text-white shrink-0 shadow-[0_4px_12px_rgb(94_92_230/0.28)]"
-          style={{ background: ASSISTANT_FILL }}
-        >
-          <Sparkles className="size-[19px]" strokeWidth={2.2} />
+        <span className="grid place-items-center size-10 text-accent shrink-0">
+          <AssistantIcon className="size-[20px]" />
         </span>
         <span className="min-w-0">
           <span className="block text-[0.9375rem] font-semibold text-ink leading-tight">

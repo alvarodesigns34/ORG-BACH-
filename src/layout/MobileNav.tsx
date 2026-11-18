@@ -7,13 +7,13 @@ import {
   type CSSProperties,
 } from 'react'
 import { AnimatePresence, m as motion } from 'motion/react'
-import { ChevronRight, LayoutGrid, Plus, Sparkles } from 'lucide-react'
+import { ChevronRight, LayoutGrid, Plus } from 'lucide-react'
 
 import { hrefFor, type RouteId } from '@/router'
 import { exitFast, haptic, spring, useMediaQuery } from '@/ui/motion'
 import { cx } from '@/ui/primitives'
 import { Modal } from '@/ui/Modal'
-import { ASSISTANT_FILL, CREATE_ITEMS, useChrome } from './chrome'
+import { AssistantIcon, CREATE_ITEMS, useChrome } from './chrome'
 import { MOBILE_PRIMARY, NAV_ITEMS, NAV_TINTS, tintFill, type NavItem } from './navigation'
 
 interface MobileNavProps {
@@ -423,11 +423,8 @@ function CreateButton() {
                   }}
                   className="pressable w-full flex items-center gap-3 h-[3.25rem] pl-2 pr-4 rounded-[22px] text-left active:bg-fill"
                 >
-                  <span
-                    className="grid place-items-center size-9 rounded-full text-white shrink-0"
-                    style={{ background: ASSISTANT_FILL }}
-                  >
-                    <Sparkles className="size-[18px]" strokeWidth={2.2} />
+                  <span className="grid place-items-center size-9 rounded-full bg-accent-quiet text-accent shrink-0">
+                    <AssistantIcon className="size-[19px]" />
                   </span>
                   <span className="min-w-0">
                     <span className="block text-[1.0625rem] font-medium text-ink leading-tight">
