@@ -31,7 +31,7 @@ export function Sidebar({ current, badges }: SidebarProps) {
   return (
     <aside
       className={cx(
-        'hidden lg:flex flex-col fixed z-30 w-[272px] rounded-[30px] liquid',
+        'app-sidebar hidden lg:flex flex-col fixed z-30 w-[272px] rounded-[30px] liquid',
         'top-[max(0.75rem,env(safe-area-inset-top))] bottom-3 left-[max(0.75rem,env(safe-area-inset-left))]',
       )}
     >

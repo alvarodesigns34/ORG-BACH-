@@ -3,7 +3,8 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react
 import { useSettings, useStore } from '@/state/StoreProvider'
 import { StoreProvider } from '@/state/StoreProvider'
 import { useTaskSummary } from '@/state/selectors'
-import { hrefFor, useRoute, type Route, type RouteId } from '@/router'
+import { hrefFor, setRoutePreloader, useRoute, type Route, type RouteId } from '@/router'
+import { lazyView, whenIdle } from '@/ui/lazyView'
 import { AppShell, StorageBanner } from '@/layout/AppShell'
 import { BrandMark } from '@/layout/Brand'
 import { ErrorBoundary } from '@/ui/ErrorBoundary'
@@ -24,21 +25,56 @@ import { ChromeProvider, type CreateKind } from '@/layout/chrome'
 import { FlightController } from '@/features/study/FlightController'
 import { ShortcutsSheet, useKeyboardShortcuts } from '@/layout/shortcuts'
 
-const TasksView = lazy(() => import('@/views/TasksView').then((m) => ({ default: m.TasksView })))
-const StudyView = lazy(() => import('@/views/StudyView'))
-const CalendarView = lazy(() => import('@/views/CalendarView').then((m) => ({ default: m.CalendarView })))
+// Vistas en bloques aparte. Se descargan en reposo tras el arranque (ver
+// `preloadViews`) y, si aún no estaban, al tocar su pestaña: el router espera
+// un momento con la pantalla vieja puesta antes de cambiar.
+const TasksView = lazyView(() => import('@/views/TasksView').then((m) => m.TasksView))
+const StudyView = lazyView(() => import('@/views/StudyView').then((m) => m.default))
+const CalendarView = lazyView(() => import('@/views/CalendarView').then((m) => m.CalendarView))
+const SubjectDetailView = lazyView(() => import('@/views/SubjectDetailView').then((m) => m.SubjectDetailView))
+const GradesView = lazyView(() => import('@/views/GradesView').then((m) => m.GradesView))
+const ExamsView = lazyView(() => import('@/views/ExamsView').then((m) => m.ExamsView))
+const StatsView = lazyView(() => import('@/views/StatsView').then((m) => m.StatsView))
+const GoalsView = lazyView(() => import('@/views/GoalsView').then((m) => m.GoalsView))
+const SettingsView = lazyView(() => import('@/views/SettingsView').then((m) => m.SettingsView))
 
-const SubjectDetailView = lazy(() => import('@/views/SubjectDetailView').then((m) => ({ default: m.SubjectDetailView })))
+function viewFor(route: Route) {
+  switch (route.id) {
+    case 'tareas': return TasksView
+    case 'calendario': return CalendarView
+    case 'estudio': return StudyView
+    case 'asignaturas': return route.params.get('id') ? SubjectDetailView : null
+    case 'notas': return GradesView
+    case 'examenes': return ExamsView
+    case 'estadisticas': return StatsView
+    case 'objetivos': return GoalsView
+    case 'ajustes': return SettingsView
+    default: return null
+  }
+}
 
-const GradesView = lazy(() => import('@/views/GradesView').then((m) => ({ default: m.GradesView })))
+setRoutePreloader((route) => {
+  const view = viewFor(route)
+  return view && !view.isLoaded() ? view.preload() : undefined
+})
 
-const ExamsView = lazy(() => import('@/views/ExamsView').then((m) => ({ default: m.ExamsView })))
+/** En orden de uso probable. El globo de Estudio se precalienta aparte (ver `prewarm`). */
+const IDLE_ORDER = [TasksView, CalendarView, StudyView, GradesView, ExamsView, SubjectDetailView, StatsView, GoalsView, SettingsView]
 
-const StatsView = lazy(() => import('@/views/StatsView').then((m) => ({ default: m.StatsView })))
-
-const GoalsView = lazy(() => import('@/views/GoalsView').then((m) => ({ default: m.GoalsView })))
-
-const SettingsView = lazy(() => import('@/views/SettingsView').then((m) => ({ default: m.SettingsView })))
+function preloadViews(): () => void {
+  let cancel = () => {}
+  let index = 0
+  const next = () => {
+    const view = IDLE_ORDER[index++]
+    if (!view) return
+    // De una en una y en reposo: no compite con lo que se está tocando.
+    void view.preload().catch(() => undefined).finally(() => {
+      cancel = whenIdle(next)
+    })
+  }
+  cancel = whenIdle(next, 3000)
+  return () => cancel()
+}
 
 const AssistantSheet = lazy(() => import('@/features/assistant/AssistantSheet').then((m) => ({ default: m.AssistantSheet })))
 
@@ -85,6 +121,12 @@ function Shell() {
   // La sincronización arranca dentro del proveedor: necesita el puente con el
   // almacén. Sin cuenta configurada no hace nada.
   useEffect(() => syncEngine.start(), [])
+
+  // El código de las demás vistas, en reposo: así cambiar de sección no
+  // espera a nada (y funciona igual sin conexión aunque el Service Worker aún
+  // no hubiera terminado de guardarlo).
+  const onboarded = settings.onboarded
+  useEffect(() => (onboarded ? preloadViews() : undefined), [onboarded])
 
   // El globo de Estudio se descarga en reposo, con Inicio ya pintado; y si se
   // abre Estudio antes, su descarga arranca a la vez que la de la vista.
