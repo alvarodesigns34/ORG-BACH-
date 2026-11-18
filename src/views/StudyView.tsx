@@ -519,6 +519,18 @@ export default function StudyView() {
       (s) => s.id !== sessionShown.id && s.status === 'aterrizado' && s.to === sessionShown.to,
     )
 
+  // El HUD del vuelo entra cuando el globo ya se ve, o a los 1,2 s aunque
+  // no haya llegado (sin red, el reloj no puede esperar al mapa).
+  const mapSettled = !mapEnabled || mapStatus !== 'cargando'
+  const [hudTimedOut, setHudTimedOut] = useState(false)
+  useEffect(() => {
+    if (stage !== 'vuelo' || mapSettled) return
+    setHudTimedOut(false)
+    const timer = window.setTimeout(() => setHudTimedOut(true), 1200)
+    return () => window.clearTimeout(timer)
+  }, [stage, mapSettled])
+  const hudReady = mapSettled || hudTimedOut
+
   const showToolbar =
     stage === 'inicio' || stage === 'reserva' || stage === 'vuelo' || stage === 'aterrizado'
 
@@ -749,6 +761,7 @@ export default function StudyView() {
 
         {stage === 'vuelo' && active && (
           <FlightHud
+            ready={hudReady}
             session={active}
             subject={active.subjectId ? subjectMap.get(active.subjectId) : undefined}
             task={activeTask}

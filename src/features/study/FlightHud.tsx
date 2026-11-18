@@ -574,7 +574,13 @@ export function FlightHud({
   onPause,
   onBreak,
   onAbandon,
+  ready = true,
 }: {
+  /**
+   * El globo ya está pintado (o no hay mapa). El HUD espera a esto para
+   * entrar: así el reloj y la ruta aparecen sobre el mapa, no sobre el vacío.
+   */
+  ready?: boolean
   session: FocusSession
   subject?: Subject
   task?: Task
@@ -600,8 +606,8 @@ export function FlightHud({
     <>
       <motion.div
         initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ ...spring.smooth, delay: 0.4 }}
+        animate={ready ? { opacity: 1, y: 0 } : { opacity: 0, y: -10 }}
+        transition={{ ...spring.smooth, delay: ready ? 0.05 : 0 }}
         className="absolute z-10 left-[max(1rem,env(safe-area-inset-left))] top-[max(1rem,env(safe-area-inset-top))]"
       >
         <div className="liquid rounded-full">
@@ -613,9 +619,9 @@ export function FlightHud({
 
       {/* La ruta y lo que se estudia. */}
       <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ ...spring.smooth, delay: 0.5 }}
+        initial={{ opacity: 0, y: -10, scale: 0.96 }}
+        animate={ready ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: -10, scale: 0.96 }}
+        transition={{ ...spring.smooth, delay: ready ? 0.12 : 0 }}
         className="study-flight-route absolute z-10"
       >
         <div className="liquid rounded-full flex items-center gap-2 h-12 pl-4 pr-2">
@@ -640,8 +646,8 @@ export function FlightHud({
       {/* Abajo: el estado del vuelo. */}
       <motion.div
         initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ ...spring.smooth, delay: 0.6 }}
+        animate={ready ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
+        transition={{ ...spring.smooth, delay: ready ? 0.2 : 0 }}
         className="study-flight-hud absolute z-10"
       >
         <div className="study-flight-card liquid rounded-[30px] overflow-hidden">

@@ -13,7 +13,6 @@
 .study-root {
   --st-glass: rgb(255 255 255 / 0.62);
   --st-glass-thick: rgb(250 250 252 / 0.86);
-  --st-blur: blur(24px) saturate(180%);
   --st-sheen: rgb(255 255 255 / 0.5);
   --st-rim: rgb(255 255 255 / 0.9);
   --st-edge: rgb(0 0 0 / 0.08);
@@ -33,8 +32,10 @@
 }
 .study-root .liquid {
   background: linear-gradient(180deg, var(--st-sheen), transparent 40%), var(--st-glass);
-  -webkit-backdrop-filter: var(--st-blur);
-  backdrop-filter: var(--st-blur);
+  /* Valores fijos: WebKit no siempre resuelve variables dentro de
+     -webkit-backdrop-filter (bug 289149). */
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
   box-shadow:
     inset 0 0 0 0.5px var(--st-edge),
     inset 0 1px 0 var(--st-rim),

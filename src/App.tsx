@@ -6,7 +6,6 @@ import { useTaskSummary } from '@/state/selectors'
 import { hrefFor, setRoutePreloader, useRoute, type Route, type RouteId } from '@/router'
 import { lazyView, whenIdle } from '@/ui/lazyView'
 import { AppShell, StorageBanner } from '@/layout/AppShell'
-import { BrandMark } from '@/layout/Brand'
 import { ErrorBoundary } from '@/ui/ErrorBoundary'
 import { TaskEditor } from '@/features/tasks/TaskEditor'
 import { ExamEditor } from '@/features/exams/ExamEditor'
@@ -286,12 +285,30 @@ function RouteFailure({ study }: { study: boolean }) {
   )
 }
 
+/**
+ * Mientras llega el código de una vista (casi nunca: se precargan en reposo).
+ * Tiene la forma de una pantalla —título, filtros, tarjetas— y aparece con
+ * un retraso: si la vista llega antes, no se ve nada y no hay parpadeo.
+ */
 function RouteLoading({ study }: { study: boolean }) {
+  if (study) {
+    return (
+      <div role="status" aria-label="Abriendo Estudio" className="route-skeleton fixed inset-0 z-[35] bg-canvas" />
+    )
+  }
   return (
-    <div role="status" className="grid min-h-[48dvh] place-items-center px-6">
-      <div className="flex flex-col items-center gap-4 animate-fade">
-        <BrandMark size={52} />
-        <span className="text-sm font-medium text-ink-2">{study ? 'Abriendo Estudio…' : 'Cargando vista…'}</span>
+    <div role="status" aria-label="Cargando vista" className="route-skeleton mx-auto w-full max-w-[1180px] px-[max(1.25rem,env(safe-area-inset-left))] sm:px-8 pt-[3.75rem] lg:pt-10">
+      <div className="skeleton-block h-3 w-28 rounded-full" />
+      <div className="skeleton-block h-9 w-56 rounded-xl mt-2.5" />
+      <div className="flex gap-2 mt-7">
+        {[72, 56, 84, 64].map((w) => (
+          <div key={w} className="skeleton-block h-8 rounded-full" style={{ width: w }} />
+        ))}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 mt-6">
+        <div className="skeleton-block h-40 rounded-[22px]" />
+        <div className="skeleton-block h-40 rounded-[22px]" />
+        <div className="skeleton-block h-28 rounded-[22px] sm:col-span-2" />
       </div>
     </div>
   )
