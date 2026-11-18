@@ -4,6 +4,7 @@ import { ChevronRight, type LucideIcon } from 'lucide-react'
 import { parseDecimal, sanitizeNumericInput, toDecimalInput } from '@/domain/number'
 
 import { SwitchControl } from './fields'
+import { tintFill } from '@/layout/navigation'
 import { cx } from './primitives'
 
 /**
@@ -31,7 +32,7 @@ export function ListGroup({
   return (
     <section id={id} className={cx('scroll-mt-20', className)}>
       {header && (
-        <h2 className="px-4 mb-1.5 text-[0.8125rem] font-medium uppercase tracking-[0.02em] text-ink-3">
+        <h2 className="px-4 mb-2 text-[0.9375rem] font-semibold tracking-[-0.01em] text-ink-2">
           {header}
         </h2>
       )}
@@ -83,15 +84,15 @@ export function ListRow({
       {Icon && (
         <span
           aria-hidden
-          className="grid place-items-center size-[29px] rounded-[7px] text-white shrink-0"
-          style={{ background: tint ?? 'var(--c-ink-3)' }}
+          className="tile grid place-items-center size-[30px] rounded-[8px] text-white shrink-0"
+          style={{ background: tintFill(tint ?? '#8e8e93') }}
         >
           <Icon className="size-[17px]" strokeWidth={2.2} />
         </span>
       )}
       <span
         className={cx(
-          'list-row-body flex-1 min-w-0 flex items-center gap-3 min-h-[2.875rem] py-2 pr-4',
+          'list-row-body flex-1 min-w-0 flex items-center gap-3 min-h-[3.25rem] py-2.5 pr-4',
         )}
       >
         <span className="flex-1 min-w-0">
@@ -111,7 +112,7 @@ export function ListRow({
               {label}
             </span>
           )}
-          {detail && <span className="block text-[0.8125rem] text-ink-3 mt-0.5">{detail}</span>}
+          {detail && <span className="block text-[0.875rem] text-ink-3 mt-0.5">{detail}</span>}
         </span>
         {value !== undefined && (
           <span className="shrink-0 max-w-[55%] truncate text-[1rem] text-ink-3 tabular-nums">
