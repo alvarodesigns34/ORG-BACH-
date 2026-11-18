@@ -433,15 +433,17 @@ export function EmptyState({
     )
   }
   return (
-    <div className={cx('flex flex-col items-center text-center py-12 px-6', className)}>
+    // «Sin contenido» de iOS (ContentUnavailableView): un símbolo grande en
+    // gris, sin fondo, un título en negrita y la acción en cápsula.
+    <div className={cx('flex flex-col items-center text-center py-14 px-6', className)}>
       {icon && (
-        <div className="flex items-center justify-center rounded-full mb-4 bg-accent-quiet text-accent size-14">
+        <div className="animate-pop mb-4 text-ink-3 [&_svg]:!size-12 [&_svg]:[stroke-width:1.6]">
           {icon}
         </div>
       )}
-      <p className="font-semibold text-ink text-base">{title}</p>
-      <p className="text-ink-3 mt-1.5 text-balance text-[0.875rem] max-w-[46ch]">{description}</p>
-      {action && <div className="mt-5">{action}</div>}
+      <p className="display text-ink text-[1.375rem] leading-tight">{title}</p>
+      <p className="text-ink-3 mt-2 text-balance text-[0.9375rem] max-w-[46ch]">{description}</p>
+      {action && <div className="mt-6">{action}</div>}
     </div>
   )
 }

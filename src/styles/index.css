@@ -955,9 +955,13 @@ html {
    solapan, así que el cambio no añade espera. Barra lateral y barra de
    pestañas no forman parte de la foto: se quedan quietas y solo se mueve la
    marca de la sección. Todo es opacidad y transform en el compositor. */
+:root[data-nav='push'] .app-sidebar,
+:root[data-nav='pop'] .app-sidebar,
 :root[data-nav='section'] .app-sidebar {
   view-transition-name: sidebar;
 }
+:root[data-nav='push'] .app-tabbar,
+:root[data-nav='pop'] .app-tabbar,
 :root[data-nav='section'] .app-tabbar {
   view-transition-name: tabbar;
 }
@@ -982,6 +986,46 @@ html {
 }
 ::view-transition-new(root) {
   mix-blend-mode: normal;
+}
+/* Pila de navegación (iOS): la ficha entra por la derecha sobre la lista,
+   que se retira un poco hacia la izquierda y se oscurece; al volver, al revés. */
+:root[data-nav='push']::view-transition-new(root) {
+  z-index: 2;
+  animation: push-in 520ms var(--spring) both;
+  box-shadow: -12px 0 40px rgb(0 0 0 / 0.12);
+}
+:root[data-nav='push']::view-transition-old(root) {
+  animation: push-under 520ms var(--spring) both;
+}
+:root[data-nav='pop']::view-transition-old(root) {
+  z-index: 2;
+  animation: pop-out 440ms var(--spring) both;
+}
+:root[data-nav='pop']::view-transition-new(root) {
+  z-index: 1;
+  animation: pop-under 440ms var(--spring) both;
+}
+@keyframes push-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes push-under {
+  to {
+    transform: translateX(-28%);
+    opacity: 0.5;
+  }
+}
+@keyframes pop-out {
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes pop-under {
+  from {
+    transform: translateX(-28%);
+    opacity: 0.5;
+  }
 }
 @keyframes screen-out {
   to {
@@ -1273,6 +1317,10 @@ html {
 }
 .search-field:focus {
   background: var(--c-raised);
+  border-color: transparent;
+  box-shadow:
+    0 0 0 0.5px var(--glass-edge),
+    0 2px 10px rgb(0 0 0 / 0.08);
 }
 
 /* Interruptor: al pulsarlo, la bola se vuelve una lente de cristal que deja

@@ -145,7 +145,18 @@ async function onHashChange(): Promise<void> {
   // Fuera de Estudio, barra lateral y barra de pestañas se quedan quietas en
   // su sitio (solo cambia la pestaña marcada); el contenido es lo que se funde.
   // Estudio ocupa toda la pantalla: ahí se funde todo.
-  root.dataset.nav = from.id === 'estudio' || to.id === 'estudio' ? 'immersive' : 'section'
+  // Entrar en una ficha (Asignaturas → Matemáticas) empuja la pantalla desde
+  // la derecha, como una pila de navegación de iOS; salir de ella, al revés.
+  const fromId = from.params.get('id')
+  const toId = to.params.get('id')
+  root.dataset.nav =
+    from.id === 'estudio' || to.id === 'estudio'
+      ? 'immersive'
+      : from.id === to.id && toId && !fromId
+        ? 'push'
+        : from.id === to.id && fromId && !toId
+          ? 'pop'
+          : 'section'
   const transition = (document as Document & { startViewTransition: StartViewTransition })
     .startViewTransition(() => flushSync(() => commit(next)))
   running = transition
