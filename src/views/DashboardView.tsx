@@ -475,7 +475,7 @@ function EditTray({
           className={cx(
             'liquid fixed z-40 rounded-[28px] p-2',
             'inset-x-3 bottom-[calc(5.75rem+env(safe-area-inset-bottom))]',
-            'lg:left-[calc(272px+3rem)] lg:right-8 lg:bottom-6 lg:max-w-[640px] lg:mx-auto',
+            'lg:left-[calc(var(--content-left)+2rem)] lg:right-8 lg:bottom-6 lg:max-w-[640px] lg:mx-auto',
           )}
         >
           <div className="relative z-[2] flex items-center gap-2">

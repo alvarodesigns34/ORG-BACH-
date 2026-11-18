@@ -298,7 +298,7 @@ function RouteLoading({ study }: { study: boolean }) {
     )
   }
   return (
-    <div role="status" aria-label="Cargando vista" className="route-skeleton mx-auto w-full max-w-[1180px] px-[max(1.25rem,env(safe-area-inset-left))] sm:px-8 pt-[3.75rem] lg:pt-10">
+    <div role="status" aria-label="Cargando vista" className="route-skeleton mx-auto w-full max-w-[1180px] px-[max(1.25rem,env(safe-area-inset-left))] sm:px-8 pt-[3.75rem] lg:pt-[4.75rem]">
       <div className="skeleton-block h-3 w-28 rounded-full" />
       <div className="skeleton-block h-9 w-56 rounded-xl mt-2.5" />
       <div className="flex gap-2 mt-7">

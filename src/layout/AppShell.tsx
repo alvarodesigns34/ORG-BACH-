@@ -146,7 +146,7 @@ export function AppShell({
       <div aria-hidden className="ambient" />
       <div inert={immersive}><Sidebar current={current} badges={badges} /></div>
 
-      <div className="min-w-0 flex flex-col min-h-dvh lg:pl-[calc(272px+0.75rem+max(0.75rem,env(safe-area-inset-left)))]">
+      <div className="app-content min-w-0 flex flex-col min-h-dvh">
         <div inert={immersive}><StorageBanner /></div>
 
         <main
@@ -187,7 +187,7 @@ export function Page({ children, className }: PageProps) {
       className={cx(
         'page-enter mx-auto w-full max-w-[1180px]',
         // En móvil, el hueco de arriba es el de la barra superior flotante.
-        'px-[max(1.25rem,env(safe-area-inset-left))] sm:px-8 pt-[3.75rem] lg:pt-10 pb-6',
+        'px-[max(1.25rem,env(safe-area-inset-left))] sm:px-8 pt-[3.75rem] lg:pt-[4.75rem] pb-6',
         className,
       )}
     >
@@ -232,14 +232,6 @@ export function PageHeader({
   return (
     <header className="mb-6 sm:mb-8">
       <TopBar title={compactTitle ?? title} collapsed={past} scrolled={scrolled} back={back} />
-      {back && (
-        <a
-          href={back.href}
-          className="max-lg:hidden inline-flex items-center gap-1 text-[0.875rem] font-medium text-accent hover:underline underline-offset-4 mb-4"
-        >
-          ‹ {back.label}
-        </a>
-      )}
       {eyebrow && (
         <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.04em] text-ink-3 mb-1">
           {eyebrow}

@@ -107,6 +107,9 @@
 
   /* Zona segura superior, legible desde JS (barra compacta). */
   --safe-top: env(safe-area-inset-top, 0px);
+
+  /* Barra lateral del iPad: ancho y hueco que deja al contenido. */
+  --sidebar-w: 280px;
 }
 
 [data-theme='dark'] {
@@ -1102,4 +1105,134 @@ html {
   color: var(--c-accent);
   font-size: .875rem;
   font-weight: 650;
+}
+
+/* ==========================================================================
+   NAVEGACIÓN DE iPadOS 26
+   ========================================================================== */
+
+/* El hueco del contenido sigue a la barra lateral: al ocultarla, el contenido
+   se ensancha con el mismo muelle con que ella sale. */
+@media (min-width: 1024px) {
+  :root {
+    --content-left: calc(var(--sidebar-w) + 0.75rem + max(0.75rem, env(safe-area-inset-left)));
+  }
+  :root[data-sidebar='hidden'] {
+    --content-left: 0px;
+  }
+  .app-content {
+    padding-left: var(--content-left);
+    transition: padding-left 560ms var(--spring);
+  }
+  .app-toolbar {
+    left: var(--content-left);
+    transition: left 560ms var(--spring);
+  }
+  .app-sidebar {
+    transition:
+      transform 560ms var(--spring),
+      opacity 240ms var(--ease-std);
+  }
+  :root[data-sidebar='hidden'] .app-sidebar {
+    transform: translateX(calc(-100% - 2rem)) scale(0.96);
+    opacity: 0;
+    transition:
+      transform 480ms var(--spring),
+      opacity 300ms var(--ease-std) 80ms;
+  }
+}
+
+/* Campo del asistente en la barra lateral: el de búsqueda de iPadOS, un
+   relleno gris dentro del cristal, sin cristal propio (nada de cristal
+   sobre cristal). */
+.sidebar-field {
+  background: var(--glass-tint);
+  transition: background-color 160ms var(--ease-std);
+}
+.sidebar-field:hover {
+  background: color-mix(in srgb, var(--glass-tint) 100%, var(--c-fill));
+}
+
+/* Grupo plegable: la altura se anima con la rejilla (0fr → 1fr), sin medir. */
+.sidebar-fold {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows 380ms var(--spring),
+    opacity 220ms var(--ease-std);
+}
+.sidebar-fold[data-open='false'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+/* Barra de herramientas del iPad: el contenido se disuelve en el color del
+   fondo al pasar por debajo de los botones (efecto de borde «suave»). */
+.edge-top-lg {
+  position: fixed;
+  top: 0;
+  right: 0;
+  /* Solo sobre el contenido: la barra lateral queda por encima, nítida. */
+  left: var(--content-left, 0px);
+  height: calc(env(safe-area-inset-top, 0px) + 76px);
+  z-index: 19;
+  pointer-events: none;
+  background: linear-gradient(
+    color-mix(in srgb, var(--c-canvas) 92%, transparent) 0%,
+    color-mix(in srgb, var(--c-canvas) 70%, transparent) 45%,
+    transparent 100%
+  );
+  transition: opacity 260ms var(--ease-std);
+}
+/* El desenfoque, en una tira aparte bajo la fila de botones: en Safari un
+   desenfoque que pasa por detrás de un botón fijo puede emborronarlo. */
+.edge-top-lg-blur {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 58px);
+  right: 0;
+  left: var(--content-left, 0px);
+  height: 44px;
+  z-index: 18;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(8px) saturate(160%);
+  backdrop-filter: blur(8px) saturate(160%);
+  -webkit-mask-image: linear-gradient(#000, transparent);
+  mask-image: linear-gradient(#000, transparent);
+  transition: opacity 260ms var(--ease-std);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .edge-top-lg-blur {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* Menús y popovers: cristal «regular» más denso (hay texto que leer) y una
+   sombra más honda, porque un cristal más grande parece más grueso. */
+.menu-panel.liquid {
+  background:
+    linear-gradient(180deg, var(--glass-sheen), transparent 46%),
+    var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  backdrop-filter: blur(28px) saturate(190%);
+  box-shadow:
+    inset 1.5px 1.5px 1px -1px var(--glass-rim),
+    inset 0 0 0 0.5px var(--glass-edge),
+    inset 0 0 22px -8px var(--glass-glow),
+    0 2px 6px rgb(0 0 0 / 0.08),
+    0 22px 50px rgb(0 0 0 / 0.18);
+}
+[data-theme='dark'] .menu-panel.liquid {
+  box-shadow:
+    inset 1.5px 1.5px 1px -1px var(--glass-rim),
+    inset 0 0 0 0.5px var(--glass-edge),
+    0 2px 6px rgb(0 0 0 / 0.4),
+    0 22px 50px rgb(0 0 0 / 0.6);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .menu-panel.liquid {
+    background: var(--c-raised);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }

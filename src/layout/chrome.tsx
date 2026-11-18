@@ -13,8 +13,9 @@ import {
   ChevronLeft,
   GraduationCap,
   ListChecks,
-  Mic,
   NotebookPen,
+  PanelLeft,
+  Plus,
   Sparkle,
   type LucideIcon,
 } from 'lucide-react'
@@ -22,8 +23,10 @@ import {
 import { hrefFor } from '@/router'
 import { useSettings } from '@/state/StoreProvider'
 import { useSync } from '@/sync/useSync'
+import { Menu } from '@/ui/Menu'
 import { exitFast, haptic, spring } from '@/ui/motion'
 import { cx } from '@/ui/primitives'
+import { toggleSidebar, useSidebarPrefs } from './sidebarState'
 
 // ---------------------------------------------------------------------------
 // Acciones globales
@@ -61,12 +64,58 @@ export const CREATE_ITEMS: {
   icon: LucideIcon
   tint: string
   needsSubject?: boolean
+  /** Atajo de teclado (ver `shortcuts.tsx`). */
+  key?: string
 }[] = [
-  { kind: 'tarea', label: 'Tarea', icon: ListChecks, tint: '#5e5ce6' },
-  { kind: 'examen', label: 'Examen', icon: NotebookPen, tint: '#ff453a', needsSubject: true },
-  { kind: 'nota', label: 'Nota', icon: GraduationCap, tint: '#bf5af2', needsSubject: true },
-  { kind: 'evento', label: 'Evento', icon: CalendarPlus, tint: '#ff9f0a' },
+  { kind: 'tarea', label: 'Tarea', icon: ListChecks, tint: '#5e5ce6', key: 'C' },
+  { kind: 'examen', label: 'Examen', icon: NotebookPen, tint: '#ff453a', needsSubject: true, key: 'E' },
+  { kind: 'nota', label: 'Nota', icon: GraduationCap, tint: '#bf5af2', needsSubject: true, key: 'G' },
+  { kind: 'evento', label: 'Evento', icon: CalendarPlus, tint: '#ff9f0a', key: 'V' },
 ]
+
+/**
+ * «+» de la barra de herramientas: un botón de cristal tintado (la acción
+ * principal) que abre un menú que brota de él, como en las apps de iPadOS 26.
+ */
+export function CreateMenu() {
+  const { openCreate, hasSubjects } = useChrome()
+  return (
+    <Menu
+      label="Crear"
+      width={220}
+      items={CREATE_ITEMS.map((item) => ({
+        id: item.kind,
+        label: item.label,
+        hint: item.key,
+        disabled: item.needsSubject && !hasSubjects,
+        icon: <item.icon className="size-[18px]" strokeWidth={2.1} style={{ color: item.tint }} />,
+        onSelect: () => openCreate(item.kind),
+      }))}
+      trigger={(props) => (
+        <button
+          type="button"
+          {...props}
+          onClick={() => {
+            haptic()
+            props.onClick()
+          }}
+          aria-label="Crear"
+          aria-haspopup="menu"
+          title="Crear"
+          className="pressable glass-tinted grid place-items-center size-11 rounded-full text-white"
+        >
+          <Plus
+            className={cx(
+              'size-[22px] transition-transform duration-300 ease-[var(--spring)]',
+              props['aria-expanded'] && 'rotate-45',
+            )}
+            strokeWidth={2.4}
+          />
+        </button>
+      )}
+    />
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Luz ambiente
@@ -169,6 +218,7 @@ export function TopBar({
 }) {
   return createPortal(
     <>
+      <PadToolbar title={title} collapsed={collapsed} scrolled={scrolled} back={back} />
       <div aria-hidden className="edge-top lg:hidden" style={{ opacity: scrolled ? 1 : 0 }} />
       <div aria-hidden className="edge-top-blur lg:hidden" style={{ opacity: scrolled ? 1 : 0 }} />
       <div className="lg:hidden fixed top-0 inset-x-0 z-40 pt-[env(safe-area-inset-top)] pointer-events-none">
@@ -208,6 +258,114 @@ export function TopBar({
       </div>
     </>,
     document.body,
+  )
+}
+
+/**
+ * Barra de herramientas del iPad en horizontal y del ordenador (iPadOS 26):
+ * sin franja ni línea, solo botones de cristal que flotan sobre el contenido,
+ * con el título pequeño en el centro cuando el grande sale de la pantalla.
+ *
+ * - A la izquierda, mostrar la barra lateral (si está oculta) y volver.
+ * - A la derecha, el asistente (si la barra lateral está oculta) y «+».
+ */
+function PadToolbar({
+  title,
+  collapsed,
+  scrolled,
+  back,
+}: {
+  title: string
+  collapsed: boolean
+  scrolled: boolean
+  back?: BackLink
+}) {
+  const { hidden } = useSidebarPrefs()
+  const { openAssistant } = useChrome()
+  return (
+    <>
+      <div aria-hidden className="edge-top-lg hidden lg:block" style={{ opacity: scrolled ? 1 : 0 }} />
+      <div
+        aria-hidden
+        className="edge-top-lg-blur hidden lg:block"
+        style={{ opacity: scrolled ? 1 : 0 }}
+      />
+      <div className="app-toolbar hidden lg:block fixed top-0 right-0 z-40 pt-[max(0.75rem,env(safe-area-inset-top))] pointer-events-none">
+        <div className="relative flex items-center justify-between gap-2 h-11 px-[max(0.75rem,env(safe-area-inset-right))]">
+          <div className="chrome-controls flex items-center gap-2">
+            <AnimatePresence initial={false}>
+              {hidden && (
+                <motion.button
+                  key="sidebar"
+                  type="button"
+                  initial={{ opacity: 0, scale: 0.5, filter: 'blur(6px)' }}
+                  animate={{ opacity: 1, scale: 1, filter: 'blur(0px)', transition: spring.bouncy }}
+                  exit={{ opacity: 0, scale: 0.6, filter: 'blur(6px)', transition: exitFast }}
+                  onClick={() => {
+                    haptic()
+                    toggleSidebar(false)
+                  }}
+                  aria-label="Mostrar la barra lateral"
+                  title="Mostrar la barra lateral"
+                  className="glass-btn pointer-events-auto grid place-items-center size-11 rounded-full text-ink"
+                >
+                  <PanelLeft className="size-[20px]" strokeWidth={2} />
+                </motion.button>
+              )}
+            </AnimatePresence>
+            {back && (
+              <a
+                href={back.href}
+                aria-label={`Volver a ${back.label}`}
+                className="glass-btn pressable pointer-events-auto flex items-center h-11 pl-2.5 pr-4 rounded-full text-ink text-[0.9375rem] font-semibold"
+              >
+                <ChevronLeft className="size-[22px]" strokeWidth={2.4} />
+                <span className="truncate max-w-[14rem]">{back.label}</span>
+              </a>
+            )}
+          </div>
+
+          <AnimatePresence>
+            {collapsed && (
+              <motion.p
+                aria-hidden
+                initial={{ opacity: 0, y: 8, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, y: 6, filter: 'blur(4px)', transition: exitFast }}
+                transition={spring.snappy}
+                className="absolute inset-x-56 text-center text-[1.0625rem] font-semibold tracking-[-0.02em] truncate"
+              >
+                {title}
+              </motion.p>
+            )}
+          </AnimatePresence>
+
+          <div className="chrome-controls pointer-events-auto flex items-center gap-2">
+            <AnimatePresence initial={false}>
+              {hidden && (
+                <motion.button
+                  key="assistant"
+                  type="button"
+                  initial={{ opacity: 0, scale: 0.5, filter: 'blur(6px)' }}
+                  animate={{ opacity: 1, scale: 1, filter: 'blur(0px)', transition: spring.bouncy }}
+                  exit={{ opacity: 0, scale: 0.6, filter: 'blur(6px)', transition: exitFast }}
+                  onClick={() => {
+                    haptic()
+                    openAssistant()
+                  }}
+                  aria-label="Asistente: escribe o habla"
+                  title="Asistente"
+                  className="glass-btn grid place-items-center size-11 rounded-full text-accent"
+                >
+                  <AssistantIcon className="size-[20px]" />
+                </motion.button>
+              )}
+            </AnimatePresence>
+            <CreateMenu />
+          </div>
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -265,47 +423,6 @@ export function ChromeActions({
         </span>
       </button>
       <AccountAvatar size={40} />
-    </div>
-  )
-}
-
-/**
- * Acceso al asistente en la barra lateral (iPad en horizontal y ordenador).
- * Parece un campo de texto, porque se le escribe; el micrófono de la derecha
- * lo abre ya dictando.
- */
-export function AssistantLauncher() {
-  const { openAssistant } = useChrome()
-  return (
-    <div className="glass-btn relative flex items-center h-[3.25rem] rounded-[20px]">
-      <button
-        type="button"
-        onClick={() => openAssistant('text')}
-        aria-label="Asistente: escríbele lo que quieras apuntar o preguntar"
-        className="pressable flex-1 min-w-0 flex items-center gap-2.5 h-full pl-1.5 pr-1 rounded-[20px] text-left"
-      >
-        <span className="grid place-items-center size-10 text-accent shrink-0">
-          <AssistantIcon className="size-[20px]" />
-        </span>
-        <span className="min-w-0">
-          <span className="block text-[0.9375rem] font-semibold text-ink leading-tight">
-            Asistente
-          </span>
-          <span className="block text-[0.75rem] text-ink-3 truncate">Escribe o habla</span>
-        </span>
-        <kbd className="ml-auto text-[0.6875rem] font-semibold text-ink-3 tabular-nums rounded-[5px] bg-fill px-1.5 py-px">
-          A
-        </kbd>
-      </button>
-      <button
-        type="button"
-        onClick={() => openAssistant('voice')}
-        aria-label="Dictar al asistente"
-        title="Dictar"
-        className="pressable grid place-items-center size-10 mr-1.5 rounded-full bg-surface text-accent shrink-0 shadow-[0_1px_3px_rgb(0_0_0/0.08)]"
-      >
-        <Mic className="size-[18px]" strokeWidth={2.3} />
-      </button>
     </div>
   )
 }

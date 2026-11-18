@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-
+import { AnimatePresence, m as motion } from 'motion/react'
 import { Check } from 'lucide-react'
 
+import { exitFast, haptic } from './motion'
 import { cx } from './primitives'
 
 export interface MenuItem {
@@ -15,6 +16,9 @@ export interface MenuItem {
   destructive?: boolean
   /** Línea separadora encima de esta opción. */
   separated?: boolean
+  /** Atajo de teclado que se muestra a la derecha («C»). */
+  hint?: string
+  disabled?: boolean
 }
 
 interface MenuProps {
@@ -26,6 +30,7 @@ interface MenuProps {
   items: MenuItem[]
   label: string
   align?: 'start' | 'end'
+  width?: number
 }
 
 /**
@@ -34,9 +39,13 @@ interface MenuProps {
  * Se dibuja en un portal y se posiciona respecto al disparador, para que no lo
  * recorte el `overflow` de una lista. Navegable con flechas, Inicio/Fin y Esc.
  */
-export function Menu({ trigger, items, label, align = 'end' }: MenuProps) {
+export function Menu({ trigger, items, label, align = 'end', width = 232 }: MenuProps) {
   const [open, setOpen] = useState(false)
-  const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
+  const [position, setPosition] = useState<{
+    top: number
+    left: number
+    origin: string
+  } | null>(null)
   const [activeIndex, setActiveIndex] = useState(0)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -44,16 +53,20 @@ export function Menu({ trigger, items, label, align = 'end' }: MenuProps) {
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return
     const rect = triggerRef.current.getBoundingClientRect()
-    const width = 216
-    const estimatedHeight = items.length * 40 + 12
+    const estimatedHeight =
+      items.length * 44 + items.filter((i) => i.separated).length * 13 + 12
 
     // Si no cabe debajo, se despliega hacia arriba; y nunca se sale por los lados.
     const below = window.innerHeight - rect.bottom
-    const top = below < estimatedHeight ? rect.top - estimatedHeight - 6 : rect.bottom + 6
+    const up = below < estimatedHeight + 8
+    const top = up ? rect.top - estimatedHeight - 8 : rect.bottom + 8
     const rawLeft = align === 'end' ? rect.right - width : rect.left
     const left = Math.max(8, Math.min(rawLeft, window.innerWidth - width - 8))
+    // El menú brota del botón (iOS 26): crece desde el punto del disparador.
+    const originX = Math.max(0, Math.min(width, rect.left + rect.width / 2 - left))
+    const origin = `${originX}px ${up ? '100%' : '0%'}`
 
-    setPosition({ top: Math.max(8, top), left })
+    setPosition({ top: Math.max(8, top), left, origin })
     setActiveIndex(
       Math.max(
         0,
@@ -100,6 +113,13 @@ export function Menu({ trigger, items, label, align = 'end' }: MenuProps) {
     triggerRef.current?.focus({ preventScroll: true })
   }
 
+  const choose = (item: MenuItem | undefined) => {
+    if (!item || item.disabled) return
+    haptic()
+    item.onSelect()
+    close()
+  }
+
   const onKeyDown = (event: React.KeyboardEvent) => {
     switch (event.key) {
       case 'Escape':
@@ -125,8 +145,7 @@ export function Menu({ trigger, items, label, align = 'end' }: MenuProps) {
       case 'Enter':
       case ' ':
         event.preventDefault()
-        items[activeIndex]?.onSelect()
-        close()
+        choose(items[activeIndex])
         break
     }
   }
@@ -139,50 +158,79 @@ export function Menu({ trigger, items, label, align = 'end' }: MenuProps) {
         ref: triggerRef,
       })}
 
-      {open &&
-        position &&
-        createPortal(
-          <div
-            ref={menuRef}
-            role="menu"
-            aria-label={label}
-            tabIndex={-1}
-            onKeyDown={onKeyDown}
-            style={{ top: position.top, left: position.left, width: 216 }}
-            className={cx(
-              'fixed z-50 py-1.5 rounded-[14px] outline-none animate-pop origin-top-right',
-              'glass',
-            )}
-          >
-            {items.map((item, index) => (
-              <div key={item.id}>
-                {item.separated && <div className="my-1.5 h-px bg-hairline" aria-hidden />}
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    item.onSelect()
-                    close()
-                  }}
-                  onPointerEnter={() => setActiveIndex(index)}
-                  className={cx(
-                    'w-full flex items-center gap-2.5 px-3.5 h-10 text-left',
-                    'text-[0.875rem] transition-colors duration-100',
-                    item.destructive ? 'text-danger' : 'text-ink',
-                    index === activeIndex && (item.destructive ? 'bg-danger-quiet' : 'bg-fill'),
-                  )}
-                >
-                  {item.icon && <span className="shrink-0 text-ink-3">{item.icon}</span>}
-                  <span className="truncate flex-1">{item.label}</span>
-                  {item.selected && (
-                    <Check aria-hidden className="size-4 text-accent shrink-0" strokeWidth={2.6} />
-                  )}
-                </button>
+      {createPortal(
+        <AnimatePresence>
+          {open && position && (
+            <motion.div
+              ref={menuRef}
+              role="menu"
+              aria-label={label}
+              tabIndex={-1}
+              onKeyDown={onKeyDown}
+              initial={{ opacity: 0, scale: 0.35, filter: 'blur(8px)' }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+                filter: 'blur(0px)',
+                transition: { type: 'spring', visualDuration: 0.34, bounce: 0.22 },
+              }}
+              exit={{ opacity: 0, scale: 0.6, filter: 'blur(6px)', transition: exitFast }}
+              style={{
+                top: position.top,
+                left: position.left,
+                width,
+                transformOrigin: position.origin,
+              }}
+              className="menu-panel liquid fixed z-50 p-1.5 rounded-[22px] outline-none"
+            >
+              <div className="relative z-[2]">
+                {items.map((item, index) => (
+                  <div key={item.id}>
+                    {item.separated && (
+                      <div className="mx-3 my-1.5 h-px bg-[var(--glass-edge)]" aria-hidden />
+                    )}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      disabled={item.disabled}
+                      onClick={() => choose(item)}
+                      onPointerEnter={() => setActiveIndex(index)}
+                      className={cx(
+                        'w-full flex items-center gap-3 px-3 h-11 rounded-[14px] text-left',
+                        'text-[0.9375rem] transition-colors duration-100 disabled:opacity-40',
+                        item.destructive ? 'text-danger' : 'text-ink',
+                        index === activeIndex &&
+                          !item.disabled &&
+                          (item.destructive ? 'bg-danger-quiet' : 'bg-[var(--glass-tint)]'),
+                      )}
+                    >
+                      {item.icon && (
+                        <span className="shrink-0 grid place-items-center w-5 text-ink-2">
+                          {item.icon}
+                        </span>
+                      )}
+                      <span className="truncate flex-1">{item.label}</span>
+                      {item.hint && (
+                        <kbd className="text-[0.8125rem] font-medium text-ink-3 font-sans">
+                          {item.hint}
+                        </kbd>
+                      )}
+                      {item.selected && (
+                        <Check
+                          aria-hidden
+                          className="size-4 text-accent shrink-0"
+                          strokeWidth={2.6}
+                        />
+                      )}
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>,
-          document.body,
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </>
   )
 }
