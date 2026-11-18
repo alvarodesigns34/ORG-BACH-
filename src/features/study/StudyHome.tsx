@@ -107,7 +107,7 @@ export function StudyHome({
             haptic()
             onStart()
           }}
-          className="study-home-cta pressable h-[3.75rem] rounded-full flex items-center justify-center gap-2.5 text-[1.0625rem] font-semibold"
+          className="glass-tinted pressable h-[3.75rem] rounded-full flex items-center justify-center gap-2.5 text-[1.0625rem] font-semibold text-white"
         >
           <Plane className="size-[19px]" strokeWidth={2.3} />
           Planear vuelo

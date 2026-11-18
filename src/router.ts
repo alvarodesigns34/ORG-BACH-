@@ -150,8 +150,10 @@ async function onHashChange(): Promise<void> {
   const fromId = from.params.get('id')
   const toId = to.params.get('id')
   root.dataset.nav =
-    from.id === 'estudio' || to.id === 'estudio'
-      ? 'immersive'
+    to.id === 'estudio'
+      ? 'study-in'
+      : from.id === 'estudio'
+        ? 'study-out'
       : from.id === to.id && toId && !fromId
         ? 'push'
         : from.id === to.id && fromId && !toId
