@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { motion } from 'motion/react'
+import { m as motion } from 'motion/react'
 import { ChevronRight, Plane } from 'lucide-react'
 
 import { activeSession, inLayover, progress, remainingMs } from '@/domain/flights'

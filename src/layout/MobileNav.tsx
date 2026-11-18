@@ -6,7 +6,7 @@ import {
   useState,
   type CSSProperties,
 } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, m as motion } from 'motion/react'
 import { ChevronRight, LayoutGrid, Plus } from 'lucide-react'
 
 import { hrefFor, type RouteId } from '@/router'

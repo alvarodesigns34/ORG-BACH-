@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, m as motion } from 'motion/react'
 import { ChevronLeft, Plane, PlaneTakeoff } from 'lucide-react'
 
 import { barcode, focusMinutes, formatFlightTime, MAX_MINUTES, MIN_MINUTES, type Airport } from '@/domain/flights'

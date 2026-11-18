@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
-import { animate, motion, useReducedMotion } from 'motion/react'
+import { animate, m as motion, useReducedMotion } from 'motion/react'
 
 import { haptic, spring } from './motion'
 
