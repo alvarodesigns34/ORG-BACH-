@@ -1421,3 +1421,22 @@ button:active > .switch-thumb {
     backdrop-filter: none;
   }
 }
+
+/* ==========================================================================
+   ASISTENTE (Mensajes de iOS)
+   ========================================================================== */
+
+/* El azul de Mensajes: un degradado vertical apenas perceptible. */
+.bubble-me {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c-accent-fill) 85%, white), var(--c-accent-fill));
+}
+/* Cada burbuja brota desde su esquina (la del envío, la de la respuesta). */
+.bubble-in {
+  animation: bubble-in 460ms var(--spring) both;
+}
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.86);
+  }
+}

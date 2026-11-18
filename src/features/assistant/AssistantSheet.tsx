@@ -591,7 +591,7 @@ export function AssistantSheet({
       footer={
         <div className="w-full">
           {phase === 'recording' ? (
-            <div className="flex items-center gap-2 h-12 rounded-full bg-fill pl-1.5 pr-1.5">
+            <div className="glass-btn flex items-center gap-2 h-12 rounded-full pl-1.5 pr-1.5">
               <IconButton label="Cancelar" size="sm" variant="ghost" onClick={cancelVoice}>
                 <X className="size-5 text-ink-2" strokeWidth={2.4} />
               </IconButton>
@@ -621,7 +621,7 @@ export function AssistantSheet({
                   onKeyDown={onKeyDown}
                   placeholder={messages.length ? 'Responde o pide otra cosa…' : 'Escribe o dicta…'}
                   aria-label="Mensaje para el asistente"
-                  className="block w-full resize-none rounded-[22px] bg-fill pl-4 pr-12 py-[0.7rem] text-[1rem] leading-[1.4] text-ink placeholder:text-ink-3 outline-none focus:ring-4 focus:ring-accent/15"
+                  className="glass-btn block w-full resize-none rounded-[24px] pl-4 pr-12 py-[0.75rem] text-[1rem] leading-[1.4] text-ink placeholder:text-ink-3 outline-none"
                 />
                 <button
                   type="button"
@@ -646,7 +646,7 @@ export function AssistantSheet({
                   onClick={() => void startVoice()}
                   disabled={phase === 'thinking' || !!pendingReview}
                   aria-label="Dictar por voz"
-                  className="pressable grid place-items-center size-12 rounded-full bg-accent-fill text-white shrink-0 shadow-[0_6px_18px_rgb(0_0_0/0.14)] disabled:opacity-50"
+                  className="glass-tinted pressable grid place-items-center size-12 rounded-full text-white shrink-0 disabled:opacity-50"
                 >
                   <Mic className="size-[22px]" strokeWidth={2.3} />
                 </button>
@@ -690,7 +690,7 @@ export function AssistantSheet({
         )}
 
         {phase === 'thinking' && (
-          <div className="self-start flex items-center gap-1.5 rounded-[20px] rounded-bl-[6px] bg-fill px-4 py-3.5 animate-fade">
+          <div className="self-start flex items-center gap-1.5 rounded-[20px] rounded-bl-[6px] bg-fill px-4 py-3.5 bubble-in origin-bottom-left">
             <span className="sr-only">Pensando…</span>
             {[0, 1, 2].map((i) => (
               <span
@@ -754,7 +754,7 @@ function ModeSwitch({
     <div
       role="radiogroup"
       aria-label="Modo del asistente"
-      className="self-center grid grid-cols-2 p-[3px] rounded-full bg-fill text-[0.8125rem] font-semibold"
+      className="self-center grid grid-cols-2 p-[3px] rounded-full bg-fill text-[0.875rem] font-semibold"
     >
       {options.map((option) => (
         <button
@@ -765,10 +765,8 @@ function ModeSwitch({
           disabled={disabled}
           onClick={() => onChange(option.free)}
           className={cx(
-            'pressable px-3.5 h-8 rounded-full transition-colors duration-200',
-            free === option.free
-              ? 'bg-surface text-ink shadow-[0_1px_3px_rgb(0_0_0/0.1)]'
-              : 'text-ink-3',
+            'pressable px-4 h-9 rounded-full transition-colors duration-200',
+            free === option.free ? 'lens text-ink' : 'text-ink-3',
           )}
         >
           {option.label}
@@ -908,10 +906,10 @@ function Welcome({ onPick }: { onPick: (text: string) => void }) {
 function Bubble({ message: m, onUndo }: { message: ChatMessage; onUndo: () => void }) {
   if (m.role === 'user') {
     return (
-      <div className="self-end max-w-[85%] flex flex-col items-end gap-1 animate-rise">
+      <div className="self-end max-w-[85%] flex flex-col items-end gap-1 bubble-in origin-bottom-right">
         <p
           className={cx(
-            'rounded-[20px] rounded-br-[6px] bg-accent-fill px-4 py-2.5 text-[0.9375rem] text-white whitespace-pre-line break-words',
+            'bubble-me rounded-[20px] rounded-br-[6px] px-4 py-2.5 text-[1rem] text-white whitespace-pre-line break-words',
             m.failed && 'opacity-60',
           )}
         >
@@ -938,8 +936,8 @@ function Bubble({ message: m, onUndo }: { message: ChatMessage; onUndo: () => vo
 
   const applied = m.applied ?? []
   return (
-    <div className="self-start w-full max-w-[92%] flex flex-col gap-2 animate-rise">
-      <p className="self-start rounded-[20px] rounded-bl-[6px] bg-fill px-4 py-2.5 text-[0.9375rem] text-ink whitespace-pre-line break-words">
+    <div className="self-start w-full max-w-[92%] flex flex-col gap-2 bubble-in origin-bottom-left">
+      <p className="self-start rounded-[20px] rounded-bl-[6px] bg-fill px-4 py-2.5 text-[1rem] text-ink whitespace-pre-line break-words">
         {m.text}
       </p>
 
