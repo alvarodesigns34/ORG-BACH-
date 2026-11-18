@@ -17,6 +17,7 @@ import {
   type EaseToOptions,
   type FlyToOptions,
   type GeoJSONSource,
+  type ImageSource,
   type LngLatBoundsLike,
   setWorkerUrl,
 } from 'maplibre-gl'
@@ -39,6 +40,7 @@ export async function warmUpMapAssets(): Promise<void> {
 }
 
 import { buildStyle, MAP_LABEL_LAYERS, VECTOR_TILEJSON, type MapLookOptions } from './mapStyle'
+import { MERCATOR_MAX_LAT, paintNight, type NightInk } from './daylight'
 import {
   arc,
   bearing,
@@ -73,6 +75,21 @@ export interface Padding {
   right: number
   bottom: number
   left: number
+}
+
+/**
+ * Día y noche sobre la esfera: solo con el globo alejado (como Apple Maps).
+ * A partir de este zoom se desvanece; desde `NIGHT_HIDE` ya no se dibuja.
+ */
+const NIGHT_FADE = 3.2
+const NIGHT_HIDE = 4.6
+/** Tamaño de la imagen de la noche: el crepúsculo ocupa ~10 píxeles. */
+const NIGHT_SIZE = 256
+
+function nightInkFor(look: MapLookOptions): NightInk {
+  if (look.kind === 'satelite') return { r: 2, g: 6, b: 20, alpha: 0.62 }
+  if (look.tone === 'dark') return { r: 0, g: 2, b: 10, alpha: 0.55 }
+  return { r: 12, g: 20, b: 44, alpha: 0.5 }
 }
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] }
@@ -120,6 +137,12 @@ export class FlightMap {
   private pins = new Map<string, Marker>()
 
   private climbUntil = 0
+
+  private nightPixels: ImageData | null = null
+  private nightTimer = 0
+  private onVisible = () => {
+    if (document.visibilityState === 'visible') this.paintNight()
+  }
 
   /** El usuario ha movido el mapa a mano: deja de seguir al avión. */
   onUserMove: (() => void) | null = null
@@ -181,6 +204,11 @@ export class FlightMap {
     })
     this.map.on('webglcontextrestored', () => this.waitForTiles())
     this.waitForTiles()
+    // La noche avanza ~0,25° por minuto: con repintarla cada minuto basta.
+    this.nightTimer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') this.paintNight()
+    }, 60000)
+    document.addEventListener('visibilitychange', this.onVisible)
     for (const event of ['dragstart', 'wheel', 'touchstart'] as const) {
       this.map.on(event, (e: unknown) => {
         if ((e as { originalEvent?: Event }).originalEvent) this.onUserMove?.()
@@ -191,6 +219,8 @@ export class FlightMap {
   destroy(): void {
     window.clearTimeout(this.loadTimeout)
     window.cancelAnimationFrame(this.revealFrame)
+    window.clearInterval(this.nightTimer)
+    document.removeEventListener('visibilitychange', this.onVisible)
     this.map.remove()
   }
 
@@ -240,6 +270,8 @@ export class FlightMap {
     map.getContainer().dataset.look =
       this.look.kind === 'satelite' || this.look.tone === 'dark' ? 'dark' : 'light'
 
+    if (this.look.globe) this.addNight()
+
     map.addSource('history', { type: 'geojson', data: this.historyData() })
     map.addSource('range', { type: 'geojson', data: this.rangeData() })
     map.addSource('route-done', { type: 'geojson', data: this.lineData(this.routeDone) })
@@ -286,6 +318,47 @@ export class FlightMap {
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-color': ink.route, 'line-width': 2.5, 'line-opacity': 0.95 },
     })
+  }
+
+  /**
+   * La sombra de la noche: una imagen del mundo entero, bajo los nombres de
+   * lugares y la ruta. No pide nada a la red: funciona sin conexión.
+   */
+  private addNight() {
+    const map = this.map
+    map.addSource('night', {
+      type: 'image',
+      coordinates: [
+        [-180, MERCATOR_MAX_LAT],
+        [180, MERCATOR_MAX_LAT],
+        [180, -MERCATOR_MAX_LAT],
+        [-180, -MERCATOR_MAX_LAT],
+      ],
+    })
+    map.addLayer(
+      {
+        id: 'night',
+        type: 'raster',
+        source: 'night',
+        maxzoom: NIGHT_HIDE,
+        paint: {
+          'raster-opacity': ['interpolate', ['linear'], ['zoom'], NIGHT_FADE, 1, NIGHT_HIDE, 0],
+          'raster-resampling': 'linear',
+          'raster-fade-duration': 0,
+        },
+      },
+      MAP_LABEL_LAYERS[0],
+    )
+    this.paintNight()
+  }
+
+  private paintNight() {
+    if (!this.look.globe) return
+    const source = this.map.getSource('night') as ImageSource | undefined
+    if (!source?.updateImage) return
+    const pixels = (this.nightPixels ??= new ImageData(NIGHT_SIZE, NIGHT_SIZE))
+    paintNight(pixels.data, NIGHT_SIZE, NIGHT_SIZE, new Date(), nightInkFor(this.look))
+    source.updateImage({ image: pixels })
   }
 
   private history: [number, number][][] = []
