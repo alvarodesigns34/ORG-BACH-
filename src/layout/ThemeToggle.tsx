@@ -37,7 +37,7 @@ export function ThemeToggle({ className }: { className?: string }) {
             onClick={() => dispatch({ type: 'settings/update', patch: { theme: value } })}
             className={cx(
               'size-8 grid place-items-center rounded-full transition-[background-color,color,box-shadow] duration-200',
-              active ? 'bg-raised text-ink shadow-sm' : 'text-ink-3 hover:text-ink',
+              active ? 'lens text-ink' : 'text-ink-3 hover:text-ink',
             )}
           >
             <Icon className="size-[15px]" strokeWidth={2} />

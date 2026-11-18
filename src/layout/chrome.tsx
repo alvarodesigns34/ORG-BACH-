@@ -77,7 +77,7 @@ export const CREATE_ITEMS: {
  * «+» de la barra de herramientas: un botón de cristal tintado (la acción
  * principal) que abre un menú que brota de él, como en las apps de iPadOS 26.
  */
-export function CreateMenu() {
+export function CreateMenu({ tinted = true }: { tinted?: boolean }) {
   const { openCreate, hasSubjects } = useChrome()
   return (
     <Menu
@@ -102,7 +102,10 @@ export function CreateMenu() {
           aria-label="Crear"
           aria-haspopup="menu"
           title="Crear"
-          className="pressable glass-tinted grid place-items-center size-11 rounded-full text-white"
+          className={cx(
+            'pressable grid place-items-center size-11 rounded-full',
+            tinted ? 'glass-tinted text-white' : 'glass-btn text-ink',
+          )}
         >
           <Plus
             className={cx(
@@ -210,15 +213,24 @@ export function TopBar({
   collapsed,
   scrolled,
   back,
+  actions,
 }: {
   title: string
   collapsed: boolean
   scrolled: boolean
   back?: BackLink
+  /** Acciones de la pantalla: en el iPad van en la barra de herramientas. */
+  actions?: ReactNode
 }) {
   return createPortal(
     <>
-      <PadToolbar title={title} collapsed={collapsed} scrolled={scrolled} back={back} />
+      <PadToolbar
+        title={title}
+        collapsed={collapsed}
+        scrolled={scrolled}
+        back={back}
+        actions={actions}
+      />
       <div aria-hidden className="edge-top lg:hidden" style={{ opacity: scrolled ? 1 : 0 }} />
       <div aria-hidden className="edge-top-blur lg:hidden" style={{ opacity: scrolled ? 1 : 0 }} />
       <div className="lg:hidden fixed top-0 inset-x-0 z-40 pt-[env(safe-area-inset-top)] pointer-events-none">
@@ -274,11 +286,13 @@ function PadToolbar({
   collapsed,
   scrolled,
   back,
+  actions,
 }: {
   title: string
   collapsed: boolean
   scrolled: boolean
   back?: BackLink
+  actions?: ReactNode
 }) {
   const { hidden } = useSidebarPrefs()
   const { openAssistant } = useChrome()
@@ -291,7 +305,7 @@ function PadToolbar({
         style={{ opacity: scrolled ? 1 : 0 }}
       />
       <div className="app-toolbar hidden lg:block fixed top-0 right-0 z-40 pt-[max(0.75rem,env(safe-area-inset-top))] pointer-events-none">
-        <div className="relative flex items-center justify-between gap-2 h-11 px-[max(0.75rem,env(safe-area-inset-right))]">
+        <div className="relative flex items-center justify-between gap-2 h-11 pl-3 pr-[max(0.75rem,env(safe-area-inset-right))]">
           <div className="chrome-controls flex items-center gap-2">
             <AnimatePresence initial={false}>
               {hidden && (
@@ -361,7 +375,10 @@ function PadToolbar({
                 </motion.button>
               )}
             </AnimatePresence>
-            <CreateMenu />
+            {actions}
+            {/* Si la pantalla ya tiene su acción principal (tintada), el «+»
+                es de cristal claro: una sola acción tintada por barra. */}
+            <CreateMenu tinted={!actions} />
           </div>
         </div>
       </div>

@@ -1236,3 +1236,54 @@ html {
     backdrop-filter: none;
   }
 }
+
+/* ==========================================================================
+   CONTROLES DE iOS 26
+   ========================================================================== */
+
+/* Cristal al tocar: en vez de hundirse, el botón de cristal se hincha un
+   poco, como un gel, y se ilumina desde el dedo. Vuelve con muelle. */
+.pressable.glass-btn:active:not(:disabled),
+.pressable.glass-tinted:active:not(:disabled),
+.pressable.filter-on:active:not(:disabled) {
+  transform: scale(1.045);
+  filter: brightness(1.06) saturate(1.1);
+  transition-duration: 160ms;
+  transition-timing-function: var(--ease-out);
+}
+.glass-btn:active:not(:disabled) {
+  --glass-btn-light: rgb(255 255 255 / 1);
+}
+
+/* Filtro aplicado: cápsula teñida de acento, aún translúcida. */
+@utility filter-on {
+  position: relative;
+  background: color-mix(in srgb, var(--c-accent-fill) 16%, transparent);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  backdrop-filter: blur(12px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0.5px rgb(255 255 255 / 0.5),
+    inset 0 0 0 0.5px color-mix(in srgb, var(--c-accent-fill) 35%, transparent),
+    0 1px 2px rgb(0 0 0 / 0.06);
+}
+
+/* Campo de búsqueda de iOS 26: cápsula gris; al escribir, se aclara. */
+.search-field {
+  background: var(--c-fill);
+}
+.search-field:focus {
+  background: var(--c-raised);
+}
+
+/* Interruptor: al pulsarlo, la bola se vuelve una lente de cristal que deja
+   ver la pista de debajo (iOS 26). */
+button:active > .switch-thumb {
+  background: rgb(255 255 255 / 0.35);
+  -webkit-backdrop-filter: blur(2px) saturate(180%);
+  backdrop-filter: blur(2px) saturate(180%);
+  box-shadow:
+    inset 0 0 0 0.75px rgb(255 255 255 / 0.9),
+    inset 1px 2px 4px -1px rgb(255 255 255 / 0.9),
+    inset -2px -3px 5px -2px rgb(0 0 0 / 0.15),
+    0 4px 12px rgb(0 0 0 / 0.18);
+}

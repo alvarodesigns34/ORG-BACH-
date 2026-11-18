@@ -159,18 +159,18 @@ export function CalendarView() {
               <h2 className="text-[1.5rem] font-bold tracking-[-0.025em] first-letter:uppercase truncate">
                 {heading}
               </h2>
-              <div className="flex items-center gap-0.5 shrink-0 rounded-full bg-fill p-[3px]">
-                <IconButton label="Anterior" size="sm" className="!size-8 hover:!bg-raised" onClick={() => step(-1)}>
+              <div className="glass-btn flex items-center gap-0.5 shrink-0 rounded-full p-[3px]">
+                <IconButton label="Anterior" size="sm" className="!size-9 hover:!bg-[var(--glass-tint)]" onClick={() => step(-1)}>
                   <ChevronLeft className="size-[18px] text-ink-2" strokeWidth={2.4} />
                 </IconButton>
                 <button
                   type="button"
                   onClick={goToday}
-                  className="pressable h-8 px-3 rounded-full text-[0.8125rem] font-semibold text-accent hover:bg-raised transition-colors"
+                  className="pressable h-9 px-3.5 rounded-full text-[0.9375rem] font-semibold text-accent hover:bg-[var(--glass-tint)] transition-colors"
                 >
                   Hoy
                 </button>
-                <IconButton label="Siguiente" size="sm" className="!size-8 hover:!bg-raised" onClick={() => step(1)}>
+                <IconButton label="Siguiente" size="sm" className="!size-9 hover:!bg-[var(--glass-tint)]" onClick={() => step(1)}>
                   <ChevronRight className="size-[18px] text-ink-2" strokeWidth={2.4} />
                 </IconButton>
               </div>

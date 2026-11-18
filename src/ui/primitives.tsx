@@ -353,7 +353,7 @@ export function Segmented<T extends string>({
             className={cx(
               'relative shrink-0 inline-flex items-center justify-center gap-1.5 rounded-full whitespace-nowrap',
               'transition-colors duration-200',
-              size === 'sm' ? 'h-7 px-3 text-[0.75rem]' : 'h-8 px-3.5 text-[0.8125rem]',
+              size === 'sm' ? 'h-7 px-3 text-[0.75rem]' : 'h-9 px-4 text-[0.875rem]',
               active ? 'text-ink font-semibold' : 'text-ink-2 font-medium hover:text-ink',
             )}
           >

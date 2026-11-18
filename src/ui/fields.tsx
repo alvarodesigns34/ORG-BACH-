@@ -124,12 +124,13 @@ export function Select({
         className={cx(
           pill
             ? cx(
-                'h-9 rounded-full pl-3.5 pr-8 text-[0.8125rem] whitespace-nowrap',
-                'appearance-none cursor-pointer transition-colors duration-200',
+                'pressable h-10 rounded-full pl-4 pr-9 text-[0.875rem] whitespace-nowrap',
+                'appearance-none cursor-pointer',
                 'focus:outline-none focus-visible:ring-4 focus-visible:ring-accent/20',
+                // Filtro de iOS 26: una cápsula de cristal; aplicado, tintada.
                 active
-                  ? 'bg-accent-quiet text-accent font-semibold'
-                  : 'bg-fill text-ink-2 font-medium',
+                  ? 'filter-on text-accent font-semibold'
+                  : 'glass-btn text-ink font-medium',
               )
             : cx(CONTROL, 'h-11 appearance-none pr-9 cursor-pointer'),
           // El bloque select nativo no hereda la fuente en algunos navegadores.
@@ -145,7 +146,7 @@ export function Select({
         viewBox="0 0 12 12"
         className={cx(
           'pointer-events-none absolute top-1/2 -translate-y-1/2 size-3',
-          pill ? 'right-3' : 'right-3.5',
+          pill ? 'right-3.5' : 'right-3.5',
           active ? 'text-accent' : 'text-ink-3',
         )}
       >
@@ -476,9 +477,9 @@ export function SwitchControl({
       <span
         aria-hidden
         className={cx(
-          'absolute top-[2px] left-[2px] h-[27px] w-[27px] rounded-full bg-white',
+          'switch-thumb absolute top-[2px] left-[2px] h-[27px] w-[27px] rounded-full bg-white',
           'shadow-[0_3px_8px_rgb(0_0_0/0.15),0_1px_1px_rgb(0_0_0/0.16)]',
-          'transition-[transform,width] duration-500 ease-[var(--spring)]',
+          'transition-[transform,width,background-color,box-shadow] duration-500 ease-[var(--spring)]',
           // Al pulsar, la bola se estira como en iOS.
           'group-active:w-[33px]',
           checked ? 'translate-x-[20px] group-active:translate-x-[14px]' : 'translate-x-0',

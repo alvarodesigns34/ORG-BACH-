@@ -231,7 +231,13 @@ export function PageHeader({
   const stretch = useTransform(scrollY, [-140, 0], [1.14, 1], { clamp: true })
   return (
     <header className="mb-6 sm:mb-8">
-      <TopBar title={compactTitle ?? title} collapsed={past} scrolled={scrolled} back={back} />
+      <TopBar
+        title={compactTitle ?? title}
+        collapsed={past}
+        scrolled={scrolled}
+        back={back}
+        actions={actions}
+      />
       {eyebrow && (
         <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.04em] text-ink-3 mb-1">
           {eyebrow}
@@ -248,7 +254,9 @@ export function PageHeader({
           </motion.h1>
           {subtitle && <div className="text-[0.9375rem] text-ink-3 mt-1">{subtitle}</div>}
         </div>
-        {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+        {/* En el iPad en horizontal las acciones suben a la barra de
+            herramientas flotante, junto al «+». */}
+        {actions && <div className="lg:hidden flex items-center gap-2 shrink-0">{actions}</div>}
       </div>
       {toolbar && <div className="mt-5">{toolbar}</div>}
     </header>

@@ -155,16 +155,17 @@ export function TasksView() {
               options={VIEW_LABELS.map((v) => ({ ...v, count: counts[v.value] }))}
             />
 
-            <div className="relative max-w-md">
+            <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-full sm:w-72 shrink-0">
               <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-ink-3 pointer-events-none"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-ink-3 pointer-events-none"
                 aria-hidden
               />
               <Input
                 value={filters.query}
                 aria-label="Buscar tareas"
                 placeholder="Buscar…"
-                className="pl-9 pr-9"
+                className="search-field pl-10 pr-9 h-10 rounded-full"
                 onChange={(e) => setFilters((prev) => ({ ...prev, query: e.target.value }))}
               />
               {filters.query && (
@@ -172,7 +173,7 @@ export function TasksView() {
                   type="button"
                   aria-label="Borrar búsqueda"
                   onClick={() => setFilters((prev) => ({ ...prev, query: '' }))}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 size-6 grid place-items-center rounded-full bg-ink-3/25 text-surface hover:bg-ink-3/40"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 size-6 grid place-items-center rounded-full bg-ink-3/25 text-surface hover:bg-ink-3/40"
                 >
                   <X className="size-3.5" strokeWidth={3} />
                 </button>
@@ -181,7 +182,7 @@ export function TasksView() {
 
             {/* Filtros como píldoras en una fila que se desliza: apilados,
                 ocupaban media pantalla del móvil antes de la primera tarea. */}
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-[1.125rem] px-[1.125rem] sm:mx-0 sm:px-0 pb-0.5">
+            <div className="flex-1 min-w-0 flex items-center gap-2 overflow-x-auto no-scrollbar -mx-[1.125rem] px-[1.125rem] sm:mx-0 sm:px-0 py-1">
               <Select
                 aria-label="Filtrar por asignatura"
                 value={filters.subjectId ?? ''}
@@ -235,8 +236,8 @@ export function TasksView() {
                     aria-haspopup="menu"
                     {...aria}
                     className={cx(
-                      'pressable shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full',
-                      'bg-fill text-[0.8125rem] font-medium text-ink-2 hover:text-ink whitespace-nowrap',
+                      'glass-btn pressable shrink-0 inline-flex items-center gap-1.5 h-10 px-4 rounded-full',
+                      'text-[0.875rem] font-medium text-ink whitespace-nowrap',
                     )}
                   >
                     <ArrowUpDown className="size-3.5" strokeWidth={2.4} />
@@ -257,6 +258,7 @@ export function TasksView() {
                   Limpiar
                 </Button>
               )}
+            </div>
             </div>
           </div>
         }
