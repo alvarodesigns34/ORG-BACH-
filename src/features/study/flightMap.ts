@@ -27,6 +27,9 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 
 setWorkerUrl(workerUrl)
 
+// El mapa satélite se retiró: libera lo que guardaba en el dispositivo.
+if (typeof caches !== 'undefined') void caches.delete('orbita-mapa-satelite-v1').catch(() => {})
+
 /**
  * Deja en caché (HTTP y Service Worker) lo que el mapa pide nada más crearse:
  * el worker y el descriptor de las teselas vectoriales. No arranca workers ni
@@ -56,7 +59,7 @@ export type MapStatus = 'cargando' | 'listo' | 'sin_cartografia' | 'no_disponibl
 
 /** Colores de lo que se dibuja encima, según el mapa de debajo. */
 function inkFor(look: MapLookOptions) {
-  if (look.kind === 'satelite' || look.tone === 'dark') {
+  if (look.tone === 'dark') {
     return { accent: '#4da3ff', route: '#ffffff', muted: 'rgba(255, 255, 255, 0.42)', history: 'rgba(255,255,255,0.28)' }
   }
   return { accent: '#0064d2', route: '#0064d2', muted: 'rgba(0, 100, 210, 0.5)', history: 'rgba(0, 70, 150, 0.32)' }
@@ -87,9 +90,8 @@ const NIGHT_HIDE = 4.6
 const NIGHT_SIZE = 256
 
 function nightInkFor(look: MapLookOptions): NightInk {
-  if (look.kind === 'satelite') return { r: 2, g: 6, b: 20, alpha: 0.62 }
-  if (look.tone === 'dark') return { r: 0, g: 2, b: 10, alpha: 0.55 }
-  return { r: 12, g: 20, b: 44, alpha: 0.5 }
+  if (look.tone === 'dark') return { r: 0, g: 2, b: 10, alpha: 0.62 }
+  return { r: 10, g: 18, b: 42, alpha: 0.58 }
 }
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] }
@@ -268,7 +270,7 @@ export class FlightMap {
     const map = this.map
     const ink = inkFor(this.look)
     map.getContainer().dataset.look =
-      this.look.kind === 'satelite' || this.look.tone === 'dark' ? 'dark' : 'light'
+      this.look.tone === 'dark' ? 'dark' : 'light'
 
     if (this.look.globe) this.addNight()
 

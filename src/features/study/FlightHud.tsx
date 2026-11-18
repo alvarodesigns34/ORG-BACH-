@@ -106,12 +106,6 @@ const MAP_OPTIONS: { id: MapKind; label: string; swatch: string }[] = [
     swatch:
       'radial-gradient(60% 70% at 30% 35%, #c9b88f, transparent 70%), radial-gradient(50% 60% at 75% 70%, #8fa36e, transparent 70%), linear-gradient(135deg, #b9c99b 0 50%, #8db3cc 50% 100%)',
   },
-  {
-    id: 'satelite',
-    label: 'Satélite',
-    swatch:
-      'radial-gradient(55% 60% at 35% 40%, #5c6b3a, transparent 70%), radial-gradient(40% 50% at 70% 65%, #a08a5c, transparent 70%), linear-gradient(135deg, #3d5230 0 48%, #0f2a45 48% 100%)',
-  },
 ]
 
 function Popover({ children, className }: { children: ReactNode; className?: string }) {

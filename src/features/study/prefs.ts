@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 
-import type { MapKind } from './mapStyle'
+import { MAP_KINDS, type MapKind } from './mapStyle'
 import type { SoundId } from './soundscape'
 
 /** Cómo se reparten los descansos de un vuelo. */
@@ -8,7 +8,7 @@ export type LayoverMode = 'no' | 'mitad' | 'pomodoro'
 
 /**
  * Preferencias del modo estudio. Son de este dispositivo (como el tema): en
- * el iPad quizá quieras satélite y lluvia, y en el ordenador, otra cosa.
+ * el iPad quizá quieras relieve y lluvia, y en el ordenador, otra cosa.
  *
  * Viven en un almacén compartido, no en el estado de un componente: las leen
  * a la vez la vista de estudio y el controlador del vuelo, que sigue vivo
@@ -66,6 +66,11 @@ function read(): StudyPrefs {
   try {
     const raw = JSON.parse(window.localStorage.getItem(KEY) ?? '{}') as Partial<StudyPrefs>
     const prefs = { ...DEFAULTS, ...raw }
+    // El mapa satélite se retiró (nov. 2026): quien lo usaba pasa a relieve,
+    // el otro mapa con imagen. Cualquier valor desconocido, al de serie.
+    if (!MAP_KINDS.includes(prefs.map)) {
+      prefs.map = (raw.map as string | undefined) === 'satelite' ? 'relieve' : DEFAULTS.map
+    }
     // Antes solo existía «escala de N minutos a mitad» (0 = ninguna).
     if (raw.layoverMode === undefined && typeof raw.layover === 'number') {
       prefs.layoverMode = raw.layover > 0 ? 'mitad' : 'no'

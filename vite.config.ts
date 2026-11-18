@@ -122,15 +122,6 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: ({ url }) => url.origin === 'https://tiles.maps.eox.at',
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'orbita-mapa-satelite-v1',
-              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 24 * 60 * 60, purgeOnQuotaError: true },
-              cacheableResponse: { statuses: [200] },
-            },
-          },
-          {
             urlPattern: ({ url }) => url.pathname.includes('/sounds/') && url.pathname.endsWith('.m4a'),
             handler: 'CacheFirst',
             options: {

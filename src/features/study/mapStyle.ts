@@ -10,16 +10,16 @@
  *
  * - Minimalista: vectorial, claro u oscuro.
  * - Relieve: el sombreado de Natural Earth (montañas y mares con volumen).
- * - Satélite: Sentinel-2 sin nubes (EOX), uso no comercial con atribución.
  *
- * Los tres se pueden ver como esfera (proyección «globe» de MapLibre) o
+ * Los dos se pueden ver como esfera (proyección «globe» de MapLibre) o
  * planos. En la esfera, el cielo lleva atmósfera y el espacio de alrededor
  * es noche estrellada (lo pinta el CSS del contenedor: `.study-map.is-globe`).
  */
 
 import type { ExpressionSpecification, StyleSpecification } from 'maplibre-gl'
 
-export type MapKind = 'minimal' | 'relieve' | 'satelite'
+export const MAP_KINDS = ['minimal', 'relieve'] as const
+export type MapKind = (typeof MAP_KINDS)[number]
 export type MapTone = 'light' | 'dark'
 export const MAP_LABEL_LAYERS = ['mar', 'ciudad', 'pais'] as const
 
@@ -89,7 +89,6 @@ export const VECTOR_TILEJSON = 'https://tiles.openfreemap.org/planet'
 
 export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): StyleSpecification {
   const p = PALETTE[tone]
-  const onImagery = kind === 'satelite'
 
   const sources: StyleSpecification['sources'] = {
     omt: {
@@ -105,18 +104,6 @@ export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): Style
       tileSize: 256,
       maxzoom: 6,
       attribution: 'Natural Earth',
-    }
-  }
-  if (kind === 'satelite') {
-    sources.satelite = {
-      type: 'raster',
-      tiles: [
-        'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2023_3857/default/g/{z}/{y}/{x}.jpg',
-      ],
-      tileSize: 256,
-      maxzoom: 14,
-      attribution:
-        '<a href="https://s2maps.eu" target="_blank">Sentinel-2 cloudless</a> por EOX (datos Copernicus Sentinel 2023)',
     }
   }
 
@@ -162,21 +149,7 @@ export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): Style
     })
   }
 
-  if (kind === 'satelite') {
-    layers.push({
-      id: 'satelite',
-      type: 'raster',
-      source: 'satelite',
-      // Sentinel-2 sale algo lavado: más contraste y color, como una foto
-      // revelada. De noche, más oscuro para que no deslumbre.
-      paint:
-        tone === 'dark'
-          ? { 'raster-brightness-max': 0.8, 'raster-contrast': 0.15, 'raster-saturation': 0.1 }
-          : { 'raster-contrast': 0.1, 'raster-saturation': 0.08, 'raster-brightness-min': 0.02 },
-    })
-  }
-
-  if (kind !== 'satelite') {
+  {
     layers.push({
       id: 'water',
       type: 'fill',
@@ -200,16 +173,16 @@ export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): Style
     filter: ['all', ['==', ['get', 'admin_level'], 2], ['!=', ['get', 'maritime'], 1]],
     layout: { 'line-join': 'round' },
     paint: {
-      'line-color': onImagery ? 'rgba(255,255,255,0.45)' : p.border,
+      'line-color': p.border,
       'line-width': ['interpolate', ['linear'], ['zoom'], 2, 0.5, 6, 1, 10, 1.6],
       'line-opacity': kind === 'relieve' ? 0.6 : 0.9,
     },
   })
 
   {
-    const text = onImagery ? '#ffffff' : p.label
-    const strong = onImagery ? '#ffffff' : p.labelStrong
-    const halo = onImagery ? 'rgba(0,0,0,0.55)' : p.halo
+    const text = p.label
+    const strong = p.labelStrong
+    const halo = p.halo
     const visibility = labels ? 'visible' : 'none'
     layers.push(
       {
@@ -227,8 +200,8 @@ export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): Style
           'text-max-width': 6,
         },
         paint: {
-          'text-color': onImagery ? 'rgba(255,255,255,0.75)' : p.waterLabel,
-          'text-halo-color': onImagery ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0)',
+          'text-color': p.waterLabel,
+          'text-halo-color': 'rgba(0,0,0,0)',
           'text-halo-width': 1,
         },
       },
@@ -272,7 +245,7 @@ export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): Style
         },
         paint: {
           'text-color': strong,
-          'text-opacity': onImagery ? 0.95 : 0.75,
+          'text-opacity': 0.75,
           'text-halo-color': halo,
           'text-halo-width': 1.4,
         },
@@ -288,7 +261,7 @@ export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): Style
     ...(globe
       ? {
           projection: { type: 'globe' },
-          sky: kind === 'satelite' ? { ...SKY[tone], 'fog-color': SATELLITE_FOG[tone] } : SKY[tone],
+          sky: SKY[tone],
         }
       : {}),
   }
@@ -323,16 +296,13 @@ const SKY: Record<MapTone, NonNullable<StyleSpecification['sky']>> = {
   },
 }
 
-/** Sobre la foto, la neblina del horizonte es azul aire, no gris papel. */
-const SATELLITE_FOG: Record<MapTone, string> = { light: '#a9c3df', dark: '#0f1d2e' }
-
 /**
  * Color con el que el sistema debe fundir la barra de estado sobre el mapa.
  * iPadOS/iOS tiñen el borde superior de las apps web con el «theme-color»;
  * con el gris claro de la interfaz salía una mancha blanca sobre el mapa.
  */
 export function mapEdgeColor(
-  { kind, tone, globe }: Pick<MapLookOptions, 'kind' | 'tone' | 'globe'>,
+  { tone, globe }: Pick<MapLookOptions, 'tone' | 'globe'>,
   /**
    * Qué hay en el borde de arriba: el suelo, el cielo (cámara inclinada en
    * vuelo) o el espacio (la esfera entera, desde lejos).
@@ -341,6 +311,5 @@ export function mapEdgeColor(
 ): string {
   if (globe && edge === 'espacio') return SPACE_COLOR
   if (globe && edge === 'cielo') return SKY[tone]['sky-color'] as string
-  if (kind === 'satelite') return '#1d2a33'
   return PALETTE[tone].land
 }
