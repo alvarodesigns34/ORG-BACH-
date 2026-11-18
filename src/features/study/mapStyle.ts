@@ -78,6 +78,9 @@ const PALETTE: Record<MapTone, Palette> = {
   },
 }
 
+/** Mar del relieve: azul más vivo, que case con los verdes y ocres. */
+const RELIEF_WATER: Record<MapTone, string> = { light: '#9ccbea', dark: '#0e2236' }
+
 const ATTRIBUTION_OSM =
   '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
 
@@ -150,10 +153,12 @@ export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): Style
       id: 'relieve',
       type: 'raster',
       source: 'relieve',
+      // Natural Earth II ya trae los colores de la vegetación (verdes,
+      // ocres del desierto, nieve): se realzan en vez de apagarlos.
       paint:
         tone === 'dark'
-          ? { 'raster-brightness-max': 0.5, 'raster-saturation': -0.35, 'raster-contrast': 0.1 }
-          : { 'raster-saturation': -0.15, 'raster-brightness-min': 0.08 },
+          ? { 'raster-brightness-max': 0.55, 'raster-saturation': -0.1, 'raster-contrast': 0.18 }
+          : { 'raster-saturation': 0.18, 'raster-contrast': 0.08 },
     })
   }
 
@@ -162,7 +167,12 @@ export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): Style
       id: 'satelite',
       type: 'raster',
       source: 'satelite',
-      paint: tone === 'dark' ? { 'raster-brightness-max': 0.78 } : {},
+      // Sentinel-2 sale algo lavado: más contraste y color, como una foto
+      // revelada. De noche, más oscuro para que no deslumbre.
+      paint:
+        tone === 'dark'
+          ? { 'raster-brightness-max': 0.8, 'raster-contrast': 0.15, 'raster-saturation': 0.1 }
+          : { 'raster-contrast': 0.1, 'raster-saturation': 0.08, 'raster-brightness-min': 0.02 },
     })
   }
 
@@ -174,11 +184,10 @@ export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): Style
       'source-layer': 'water',
       filter: ['!=', ['get', 'brunnel'], 'tunnel'],
       paint: {
-        'fill-color': p.water,
-        // Sobre el relieve, el agua solo aparece al acercarse (donde el
-        // sombreado ya no tiene detalle).
-        'fill-opacity':
-          kind === 'relieve' ? ['interpolate', ['linear'], ['zoom'], 5, 0, 6.5, 1] : 1,
+        // Las teselas de relieve traen el mar en blanco: el agua vectorial lo
+        // pinta de azul a cualquier zoom (antes el mar quedaba gris).
+        'fill-color': kind === 'relieve' ? RELIEF_WATER[tone] : p.water,
+        'fill-antialias': true,
       },
     })
   }
@@ -279,7 +288,7 @@ export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): Style
     ...(globe
       ? {
           projection: { type: 'globe' },
-          sky: SKY[tone],
+          sky: kind === 'satelite' ? { ...SKY[tone], 'fog-color': SATELLITE_FOG[tone] } : SKY[tone],
         }
       : {}),
   }
@@ -313,6 +322,9 @@ const SKY: Record<MapTone, NonNullable<StyleSpecification['sky']>> = {
     'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 9, 0.35],
   },
 }
+
+/** Sobre la foto, la neblina del horizonte es azul aire, no gris papel. */
+const SATELLITE_FOG: Record<MapTone, string> = { light: '#a9c3df', dark: '#0f1d2e' }
 
 /**
  * Color con el que el sistema debe fundir la barra de estado sobre el mapa.
