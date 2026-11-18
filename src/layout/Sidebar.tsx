@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { m as motion } from 'motion/react'
 import { Mic, Plus } from 'lucide-react'
 
@@ -25,6 +26,7 @@ interface SidebarProps {
 export function Sidebar({ current, badges }: SidebarProps) {
   const settings = useSettings()
   const { openAssistant, openCreate, hasSubjects } = useChrome()
+  const indicator = useActiveIndicator(current)
 
   return (
     <aside
@@ -91,7 +93,26 @@ export function Sidebar({ current, badges }: SidebarProps) {
         </div>
 
         {/* --- Navegación --- */}
-        <nav className="flex-1 overflow-y-auto no-scrollbar px-3 pb-4" aria-label="Secciones">
+        <nav
+          ref={indicator.navRef}
+          className="relative flex-1 overflow-y-auto no-scrollbar px-3 pb-4"
+          aria-label="Secciones"
+        >
+          {/* Un solo indicador que viaja de una sección a otra. Se mueve en el
+              espacio de la propia lista, no con un `layoutId`: la barra es
+              `fixed` y Motion mide las animaciones compartidas en coordenadas
+              de página, así que al cambiar de sección con la página desplazada
+              (la memoria de scroll vuelve arriba) el indicador salía disparado
+              tantos píxeles como hubiera desplazamiento y luego volvía. */}
+          {indicator.box && (
+            <motion.span
+              aria-hidden
+              initial={false}
+              animate={{ y: indicator.box.top, height: indicator.box.height, opacity: 1 }}
+              transition={indicator.animate ? spring.snappy : { duration: 0 }}
+              className="absolute left-3 right-3 top-0 rounded-[12px] bg-[var(--glass-tint)] shadow-[inset_0_0_0_0.5px_var(--glass-edge)] pointer-events-none"
+            />
+          )}
           {NAV_GROUPS.map((group) => {
             const items = NAV_ITEMS.filter(
               (item) => item.group === group.id && item.id !== 'ajustes',
@@ -108,6 +129,7 @@ export function Sidebar({ current, badges }: SidebarProps) {
                       <li key={item.id}>
                         <a
                           href={hrefFor(item.id)}
+                          data-nav={item.id}
                           aria-current={active ? 'page' : undefined}
                           className={cx(
                             'pressable relative flex items-center gap-2.5 h-10 pl-2 pr-3 rounded-[12px]',
@@ -117,15 +139,6 @@ export function Sidebar({ current, badges }: SidebarProps) {
                               : 'text-ink-2 hover:text-ink hover:bg-[var(--glass-tint)]/60',
                           )}
                         >
-                          {/* Un solo indicador que viaja de una sección a otra. */}
-                          {active && (
-                            <motion.span
-                              aria-hidden
-                              layoutId="sidebar-activo"
-                              transition={spring.snappy}
-                              className="absolute inset-0 rounded-[12px] bg-[var(--glass-tint)] shadow-[inset_0_0_0_0.5px_var(--glass-edge)]"
-                            />
-                          )}
                           <span
                             className="tile relative grid place-items-center size-[26px] rounded-[8px] text-white shrink-0"
                             style={{ background: tintFill(NAV_TINTS[item.id]) }}
@@ -171,4 +184,31 @@ export function Sidebar({ current, badges }: SidebarProps) {
       </div>
     </aside>
   )
+}
+
+/**
+ * Posición del indicador de la sección activa, medida dentro de la lista.
+ * La primera medida no se anima (al abrir la app ya está en su sitio).
+ */
+function useActiveIndicator(current: RouteId) {
+  const navRef = useRef<HTMLElement>(null)
+  const [box, setBox] = useState<{ top: number; height: number } | null>(null)
+  const measured = useRef(false)
+
+  useLayoutEffect(() => {
+    const link = navRef.current?.querySelector<HTMLElement>(`[data-nav="${current}"]`)
+    if (!link) {
+      // Ajustes vive en el pie, fuera de la lista: sin indicador.
+      setBox(null)
+      measured.current = false
+      return
+    }
+    setBox({ top: link.offsetTop, height: link.offsetHeight })
+  }, [current])
+
+  useLayoutEffect(() => {
+    if (box) measured.current = true
+  })
+
+  return { navRef, box, animate: measured.current }
 }

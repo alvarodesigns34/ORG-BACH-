@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { CalendarPlus, ChevronLeft, ChevronRight, GripVertical, ListPlus, Plus } from 'lucide-react'
+import { CalendarPlus, Check, ChevronLeft, ChevronRight, GripVertical, ListPlus, Plus } from 'lucide-react'
 
 import {
   MONTHS_LONG,
@@ -154,20 +154,24 @@ export function CalendarView() {
           </div>
         }
         toolbar={
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-[1.375rem] font-bold tracking-[-0.022em] first-letter:uppercase truncate">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center justify-between gap-3 md:justify-start md:gap-4 min-w-0">
+              <h2 className="text-[1.5rem] font-bold tracking-[-0.025em] first-letter:uppercase truncate">
                 {heading}
               </h2>
-              <div className="flex items-center gap-1 shrink-0">
-                <IconButton label="Anterior" onClick={() => step(-1)}>
-                  <ChevronLeft className="size-5 text-accent" strokeWidth={2.4} />
+              <div className="flex items-center gap-0.5 shrink-0 rounded-full bg-fill p-[3px]">
+                <IconButton label="Anterior" size="sm" className="!size-8 hover:!bg-raised" onClick={() => step(-1)}>
+                  <ChevronLeft className="size-[18px] text-ink-2" strokeWidth={2.4} />
                 </IconButton>
-                <Button variant="ghost" size="sm" onClick={goToday} className="px-2.5">
+                <button
+                  type="button"
+                  onClick={goToday}
+                  className="pressable h-8 px-3 rounded-full text-[0.8125rem] font-semibold text-accent hover:bg-raised transition-colors"
+                >
                   Hoy
-                </Button>
-                <IconButton label="Siguiente" onClick={() => step(1)}>
-                  <ChevronRight className="size-5 text-accent" strokeWidth={2.4} />
+                </button>
+                <IconButton label="Siguiente" size="sm" className="!size-8 hover:!bg-raised" onClick={() => step(1)}>
+                  <ChevronRight className="size-[18px] text-ink-2" strokeWidth={2.4} />
                 </IconButton>
               </div>
             </div>
@@ -183,13 +187,17 @@ export function CalendarView() {
                 { value: 'semana', label: 'Semana' },
                 { value: 'dia', label: 'Día' },
               ]}
-              className="self-start"
+              className="self-start md:self-auto shrink-0"
             />
           </div>
         }
       />
 
-      <div className={cx('grid grid-cols-1 gap-5 md:gap-6', mode !== 'dia' && 'md:grid-cols-[minmax(0,1.65fr)_minmax(14rem,1fr)]')}>
+      {/* En iPad el mes ocupa todo el ancho (con la barra lateral, a dos
+          columnas cada día quedaba en ~80 px y los títulos se cortaban en
+          «Exam…»); el día y lo pendiente van debajo, lado a lado. A partir
+          de pantallas anchas, a la derecha como en Calendario de macOS. */}
+      <div className={cx('grid grid-cols-1 gap-5 md:gap-6', mode !== 'dia' && 'xl:grid-cols-[minmax(0,1fr)_20rem]')}>
         <div className="min-w-0">
           {mode === 'mes' && (
             <MonthGrid
@@ -231,7 +239,12 @@ export function CalendarView() {
           )}
         </div>
 
-        <div className="min-w-0 flex flex-col gap-6">
+        <div
+          className={cx(
+            'min-w-0 grid gap-6 items-start content-start',
+            mode !== 'dia' && unplanned.length > 0 && 'md:grid-cols-2 xl:grid-cols-1',
+          )}
+        >
           {mode !== 'dia' && (
             <DayPanel
               day={selected}
@@ -359,13 +372,13 @@ function MonthGrid({
   )
 
   return (
-    <div className="card px-1.5 sm:px-3 pt-3 pb-2">
-      <div className="grid grid-cols-7 mb-1">
+    <div className="card overflow-hidden">
+      <div className="grid grid-cols-7 px-1.5 lg:px-0 pt-3 pb-2 lg:pb-2.5">
         {headers.map((label, i) => (
           <abbr
             key={i}
             title={headerNames[i]}
-            className="text-center text-[0.6875rem] font-semibold text-ink-3 no-underline"
+            className="text-center lg:text-left lg:pl-3 text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-ink-3"
             style={{ textDecoration: 'none' }}
           >
             {label}
@@ -373,13 +386,14 @@ function MonthGrid({
         ))}
       </div>
 
-      <div className="grid grid-cols-7">
-        {days.map((day) => {
+      <div className="grid grid-cols-7 px-1.5 pb-1.5 lg:p-0">
+        {days.map((day, i) => {
           const items = index.get(day) ?? []
           const inMonth = isSameMonth(day, cursor)
           const isToday = day === today
           const isSelected = day === selected
           const date = parseDay(day)
+          const { shown, hidden, done } = cellItems(items, 3)
 
           return (
             <button
@@ -391,24 +405,29 @@ function MonthGrid({
               aria-pressed={isSelected}
               data-drop-day={day}
               className={cx(
-                'group relative flex flex-col items-center gap-1 pt-1.5 pb-1 rounded-[12px]',
-                'min-h-[3.375rem] lg:min-h-[6.5rem] lg:items-stretch lg:px-1.5',
-                'transition-colors duration-150 lg:hover:bg-fill/60',
-                isSelected && 'lg:bg-accent-quiet',
+                'group relative flex flex-col items-center gap-1 pt-1.5 pb-1 rounded-[12px] text-left',
+                'min-h-[3.375rem] lg:min-h-[7.25rem] lg:items-stretch lg:rounded-none lg:px-1.5 lg:pt-1.5 lg:pb-2',
+                // Líneas finas entre semanas y días, como el mes de Calendario.
+                'lg:border-t lg:border-hairline',
+                i % 7 !== 6 && 'lg:border-r',
+                'transition-colors duration-200 lg:hover:bg-fill/50',
+                !inMonth && 'lg:bg-fill/30',
+                isSelected && 'lg:bg-accent-quiet/70 lg:hover:bg-accent-quiet',
                 drag?.over === day && 'bg-accent-quiet ring-2 ring-accent ring-inset',
               )}
             >
               <span
                 className={cx(
-                  'grid place-items-center size-[2.125rem] rounded-full text-[1.0625rem] tabular-nums shrink-0 lg:self-start lg:size-7 lg:text-[0.875rem]',
+                  'grid place-items-center size-[2.125rem] rounded-full text-[1.0625rem] tabular-nums shrink-0',
+                  'lg:self-start lg:size-[1.75rem] lg:text-[0.875rem] lg:ml-0.5',
                   'transition-[background-color,color,transform] duration-300 ease-[var(--spring)] group-active:scale-90',
                   isToday
-                    ? cx('font-semibold', isSelected ? 'bg-accent-fill text-white' : 'text-accent')
+                    ? 'bg-accent-fill text-white font-semibold'
                     : isSelected
                       ? 'bg-ink text-canvas font-semibold'
                       : inMonth
-                        ? 'text-ink'
-                        : 'text-ink-3/50',
+                        ? 'text-ink font-medium'
+                        : 'text-ink-3/60',
                 )}
               >
                 {date.getDate()}
@@ -431,18 +450,25 @@ function MonthGrid({
                 ))}
               </span>
 
-              {/* Escritorio: hay sitio para leer qué es. */}
-              <span className="max-lg:hidden flex flex-col gap-0.5 w-full min-w-0">
-                {items.slice(0, 3).map((item) => (
+              {/* iPad y ordenador: lo pendiente se lee; lo ya hecho se resume
+                  en un contador discreto en vez de llenar el día de tachados. */}
+              <span className={cx('max-lg:hidden flex flex-col gap-[3px] w-full min-w-0 mt-1', !inMonth && 'opacity-55')}>
+                {shown.map((item) => (
                   <ItemChip
                     key={`${item.kind}-${item.id}`}
                     item={item}
                     subject={subjects.get(item.subjectId ?? '')}
                   />
                 ))}
-                {items.length > 3 && (
-                  <span className="text-[0.6875rem] text-ink-3 pl-1 tabular-nums">
-                    +{items.length - 3} más
+                {(hidden > 0 || done > 0) && (
+                  <span className="flex items-center gap-2 px-1.5 pt-px text-[0.6875rem] font-medium text-ink-3 tabular-nums">
+                    {hidden > 0 && <span>{hidden} más</span>}
+                    {done > 0 && (
+                      <span className="inline-flex items-center gap-0.5" title={`${done} hecha${done === 1 ? '' : 's'}`}>
+                        <Check className="size-3" strokeWidth={2.6} />
+                        {done}
+                      </span>
+                    )}
                   </span>
                 )}
               </span>
@@ -454,35 +480,63 @@ function MonthGrid({
   )
 }
 
+/**
+ * Qué cabe en una celda: primero los exámenes, luego lo pendiente por hora.
+ * Lo completado no ocupa sitio, solo se cuenta.
+ */
+function cellItems(items: DayItem[], max: number) {
+  const open = items.filter((item) => !item.done)
+  const ordered = [
+    ...open.filter((item) => item.kind === 'examen'),
+    ...open.filter((item) => item.kind !== 'examen'),
+  ]
+  const room = ordered.length > max ? max - 1 : max
+  return {
+    shown: ordered.slice(0, room),
+    hidden: ordered.length - Math.min(room, ordered.length),
+    done: items.length - open.length,
+  }
+}
+
 function dotColor(item: DayItem, subjects: Map<string, Subject>): string {
   const subject = subjects.get(item.subjectId ?? '')
   return subject ? colorVar(subject.color) : 'var(--c-ink-3)'
 }
 
+/**
+ * Una línea por elemento, como los eventos del mes de Calendario: fondo
+ * tenue del color de la asignatura, barra a la izquierda y el título entero
+ * hasta donde quepa. El examen va más marcado; el evento, sin fondo.
+ */
 function ItemChip({ item, subject }: { item: DayItem; subject?: Subject }) {
   const color = subject ? colorVar(subject.color) : 'var(--c-ink-3)'
-  const style = KIND_STYLE[item.kind]
+  const exam = item.kind === 'examen'
+  const event = item.kind === 'evento'
 
   return (
     <span
       className={cx(
-        'flex items-center gap-1 min-w-0 px-1.5 py-0.5 rounded-[6px]',
-        'text-[0.6875rem] leading-tight',
-        item.kind === 'examen' ? 'font-semibold' : 'font-normal',
-        item.done && 'opacity-45 line-through',
+        'relative flex items-center gap-1.5 min-w-0 h-[1.375rem] pl-2 pr-1.5 rounded-[6px] overflow-hidden',
+        'text-[0.75rem] leading-none',
+        exam ? 'font-semibold' : 'font-medium',
+        item.done && 'opacity-50',
       )}
-      style={
-        item.kind === 'examen'
-          ? { background: `color-mix(in oklab, ${color} 14%, transparent)` }
-          : undefined
-      }
+      style={{
+        background: event
+          ? undefined
+          : `color-mix(in oklab, ${color} ${exam ? 22 : 12}%, transparent)`,
+        color: exam ? `color-mix(in oklab, ${color} 70%, var(--c-ink))` : 'var(--c-ink)',
+      }}
     >
       <span
         aria-hidden
-        className={cx('size-1.5 shrink-0', style.shape)}
+        className={cx(
+          'shrink-0',
+          event ? 'size-1.5 rounded-[2px]' : 'absolute left-0 inset-y-0 w-[3px]',
+        )}
         style={{ background: color }}
       />
-      <span className="truncate" style={item.kind === 'examen' ? { color } : undefined}>
+      <span className="truncate">
         {item.title}
       </span>
     </span>
@@ -524,7 +578,7 @@ function WeekColumns({
               aria-pressed={day === selected}
               data-drop-day={day}
               className={cx(
-                'flex flex-col text-left p-3 min-h-[9rem]',
+                'flex flex-col text-left p-2.5 min-h-[9rem]',
                 'border-b border-r border-hairline last:border-r-0',
                 'transition-colors duration-150',
                 day === selected ? 'bg-accent-quiet' : 'hover:bg-fill/60',
@@ -547,7 +601,7 @@ function WeekColumns({
                 {items.length === 0 ? (
                   <span className="text-[0.6875rem] text-ink-3">—</span>
                 ) : (
-                  items.map((item) => (
+                  [...items.filter((x) => !x.done), ...items.filter((x) => x.done)].map((item) => (
                     <ItemChip
                       key={`${item.kind}-${item.id}`}
                       item={item}
@@ -597,7 +651,7 @@ function DayPanel({
   const date = parseDay(day)
 
   return (
-    <section className={cx('lg:sticky lg:top-6', expanded && 'lg:static')}>
+    <section className={cx('xl:sticky xl:top-6', expanded && 'xl:static')}>
       <div className="flex items-end justify-between gap-3 px-1 mb-2.5">
         <div className="min-w-0">
           <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.04em] text-ink-3">
@@ -627,24 +681,35 @@ function DayPanel({
 
               const body = (
                 <>
-                  {/* Barra de color con la hora, como la agenda de iOS. */}
+                  {/* Hora a la izquierda y barra de color, como la agenda de iOS. */}
+                  <span className="w-[4.5rem] shrink-0 pt-px text-right whitespace-nowrap">
+                    {item.time ? (
+                      <span className="text-[0.8125rem] font-semibold tabular-nums text-ink-2">
+                        {item.time}
+                      </span>
+                    ) : (
+                      <span className="text-[0.75rem] font-medium text-ink-3">
+                        todo el día
+                      </span>
+                    )}
+                  </span>
                   <span
                     aria-hidden
-                    className="w-1 self-stretch rounded-full shrink-0"
+                    className={cx('w-[3px] self-stretch rounded-full shrink-0', item.done && 'opacity-40')}
                     style={{ background: color }}
                   />
                   <div className="min-w-0 flex-1">
                     <p
                       className={cx(
                         'text-[0.9375rem] leading-snug',
-                        item.done ? 'text-ink-3 line-through' : 'text-ink',
+                        item.done ? 'text-ink-3' : 'text-ink',
                         item.kind === 'examen' && 'font-semibold',
                       )}
                     >
                       {item.title}
                     </p>
-                    <p className="text-[0.75rem] text-ink-3 mt-0.5">
-                      {KIND_STYLE[item.kind].label}
+                    <p className="text-[0.75rem] text-ink-3 mt-0.5 truncate">
+                      {item.done ? 'Hecha' : KIND_STYLE[item.kind].label}
                       {subject && ` · ${subject.name}`}
                     </p>
                     {exam?.topics && (
@@ -653,9 +718,7 @@ function DayPanel({
                       </p>
                     )}
                   </div>
-                  <span className="text-[0.8125rem] text-ink-3 tabular-nums shrink-0">
-                    {item.time ?? 'Todo el día'}
-                  </span>
+                  {item.done && <Check className="size-4 text-ok shrink-0 mt-0.5" strokeWidth={2.6} />}
                 </>
               )
 
@@ -679,7 +742,7 @@ function DayPanel({
                       type="button"
                       onClick={() => onOpen(item)}
                       aria-label={`Editar ${KIND_STYLE[item.kind].label.toLowerCase()}: ${item.title}`}
-                      className="w-full text-left flex items-start gap-3 px-4 py-3 active:bg-fill hover:bg-fill/50 transition-colors duration-150"
+                      className="w-full text-left flex items-start gap-2.5 pl-2 pr-4 py-3 active:bg-fill hover:bg-fill/50 transition-colors duration-150"
                     >
                       {body}
                     </button>

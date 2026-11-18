@@ -149,27 +149,42 @@ export default function StudyView() {
 
   // La barra de estado del iPad toma el color del mapa (no el gris claro de
   // la app) mientras dure el modo estudio; al salir se deja como estaba.
+  // En vuelo sobre la esfera la cámara va inclinada: arriba está el cielo.
+  const edgeColor = mapEdgeColor(
+    look,
+    stage === 'vuelo' || stage === 'aterrizado'
+      ? 'cielo'
+      : stage === 'inicio' && tab === 'resumen'
+        ? 'espacio'
+        : 'suelo',
+  )
+  // Desde iOS/iPadOS 26, Safari ya no lee «theme-color»: el velo difuminado
+  // de arriba lo tiñe con el fondo de html/body y con el de los elementos
+  // fijos pegados al borde superior. El body seguía en el gris claro de la
+  // app y la cabina (fija, a pantalla completa) también, así que salía una
+  // franja blanca difuminada sobre el mapa. Se pintan los tres del color del
+  // borde del mapa; «theme-color» se mantiene para versiones anteriores.
   useEffect(() => {
     const metas = [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')]
     const before = metas.map((m) => m.getAttribute('content'))
-    // En vuelo sobre la esfera la cámara va inclinada: arriba está el cielo.
-    const color = mapEdgeColor(
-      look,
-      stage === 'vuelo' || stage === 'aterrizado'
-        ? 'cielo'
-        : stage === 'inicio' && tab === 'resumen'
-          ? 'espacio'
-          : 'suelo',
-    )
-    for (const m of metas) m.setAttribute('content', color)
+    for (const m of metas) m.setAttribute('content', edgeColor)
     const html = document.documentElement
-    const bg = html.style.backgroundColor
-    html.style.backgroundColor = color
+    const body = document.body
+    const prev = {
+      html: html.style.backgroundColor,
+      body: body.style.backgroundColor,
+      scheme: html.style.colorScheme,
+    }
+    html.style.backgroundColor = edgeColor
+    body.style.backgroundColor = edgeColor
+    if (inCabin) html.style.colorScheme = 'dark'
     return () => {
       metas.forEach((m, i) => before[i] !== null && m.setAttribute('content', before[i]!))
-      html.style.backgroundColor = bg
+      html.style.backgroundColor = prev.html
+      body.style.backgroundColor = prev.body
+      html.style.colorScheme = prev.scheme
     }
-  }, [look, stage, tab])
+  }, [edgeColor, inCabin])
 
   // --- Sesión en el aire (también si despegó en otro dispositivo) ---
   // Las escalas y el aterrizaje los aplica el controlador del vuelo, que vive
@@ -496,7 +511,8 @@ export default function StudyView() {
 
   return (
     <div
-      className="study-root fixed inset-0 z-[35] bg-canvas overflow-hidden text-ink"
+      className="study-root fixed inset-0 z-[35] overflow-hidden text-ink"
+      style={{ backgroundColor: edgeColor }}
       data-stage={stage}
       data-quiet={prefs.quiet ? 'true' : undefined}
       data-cabin={inCabin ? 'true' : undefined}
