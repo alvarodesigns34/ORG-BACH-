@@ -108,7 +108,7 @@ interface Suggestion {
  * asignatura y la tarea o el examen ya puestos. En iPad es una lista; en
  * iPhone, una fila que se desliza para no empujar los botones de despegue.
  */
-export function StudyNext({ subjects, today }: { subjects: Map<string, Subject>; today: string }) {
+export function StudyNext({ subjects, today, flat = false }: { subjects: Map<string, Subject>; today: string; flat?: boolean }) {
   const summary = useTaskSummary()
   const exams = useUpcomingExams()
 
@@ -147,12 +147,13 @@ export function StudyNext({ subjects, today }: { subjects: Map<string, Subject>;
   if (!items.length) return null
 
   return (
-    <section className="liquid rounded-[26px] py-2" aria-label="Con qué estudiar ahora">
-      <p aria-hidden="true" className="relative z-[2] eyebrow px-4.5 pt-1 mb-1.5">Con qué estudiar ahora</p>
+    <section className={flat ? 'pt-1' : 'liquid rounded-[26px] py-2'} aria-label="Con qué estudiar ahora">
+      <p aria-hidden="true" className={cx('relative z-[2] eyebrow pt-1 mb-1.5', flat ? 'px-6' : 'px-4.5')}>Con qué estudiar ahora</p>
       <ul
         className={cx(
           // iPhone: fila deslizable con tarjetas compactas.
-          'relative z-[2] flex gap-2 overflow-x-auto no-scrollbar snap-x snap-mandatory px-2 scroll-px-2',
+          'relative z-[2] flex gap-2 overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-px-2',
+          flat ? 'px-4' : 'px-2',
           // iPad y escritorio (panel lateral): lista vertical.
           'min-[720px]:flex-col min-[720px]:gap-1 min-[720px]:overflow-visible',
         )}
@@ -599,6 +600,7 @@ export function BookingPanel({
   layover,
   onLayover,
   onBack,
+  quick,
   onBook,
 }: {
   origin: Airport
@@ -611,6 +613,8 @@ export function BookingPanel({
   layover: { mode: LayoverMode; minutes: number; focus: number }
   onLayover: (patch: Partial<Pick<StudyPrefs, 'layoverMode' | 'layover' | 'focus'>>) => void
   onBack: () => void
+  /** «Despegar ya» y «Con qué estudiar ahora», sobre la planificación. */
+  quick?: ReactNode
   onBook: () => void
 }) {
   const [searching, setSearching] = useState(false)
@@ -659,6 +663,7 @@ export function BookingPanel({
           {searching ? <X className="size-[18px]" strokeWidth={2.4} /> : <Search className="size-[18px]" strokeWidth={2.2} />}
         </IconButton>
       </div>
+      {!searching && quick}
 
       <AnimatePresence mode="popLayout" initial={false}>
         {searching ? (

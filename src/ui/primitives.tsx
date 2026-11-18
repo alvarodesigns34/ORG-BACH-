@@ -19,9 +19,9 @@ type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerFill'
 type ButtonSize = 'sm' | 'md' | 'lg'
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary:
-    'bg-accent-fill text-accent-ink hover:brightness-[1.08] shadow-[inset_0_1px_0_rgb(255_255_255/0.22),0_1px_2px_rgb(0_0_0/0.08)]',
-  secondary: 'bg-fill text-ink hover:bg-[color-mix(in_srgb,var(--c-fill)_100%,var(--c-ink)_4%)]',
+  primary: 'glass-tinted text-accent-ink hover:brightness-[1.08]',
+  // Botón de cristal: el control secundario de iOS 26.
+  secondary: 'glass-btn text-ink',
   ghost: 'bg-transparent text-accent hover:bg-fill',
   danger: 'bg-transparent text-danger hover:bg-danger-quiet',
   dangerFill: 'bg-danger text-white hover:brightness-110',
@@ -362,7 +362,7 @@ export function Segmented<T extends string>({
                 aria-hidden
                 layoutId={thumbId}
                 transition={spring.snappy}
-                className="absolute inset-0 rounded-full bg-raised shadow-sm"
+                className="lens absolute inset-0 rounded-full"
               />
             )}
             <span className="relative">{option.label}</span>

@@ -28,29 +28,23 @@ const ACTIVITY: { tab: HomeTab; label: string; icon: typeof Plane }[] = [
 
 /**
  * Entrada de Estudio. Lo mínimo sobre el mapa, como una app de vuelo: dónde
- * estás, un botón grande para despegar y lo que toca estudiar. El resumen,
- * el diario y el pasaporte quedan a un toque (barra de la derecha), en la
- * hoja lateral, en vez de ocupar la pantalla al entrar.
+ * estás y un botón grande. «Despegar ya» y «Con qué estudiar ahora» van
+ * dentro de «Planear vuelo» (ver `QuickStart`); el resumen, el diario y el
+ * pasaporte, a un toque en la barra de la derecha.
  */
 export function StudyHome({
   origin,
-  subjects,
-  today,
   hidden,
   onExit,
   onActivity,
   onStart,
-  onQuick,
 }: {
   origin: Airport
-  subjects: Map<string, Subject>
-  today: string
   /** La hoja de actividad está abierta: se apartan los controles de la izquierda. */
   hidden: boolean
   onExit: () => void
   onActivity: (tab: HomeTab) => void
   onStart: () => void
-  onQuick: (minutes: number) => void
 }) {
   const settings = useSettings()
   const name = settings.userName.trim().split(/\s+/)[0]
@@ -107,34 +101,6 @@ export function StudyHome({
         inert={hidden}
         className="study-home-dock absolute z-10 flex flex-col gap-3"
       >
-        <div className="study-home-next">
-          <StudyNext subjects={subjects} today={today} />
-        </div>
-
-        <div className="liquid rounded-[26px] p-1.5">
-          <p className="relative z-[2] eyebrow px-3 pt-1.5 pb-1.5">Despegar ahora</p>
-          <div className="relative z-[2] grid grid-cols-4 gap-1">
-            {QUICK.map((m) => {
-              const { value, unit } = quickLabel(m)
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => {
-                    haptic()
-                    onQuick(m)
-                  }}
-                  aria-label={`Despegar ${m < 60 ? `${m} minutos` : `${value} ${unit}`}`}
-                  className="pressable h-[3.25rem] rounded-[20px] bg-[var(--glass-tint)] hover:bg-[color-mix(in_srgb,var(--glass-tint)_100%,var(--c-ink)_5%)] flex flex-col items-center justify-center"
-                >
-                  <span className="numeral text-[1.0625rem] leading-none">{value}</span>
-                  <span className="text-[0.6875rem] font-medium text-ink-3 mt-1">{unit}</span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
         <button
           type="button"
           onClick={() => {
@@ -164,5 +130,48 @@ export function StudyHome({
         </div>
       </motion.nav>
     </>
+  )
+}
+
+/**
+ * Arriba de «Planear vuelo»: despegar ya con una duración o con lo que toca
+ * estudiar, sin elegir destino ni asiento.
+ */
+export function QuickStart({
+  subjects,
+  today,
+  onQuick,
+}: {
+  subjects: Map<string, Subject>
+  today: string
+  onQuick: (minutes: number) => void
+}) {
+  return (
+    <div className="pb-3 border-b border-[var(--glass-edge)]">
+      <p className="eyebrow px-6 pt-3 mb-1.5">Despegar ya</p>
+      <div className="grid grid-cols-4 gap-1.5 px-4">
+        {QUICK.map((m) => {
+          const { value, unit } = quickLabel(m)
+          return (
+            <button
+              key={m}
+              type="button"
+              onClick={() => {
+                haptic()
+                onQuick(m)
+              }}
+              aria-label={`Despegar ya ${m < 60 ? `${m} minutos` : `${value} ${unit}`}`}
+              className="glass-btn pressable h-12 rounded-[16px] flex flex-col items-center justify-center"
+            >
+              <span className="numeral text-[1rem] leading-none">{value}</span>
+              <span className="text-[0.6875rem] font-medium text-ink-3 mt-1">{unit}</span>
+            </button>
+          )
+        })}
+      </div>
+      <div className="mt-2">
+        <StudyNext subjects={subjects} today={today} flat />
+      </div>
+    </div>
   )
 }

@@ -37,7 +37,7 @@ import type { Padding } from '@/features/study/flightMap'
 import { mapEdgeColor } from '@/features/study/mapStyle'
 import { BookingPanel, HomePanel, PANEL_WIDTH, SidePanel, type HomeTab } from '@/features/study/Panels'
 import { SeatPicker, type SeatChoice } from '@/features/study/SeatPicker'
-import { StudyHome } from '@/features/study/StudyHome'
+import { QuickStart, StudyHome } from '@/features/study/StudyHome'
 import { BoardingPass, Takeoff } from '@/features/study/BoardingPass'
 import { FlightHud, LandedCard, LayoverCard, MapToolbar } from '@/features/study/FlightHud'
 import { beginFlightAudio } from '@/features/study/flightAudio'
@@ -592,8 +592,6 @@ export default function StudyView() {
           <StudyHome
             key="entrada"
             origin={origin}
-            subjects={subjectMap}
-            today={today}
             hidden={activity}
             onExit={leave}
             onActivity={(next) => {
@@ -601,7 +599,6 @@ export default function StudyView() {
               setActivity(true)
             }}
             onStart={startBooking}
-            onQuick={(duration) => navigate('estudio', { despegar: String(duration) })}
           />
         )}
       </AnimatePresence>
@@ -641,6 +638,13 @@ export default function StudyView() {
               layover={{ mode: prefs.layoverMode, minutes: prefs.layover, focus: prefs.focus }}
               onLayover={(patch) => setPrefs(patch)}
               onBack={() => setStage('inicio')}
+              quick={
+                <QuickStart
+                  subjects={subjectMap}
+                  today={today}
+                  onQuick={(duration) => navigate('estudio', { despegar: String(duration) })}
+                />
+              }
               onBook={() => {
                 if (!selected) return
                 setDestIata(selected.airport.iata)

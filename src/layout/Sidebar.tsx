@@ -59,7 +59,7 @@ export function Sidebar({ current, badges }: SidebarProps) {
             <button
               type="button"
               onClick={() => openCreate('tarea')}
-              className="pressable flex-1 flex items-center gap-2 h-11 pl-4 pr-3 rounded-full bg-accent-fill text-white text-[0.9375rem] font-semibold shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_4px_14px_rgb(0_113_227/0.28)]"
+              className="pressable flex-1 flex items-center gap-2 h-11 pl-4 pr-3 rounded-full glass-tinted text-white text-[0.9375rem] font-semibold"
             >
               <Plus className="size-4" strokeWidth={2.6} />
               Nueva tarea
@@ -75,7 +75,7 @@ export function Sidebar({ current, badges }: SidebarProps) {
                 type="button"
                 disabled={item.needsSubject && !hasSubjects}
                 onClick={() => openCreate(item.kind)}
-                className="pressable flex flex-col items-center gap-1 py-2 rounded-[14px] bg-fill text-[0.6875rem] font-semibold text-ink-2 hover:text-ink disabled:opacity-40"
+                className="glass-btn pressable flex flex-col items-center gap-1 py-2 rounded-[14px] text-[0.6875rem] font-semibold text-ink-2 hover:text-ink disabled:opacity-40"
               >
                 <item.icon className="size-4" strokeWidth={2.2} style={{ color: item.tint }} />
                 {item.label}
@@ -102,7 +102,7 @@ export function Sidebar({ current, badges }: SidebarProps) {
               initial={false}
               animate={{ y: indicator.box.top, height: indicator.box.height, opacity: 1 }}
               transition={indicator.animate ? spring.snappy : { duration: 0 }}
-              className="absolute left-3 right-3 top-0 rounded-[12px] bg-[var(--glass-tint)] shadow-[inset_0_0_0_0.5px_var(--glass-edge)] pointer-events-none"
+              className="lens absolute left-3 right-3 top-0 rounded-[12px] pointer-events-none"
             />
           )}
           {NAV_GROUPS.map((group) => {

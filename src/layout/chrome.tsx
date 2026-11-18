@@ -277,7 +277,7 @@ export function ChromeActions({
 export function AssistantLauncher() {
   const { openAssistant } = useChrome()
   return (
-    <div className="relative flex items-center h-[3.25rem] rounded-[20px] bg-[var(--glass-tint)] shadow-[inset_0_0_0_0.5px_var(--glass-edge)]">
+    <div className="glass-btn relative flex items-center h-[3.25rem] rounded-[20px]">
       <button
         type="button"
         onClick={() => openAssistant('text')}
