@@ -136,7 +136,7 @@ export function SettingsView({ section }: { section?: string | null }) {
         <div className="card flex items-center gap-4 px-4 py-4">
           <AccountAvatar size={60} decorative />
           <div className="min-w-0">
-            <p className="text-[1.25rem] font-semibold tracking-[-0.02em] truncate">
+            <p className="text-[1.25rem] font-semibold tracking-[-0.012em] truncate">
               {settings.userName || 'Sin nombre'}
             </p>
             <p className="text-[0.875rem] text-ink-3 truncate">

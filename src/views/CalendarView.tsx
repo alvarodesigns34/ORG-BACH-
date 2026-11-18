@@ -156,7 +156,7 @@ export function CalendarView() {
         toolbar={
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center justify-between gap-3 md:justify-start md:gap-4 min-w-0">
-              <h2 className="text-[1.5rem] font-bold tracking-[-0.025em] first-letter:uppercase truncate">
+              <h2 className="text-[1.5rem] font-bold tracking-[-0.015em] first-letter:uppercase truncate">
                 {heading}
               </h2>
               <div className="glass-btn flex items-center gap-0.5 shrink-0 rounded-full p-[3px]">
@@ -261,7 +261,7 @@ export function CalendarView() {
           {unplanned.length > 0 && (
             <section aria-label="Por planificar">
               <div className="flex items-baseline justify-between px-1 mb-2.5">
-                <h2 className="text-[1.125rem] font-bold tracking-[-0.02em]">Por planificar</h2>
+                <h2 className="text-[1.125rem] font-bold tracking-[-0.012em]">Por planificar</h2>
                 <span className="text-[0.75rem] text-ink-3">Arrastra a un día</span>
               </div>
               <ul className="card overflow-hidden">
@@ -661,7 +661,7 @@ function DayPanel({
           <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.04em] text-ink-3">
             {isToday ? 'Hoy' : WEEKDAYS_LONG[date.getDay()]}
           </p>
-          <h2 className="text-[1.375rem] font-bold tracking-[-0.022em] leading-tight">
+          <h2 className="text-[1.375rem] font-bold tracking-[-0.014em] leading-tight">
             {date.getDate()} de {MONTHS_LONG[date.getMonth()]}
           </h2>
         </div>

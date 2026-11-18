@@ -115,7 +115,7 @@ export function Onboarding() {
 
           <div className="max-w-[30ch]">
             <p className="eyebrow mb-5">Curso {settings.academicYear}</p>
-            <h1 className="display text-[3rem] xl:text-[3.5rem] leading-[1.02] tracking-[-0.03em]">
+            <h1 className="display text-[3rem] xl:text-[3.5rem] leading-[1.02] tracking-[-0.018em]">
               Todo el curso,
               <br />
               en un sitio.
@@ -143,7 +143,7 @@ export function Onboarding() {
 
             {step === 'perfil' ? (
               <div className="animate-rise">
-                <h2 className="display text-[1.75rem] leading-tight tracking-[-0.025em] mt-6">
+                <h2 className="display text-[1.75rem] leading-tight tracking-[-0.015em] mt-6">
                   Empecemos por lo básico
                 </h2>
                 <p className="text-[0.875rem] text-ink-3 mt-2">
@@ -240,7 +240,7 @@ export function Onboarding() {
               </div>
             ) : (
               <div className="animate-rise">
-                <h2 className="display text-[1.75rem] leading-tight tracking-[-0.025em] mt-6">
+                <h2 className="display text-[1.75rem] leading-tight tracking-[-0.015em] mt-6">
                   ¿Qué asignaturas tienes?
                 </h2>
                 <p className="text-[0.875rem] text-ink-3 mt-2">

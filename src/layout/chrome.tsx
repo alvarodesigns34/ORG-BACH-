@@ -258,7 +258,7 @@ export function TopBar({
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 exit={{ opacity: 0, y: 6, filter: 'blur(4px)', transition: exitFast }}
                 transition={spring.snappy}
-                className="absolute inset-x-28 text-center text-[1.0625rem] font-semibold tracking-[-0.02em] truncate"
+                className="absolute inset-x-28 text-center text-[1.0625rem] font-semibold tracking-[-0.012em] truncate"
               >
                 {title}
               </motion.p>
@@ -347,7 +347,7 @@ function PadToolbar({
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 exit={{ opacity: 0, y: 6, filter: 'blur(4px)', transition: exitFast }}
                 transition={spring.snappy}
-                className="absolute inset-x-56 text-center text-[1.0625rem] font-semibold tracking-[-0.02em] truncate"
+                className="absolute inset-x-56 text-center text-[1.0625rem] font-semibold tracking-[-0.012em] truncate"
               >
                 {title}
               </motion.p>

@@ -292,7 +292,8 @@
     font-family: var(--font-sans);
     font-size: 0.9375rem;
     line-height: 1.5;
-    letter-spacing: -0.006em;
+    /* SF ya trae su propio espaciado óptico por tamaño: apenas se toca. */
+    letter-spacing: -0.003em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: 'kern';
@@ -301,8 +302,8 @@
   h1,
   h2,
   h3 {
-    font-weight: 650;
-    letter-spacing: -0.02em;
+    font-weight: 700;
+    letter-spacing: -0.012em;
     text-wrap: balance;
   }
 
@@ -353,7 +354,9 @@ html {
 @utility display {
   font-family: var(--font-display);
   font-weight: 700;
-  letter-spacing: -0.025em;
+  /* Los títulos de iOS 26: negrita y sin apretar de más (SF Display ya
+     ajusta el espaciado a su tamaño). */
+  letter-spacing: -0.015em;
 }
 
 /* Cifras académicas: redondeadas, tabulares, sin baile al actualizarse. */

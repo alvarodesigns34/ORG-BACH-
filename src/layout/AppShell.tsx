@@ -254,8 +254,8 @@ export function PageHeader({
             className={cx(
               'display leading-[1.06]',
               large
-                ? 'text-[2.25rem] sm:text-[3rem] tracking-[-0.035em]'
-                : 'text-[2.125rem] sm:text-[2.5rem] tracking-[-0.03em]',
+                ? 'text-[2.25rem] sm:text-[3rem] tracking-[-0.012em]'
+                : 'text-[2.125rem] sm:text-[2.5rem] tracking-[-0.018em]',
             )}
           >
             {title}
