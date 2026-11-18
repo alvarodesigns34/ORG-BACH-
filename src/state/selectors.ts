@@ -6,9 +6,10 @@
  * no puedan discrepar nunca — salen de la misma función.
  */
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { detectAlerts, type Alert } from '../domain/alerts.ts'
+import { clockOf, pendingExams } from '../domain/exams.ts'
 import { goalProgress, type GoalContext, type GoalProgress } from '../domain/goals.ts'
 import { daysUntil, startOfWeek, toDay } from '../domain/dates.ts'
 import { globalAverage, subjectResult, type SubjectResult } from '../domain/grades.ts'
@@ -144,6 +145,37 @@ export function useUpcomingExams(limit?: number): Exam[] {
       .sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))
     return limit ? list.slice(0, limit) : list
   }, [data.exams, today, limit])
+}
+
+/** Minuto actual (hora local), que avanza solo cada minuto. */
+function useMinuteClock(): number {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const tick = () => setNow(Date.now())
+    const id = window.setInterval(tick, 60_000)
+    // Al volver a la app (iPad en reposo) el intervalo pudo quedarse dormido.
+    document.addEventListener('visibilitychange', tick)
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', tick)
+    }
+  }, [])
+  return Math.floor(now / 60_000)
+}
+
+/**
+ * Exámenes que todavía están por hacer: sin nota y sin haber pasado su hora
+ * (o la de su clase). Es lo que se puede sugerir estudiar.
+ */
+export function usePendingExams(limit?: number): Exam[] {
+  const { data, today } = useStore()
+  const minute = useMinuteClock()
+  return useMemo(() => {
+    const list = pendingExams(data.exams, data.subjects, clockOf(new Date(minute * 60_000)))
+    return limit ? list.slice(0, limit) : list
+    // `today` también cuenta: cambia a medianoche aunque el reloj vaya parado.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.exams, data.subjects, minute, today, limit])
 }
 
 // ---------------------------------------------------------------------------

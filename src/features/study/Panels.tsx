@@ -19,7 +19,7 @@ import {
 import { daysUntil, relativeDay } from '@/domain/dates'
 import { focusMinutes } from '@/domain/flights'
 import { studyHref } from '@/router'
-import { useTaskSummary, useUpcomingExams } from '@/state/selectors'
+import { usePendingExams, useTaskSummary } from '@/state/selectors'
 import type { FocusSession, Subject } from '@/domain/types'
 import { colorVar } from '@/domain/palette'
 import { haptic, spring } from '@/ui/motion'
@@ -110,7 +110,8 @@ interface Suggestion {
  */
 export function StudyNext({ subjects, today, flat = false }: { subjects: Map<string, Subject>; today: string; flat?: boolean }) {
   const summary = useTaskSummary()
-  const exams = useUpcomingExams()
+  // Solo exámenes por hacer: uno de hoy cuya clase ya pasó no se sugiere.
+  const exams = usePendingExams()
 
   const items = useMemo(() => {
     const out: Suggestion[] = []

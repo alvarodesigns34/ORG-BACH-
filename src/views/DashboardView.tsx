@@ -52,6 +52,7 @@ import {
   useSubjectMap,
   useSubjects,
   useTaskSummary,
+  usePendingExams,
   useUpcomingExams,
 } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
@@ -205,7 +206,8 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
   }
 
   const firstName = settings.userName.split(' ')[0]
-  const nextExam = exams.find((e) => e.date >= today)
+  // El próximo examen por hacer: uno de hoy que ya pasó no cuenta.
+  const nextExam = usePendingExams(1)[0]
 
   // Una frase que resume el día, bajo el saludo.
   const brief = useMemo(() => {
