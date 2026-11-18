@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { AnimatePresence, m as motion } from 'motion/react'
-import { ChevronLeft, Coffee, Plane, Search, Shuffle, X } from 'lucide-react'
+import { ChevronLeft, Coffee, Plane, PlaneTakeoff, Search, Shuffle, X } from 'lucide-react'
 
 import {
   MAX_MINUTES,
@@ -16,7 +16,10 @@ import {
   type Airport,
   type Destination,
 } from '@/domain/flights'
-import { relativeDay } from '@/domain/dates'
+import { daysUntil, relativeDay } from '@/domain/dates'
+import { focusMinutes } from '@/domain/flights'
+import { studyHref } from '@/router'
+import { useTaskSummary, useUpcomingExams } from '@/state/selectors'
 import type { FocusSession, Subject } from '@/domain/types'
 import { colorVar } from '@/domain/palette'
 import { haptic, spring } from '@/ui/motion'
@@ -85,6 +88,108 @@ function Figure({ value, unit, label }: { value: string; unit?: string; label: s
 export type HomeTab = 'resumen' | 'diario' | 'pasaporte'
 
 const QUICK = [25, 45, 60, 90]
+
+/** Un examen se prepara en bloques más largos que una tarea suelta. */
+const EXAM_BLOCK = 45
+/** Exámenes que ya merece la pena preparar. */
+const EXAM_HORIZON_DAYS = 14
+
+interface Suggestion {
+  key: string
+  title: string
+  detail: string
+  subject?: Subject
+  minutes: number
+  href: string
+  urgent: boolean
+}
+
+/**
+ * «Con qué estudiar ahora»: el próximo examen y lo que toca hoy, cada uno con
+ * su despegue. Lleva a la misma cabina que «Despegar ahora», con la
+ * asignatura y la tarea o el examen ya puestos. En iPad es una lista; en
+ * iPhone, una fila que se desliza para no empujar los botones de despegue.
+ */
+function StudyNext({ subjects, today }: { subjects: Map<string, Subject>; today: string }) {
+  const summary = useTaskSummary()
+  const exams = useUpcomingExams()
+
+  const items = useMemo(() => {
+    const out: Suggestion[] = []
+    const exam = exams.find((e) => e.date >= today && daysUntil(e.date, today) <= EXAM_HORIZON_DAYS)
+    if (exam) {
+      const days = daysUntil(exam.date, today)
+      const subject = subjects.get(exam.subjectId)
+      out.push({
+        key: `examen-${exam.id}`,
+        title: exam.title || `Examen de ${subject?.name ?? 'asignatura'}`,
+        detail: days === 0 ? 'Examen hoy' : days === 1 ? 'Examen mañana' : `Examen en ${days} días`,
+        subject,
+        minutes: EXAM_BLOCK,
+        href: studyHref({ minutes: EXAM_BLOCK, examId: exam.id, subjectId: exam.subjectId }),
+        urgent: days <= 2,
+      })
+    }
+    for (const task of summary.today.slice(0, exam ? 3 : 4)) {
+      const minutes = focusMinutes(task.estimatedMinutes ?? 25) ?? 25
+      const late = !!task.dueDate && task.dueDate < today
+      out.push({
+        key: `tarea-${task.id}`,
+        title: task.title,
+        detail: late ? 'Atrasada' : 'Para hoy',
+        subject: task.subjectId ? subjects.get(task.subjectId) : undefined,
+        minutes,
+        href: studyHref({ minutes, taskId: task.id, subjectId: task.subjectId }),
+        urgent: late,
+      })
+    }
+    return out
+  }, [exams, summary.today, subjects, today])
+
+  if (!items.length) return null
+
+  return (
+    <section className="mt-4 min-[720px]:mt-5" aria-label="Con qué estudiar ahora">
+      <p aria-hidden="true" className="eyebrow px-6 mb-2">Con qué estudiar ahora</p>
+      <ul
+        className={cx(
+          // iPhone: fila deslizable con tarjetas compactas.
+          'flex gap-2 overflow-x-auto no-scrollbar snap-x snap-mandatory px-4 scroll-px-4',
+          // iPad y escritorio (panel lateral): lista vertical.
+          'min-[720px]:flex-col min-[720px]:overflow-visible',
+        )}
+      >
+        {items.map((item) => (
+          <li key={item.key} className="snap-start shrink-0 w-[78%] max-w-[280px] min-[720px]:w-auto min-[720px]:max-w-none">
+            <a
+              href={item.href}
+              onClick={() => haptic()}
+              aria-label={`Despegar ${item.minutes} minutos: ${item.title}`}
+              className="pressable h-full rounded-[18px] bg-[var(--glass-tint)] hover:bg-[color-mix(in_srgb,var(--glass-tint)_100%,var(--c-ink)_4%)] pl-3 pr-2 py-2 min-[720px]:py-2.5 flex items-center gap-3"
+            >
+              <span
+                aria-hidden="true"
+                className="w-1 self-stretch rounded-full shrink-0"
+                style={{ background: item.subject ? colorVar(item.subject.color) : 'var(--c-ink-3)' }}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[0.875rem] min-[720px]:text-[0.9375rem] font-semibold leading-snug truncate">{item.title}</span>
+                <span className="block text-[0.75rem] text-ink-3 truncate mt-0.5">
+                  <span className={item.urgent ? 'text-danger font-medium' : undefined}>{item.detail}</span>
+                  {item.subject && ` · ${item.subject.name}`}
+                </span>
+              </span>
+              <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-accent-fill text-accent-ink px-2.5 h-8 text-[0.8125rem] font-semibold tabular-nums">
+                <PlaneTakeoff className="size-3.5" strokeWidth={2.4} aria-hidden="true" />
+                {item.minutes}′
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
 
 export function HomePanel({
   origin,
@@ -272,6 +377,8 @@ function Summary({
             </ul>
           </div>
         )}
+
+        <StudyNext subjects={subjects} today={today} />
 
         <div className="px-4 mt-5 pb-4">
           <p className="eyebrow px-2 mb-2">Despegar ahora</p>
