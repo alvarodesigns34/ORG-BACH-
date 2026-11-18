@@ -875,7 +875,7 @@ Deno.serve(async (req) => {
     times.total = Date.now() - startedAt
     times.status = status
     console.log('tiempos', JSON.stringify(times))
-    return respond(body, status)
+    return json(body, status)
   }
 
   try {
