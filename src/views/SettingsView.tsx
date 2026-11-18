@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Award,
   CalendarClock,
+  CalendarArrowUp,
   CalendarDays,
   CalendarRange,
   Check,
@@ -32,6 +33,9 @@ import { DigestSection } from '@/features/notifications/DigestCard'
 import { useSync } from '@/sync/useSync'
 import { SnapshotsSheet } from '@/features/backup/Backups'
 import { exportBackup } from '@/storage/backup'
+import { exportCalendar } from '@/storage/calendarExport'
+import { icsSelection } from '@/domain/ics'
+import { today as todayISO } from '@/domain/dates'
 import { listSnapshots, saveSnapshot } from '@/storage/snapshots'
 import { ListGroup, ListRow, RowInput, RowNumber, RowSelect, RowSwitch } from '@/ui/list'
 import { ConfirmDialog } from '@/ui/Modal'
@@ -74,6 +78,12 @@ export function SettingsView({ section }: { section?: string | null }) {
   // --- Exportar ---
   // En iPad abre la hoja de compartir («Guardar en Archivos»); en el resto,
   // descarga el archivo (ver `exportBackup`).
+  const calendarDetail = (() => {
+    const sel = icsSelection({ tasks: data.tasks, exams: data.exams, subjects: data.subjects, today: todayISO() })
+    const t = sel.tasks.length
+    const e = sel.exams.length
+    return `${t} ${t === 1 ? 'tarea' : 'tareas'} con fecha y ${e} ${e === 1 ? 'examen' : 'exámenes'}, en un archivo .ics`
+  })()
   const exportData = async () => {
     if (await exportBackup(data)) setNotice({ tone: 'ok', text: 'Copia guardada correctamente.' })
   }
@@ -267,7 +277,7 @@ export function SettingsView({ section }: { section?: string | null }) {
 
         <ListGroup
           header="Avisos en Inicio"
-          footer="Asignaturas por debajo de su objetivo y semanas con demasiadas tareas juntas."
+          footer="Exámenes cercanos, tareas atrasadas, asignaturas por debajo de su objetivo y semanas con demasiadas tareas juntas, dentro de la app. El resumen diario por notificación va aparte, en Notificaciones."
         >
           <RowSwitch
             icon={TriangleAlert}
@@ -315,6 +325,16 @@ export function SettingsView({ section }: { section?: string | null }) {
         >
           <ListRow icon={Database} tint="#8e8e93" label="Contenido" value={counts} />
           <ListRow icon={Download} tint="#0a84ff" label="Exportar copia" onClick={() => void exportData()} />
+          <ListRow
+            icon={CalendarArrowUp}
+            tint="#ff3b30"
+            label="Exportar al calendario"
+            detail={calendarDetail}
+            onClick={() => {
+              exportCalendar(data)
+              setNotice({ tone: 'ok', text: 'Calendario exportado. En iPhone y iPad, toca «Añadir todo» para pasarlo a Calendario.' })
+            }}
+          />
           <ListRow
             icon={History}
             tint="#30b158"

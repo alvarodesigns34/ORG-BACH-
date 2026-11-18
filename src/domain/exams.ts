@@ -104,6 +104,37 @@ export function isExamOver(exam: Exam, subjects: Map<string, Subject> | Subject[
 export function pendingExams(exams: Exam[], subjects: Map<string, Subject> | Subject[], now: Clock): Exam[] {
   const map = Array.isArray(subjects) ? new Map(subjects.map((s) => [s.id, s])) : subjects
   return exams
-    .filter((e) => !isExamOver(e, map, now))
+    // Una asignatura archivada ya no se estudia: sus exámenes no se sugieren.
+    .filter((e) => !map.get(e.subjectId)?.archived && !isExamOver(e, map, now))
     .sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))
+}
+
+/** Días tras el examen durante los que se sigue preguntando por la nota. */
+export const GRADE_FOLLOW_UP_DAYS = 30
+
+/**
+ * Exámenes ya hechos que siguen sin nota: los que merecen la pregunta
+ * «¿qué tal te fue?». Más recientes primero. Un enlace a una nota que ya no
+ * existe cuenta como «sin nota». Fuera quedan los de asignaturas archivadas
+ * y los de hace más de `GRADE_FOLLOW_UP_DAYS` días (a esas alturas la
+ * pregunta ya es ruido).
+ */
+export function examsAwaitingGrade(
+  exams: Exam[],
+  subjects: Map<string, Subject> | Subject[],
+  gradeIds: Set<string>,
+  now: Clock,
+  days = GRADE_FOLLOW_UP_DAYS,
+): Exam[] {
+  const map = Array.isArray(subjects) ? new Map(subjects.map((s) => [s.id, s])) : subjects
+  const [y, m, d] = now.day.split('-').map(Number)
+  const oldest = toDay(new Date(y, (m ?? 1) - 1, (d ?? 1) - days))
+  return exams
+    .filter((e) => {
+      if (map.get(e.subjectId)?.archived) return false
+      if (e.gradeEntryId && gradeIds.has(e.gradeEntryId)) return false
+      if (e.date < oldest) return false
+      return isExamOver({ ...e, gradeEntryId: undefined }, map, now)
+    })
+    .sort((a, b) => b.date.localeCompare(a.date) || (b.time ?? '').localeCompare(a.time ?? ''))
 }

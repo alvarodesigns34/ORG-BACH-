@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { EXAM_FALLBACK_END, clockOf, examEndMinute, isExamOver, pendingExams } from '../src/domain/exams.ts'
+import { EXAM_FALLBACK_END, clockOf, examEndMinute, examsAwaitingGrade, isExamOver, pendingExams } from '../src/domain/exams.ts'
 import type { Exam, ScheduleSlot, Subject } from '../src/domain/types.ts'
 
 // 2026-11-18 es miércoles (3).
@@ -115,5 +115,42 @@ describe('clockOf', () => {
   it('usa la hora local, no UTC (00:30 en España sigue siendo ese día)', () => {
     const local = new Date(2026, 10, 19, 0, 30)
     assert.deepEqual(clockOf(local), { day: '2026-11-19', minutes: 30 })
+  })
+})
+
+describe('examsAwaitingGrade', () => {
+  const grades = new Set(['g1'])
+  const list = [
+    exam('hoy-hecho', 'historia', TODAY),
+    exam('hoy-pendiente', 'mates', TODAY),
+    exam('ayer', 'mates', '2026-11-17'),
+    exam('con-nota', 'historia', '2026-11-16', { gradeEntryId: 'g1' }),
+    exam('nota-borrada', 'historia', '2026-11-15', { gradeEntryId: 'g-borrada' }),
+    exam('viejo', 'historia', '2026-10-01'),
+    exam('manana', 'historia', '2026-11-19'),
+  ]
+
+  it('a las 12:00: los hechos sin nota, del más reciente al más antiguo', () => {
+    assert.deepEqual(
+      examsAwaitingGrade(list, subjects, grades, at('12:00')).map((x) => x.id),
+      ['hoy-hecho', 'ayer', 'nota-borrada'],
+    )
+  })
+
+  it('a las 23:00 ya entra también el de mates de hoy', () => {
+    assert.ok(examsAwaitingGrade(list, subjects, grades, at('23:00')).some((x) => x.id === 'hoy-pendiente'))
+  })
+
+  it('no pregunta por los de asignaturas archivadas', () => {
+    const archivada = subject('historia', historia.schedule, true)
+    const ids = examsAwaitingGrade(list, [archivada, mates], grades, at('23:00')).map((x) => x.id)
+    assert.deepEqual(ids, ['hoy-pendiente', 'ayer'])
+  })
+})
+
+describe('pendingExams y asignaturas archivadas', () => {
+  it('no sugiere estudiar exámenes de una asignatura archivada', () => {
+    const archivada = subject('historia', historia.schedule, true)
+    assert.deepEqual(pendingExams([exam('m', 'historia', '2026-11-19')], [archivada], at('10:00')), [])
   })
 })

@@ -7,7 +7,7 @@
 export function localParts(
   date: Date,
   timeZone: string,
-): { day: string; hour: number; weekday: number } {
+): { day: string; hour: number; minute: number; weekday: number } {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('en-CA', {
       timeZone,
@@ -15,6 +15,7 @@ export function localParts(
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
+      minute: '2-digit',
       hourCycle: 'h23',
       weekday: 'short',
     })
@@ -25,6 +26,7 @@ export function localParts(
   return {
     day: `${parts.year}-${parts.month}-${parts.day}`,
     hour: Number(parts.hour),
+    minute: Number(parts.minute),
     weekday: weekdays.indexOf(parts.weekday),
   }
 }
@@ -71,19 +73,64 @@ export interface Digest {
   title: string
   body: string
   empty: boolean
+  /** Vacío porque el alumno apagó «Mostrar avisos», no por falta de cosas. */
+  muted?: boolean
 }
 
 function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`
 }
 
-export function buildDigest(rows: SyncRow[], today: string): Digest {
+const hm = (v: unknown): number => {
+  const m = typeof v === 'string' ? /^(\d{1,2}):(\d{2})$/.exec(v) : null
+  return m && Number(m[1]) < 24 && Number(m[2]) < 60 ? Number(m[1]) * 60 + Number(m[2]) : Number.NaN
+}
+
+/**
+ * Minuto en que se da por hecho un examen de hoy. Es la misma regla que
+ * `src/domain/exams.ts` (que la app usa para no sugerirlo), en corto porque la
+ * función no puede importar código de fuera de su carpeta: con hora, el fin
+ * de su clase o una hora después; sin hora, el fin de la última clase de la
+ * asignatura ese día; sin nada, las 20:00.
+ */
+function examEnd(exam: Record<string, unknown>, subject: Record<string, unknown> | undefined, weekday: number): number {
+  const slots = (Array.isArray(subject?.schedule) ? subject.schedule : [])
+    .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object' && x.day === weekday)
+    .map((x) => ({ start: hm(x.start), end: hm(x.end) }))
+    .filter((x) => Number.isFinite(x.start) && Number.isFinite(x.end) && x.end > x.start)
+    .sort((a, b) => a.start - b.start)
+  const blocks: { start: number; end: number }[] = []
+  for (const slot of slots) {
+    const last = blocks[blocks.length - 1]
+    if (last && slot.start <= last.end) last.end = Math.max(last.end, slot.end)
+    else blocks.push({ ...slot })
+  }
+  const start = hm(exam.time)
+  if (Number.isFinite(start)) {
+    return blocks.find((b) => start >= b.start && start < b.end)?.end ?? start + 60
+  }
+  return blocks.length ? blocks[blocks.length - 1].end : 20 * 60
+}
+
+/**
+ * `nowMinutes` (minutos desde medianoche, hora local) permite quitar un
+ * examen de hoy que ya ha terminado: a las 17:00 no tiene sentido anunciar
+ * el examen de las 9:00.
+ */
+export function buildDigest(rows: SyncRow[], today: string, nowMinutes?: number): Digest {
   const live = rows.filter((r) => !isDeleted(r))
-  const subjects = new Map(
-    live.filter((r) => r.collection === 'subjects').map((r) => [r.id, String(r.data.name ?? '')]),
-  )
+  const subjectRows = new Map(live.filter((r) => r.collection === 'subjects').map((r) => [r.id, r.data]))
+  const subjects = new Map([...subjectRows].map(([id, data]) => [id, String(data.name ?? '')]))
   const settings = live.find((r) => r.collection === 'settings')?.data ?? {}
   const examDays = Math.min(30, Math.max(1, Number(settings.examAlertDays) || 7))
+
+  // «Mostrar avisos» apagado silencia también el resumen: es lo que se espera
+  // de un interruptor así. (Ajuste ya sincronizado; no cambia el esquema.)
+  if (settings.alertsEnabled === false) {
+    return { title: 'Resumen silenciado', body: 'Tienes «Mostrar avisos» apagado en Ajustes.', empty: true, muted: true }
+  }
+  const [ty, tm, td] = today.split('-').map(Number)
+  const weekday = new Date(Date.UTC(ty, tm - 1, td)).getUTCDay()
 
   const pending = live
     .filter((r) => r.collection === 'tasks')
@@ -97,7 +144,12 @@ export function buildDigest(rows: SyncRow[], today: string): Digest {
     .map((r) => r.data)
     .filter((e) => {
       if (typeof e.date !== 'string') return false
+      // Ya con nota, o de una asignatura archivada: no se anuncia.
+      if (typeof e.gradeEntryId === 'string' && e.gradeEntryId) return false
+      const subject = subjectRows.get(String(e.subjectId))
+      if (subject?.archived === true) return false
       const diff = daysBetween(today, e.date)
+      if (diff === 0 && nowMinutes !== undefined && nowMinutes >= examEnd(e, subject, weekday)) return false
       return diff >= 0 && diff <= examDays
     })
     .sort((a, b) => String(a.date).localeCompare(String(b.date)))

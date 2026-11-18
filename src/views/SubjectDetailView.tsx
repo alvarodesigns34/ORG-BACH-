@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
-import { CalendarPlus, ListChecks, Pencil, PlaneTakeoff, Plus } from 'lucide-react'
+import { Archive, CalendarPlus, ListChecks, Pencil, PlaneTakeoff, Plus } from 'lucide-react'
 
 import { formatGrade, formatPercent, numeralTone } from '@/domain/grades'
 import { colorVar } from '@/domain/palette'
 import { isDone, sortTasks } from '@/domain/tasks'
 import { termName, type Exam, type GradeEntry, type Task } from '@/domain/types'
 import { hrefFor, studyHref } from '@/router'
-import { useSettings, useStore, useToday } from '@/state/StoreProvider'
+import { useDispatch, useSettings, useStore, useToday } from '@/state/StoreProvider'
 import { useSubjectResults } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
 import { useAmbient } from '@/layout/chrome'
@@ -24,6 +24,7 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
   const settings = useSettings()
   const today = useToday()
   const { data } = useStore()
+  const dispatch = useDispatch()
   const results = useSubjectResults(settings.activeTerm)
 
   const subject = data.subjects.find((s) => s.id === subjectId)
@@ -124,6 +125,23 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
           </>
         }
       />
+
+      {subject.archived && (
+        <div className="liquid rounded-[22px] mb-4 px-4 py-3 flex items-center gap-3 flex-wrap">
+          <Archive className="relative z-[2] size-5 text-ink-3 shrink-0" aria-hidden="true" />
+          <p className="relative z-[2] flex-1 min-w-[200px] text-[0.875rem] text-ink-2 leading-snug">
+            Archivada: no sale en el horario, las medias ni las sugerencias. Sus notas y exámenes se conservan.
+          </p>
+          <Button
+            size="sm"
+            variant="primary"
+            className="relative z-[2]"
+            onClick={() => dispatch({ type: 'subject/update', id: subject.id, patch: { archived: false } })}
+          >
+            Recuperar
+          </Button>
+        </div>
+      )}
 
       {/* --- Cifras --- */}
       <div className="card overflow-hidden">

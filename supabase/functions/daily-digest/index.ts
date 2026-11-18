@@ -112,12 +112,12 @@ function safeEqual(a: string, b: string): boolean {
 // Resumen (el texto se compone en digest.ts)
 // ---------------------------------------------------------------------------
 
-async function digestFor(userId: string, today: string): Promise<Digest> {
+async function digestFor(userId: string, today: string, nowMinutes?: number): Promise<Digest> {
   const rows = await sql<SyncRow[]>`
     select collection, id, data, clocks
     from public.sync_records
     where user_id = ${userId} and collection in ('tasks', 'exams', 'subjects', 'settings')`
-  return buildDigest(rows, today)
+  return buildDigest(rows, today, nowMinutes)
 }
 
 // ---------------------------------------------------------------------------
@@ -240,7 +240,7 @@ async function runCron(): Promise<Response> {
     const cacheKey = `${sub.user_id}|${local.day}`
     let digest = digests.get(cacheKey)
     if (!digest) {
-      digest = await digestFor(sub.user_id, local.day)
+      digest = await digestFor(sub.user_id, local.day, local.hour * 60 + local.minute)
       digests.set(cacheKey, digest)
     }
     // Sin nada que contar no se molesta: una notificación vacía diaria acaba
@@ -329,8 +329,10 @@ async function runTest(req: Request, body: Record<string, unknown>): Promise<Res
     where user_id = ${userId} ${endpoint ? sql`and endpoint = ${endpoint}` : sql``}`
   if (subs.length === 0) return json({ error: 'Este dispositivo no tiene avisos activados' }, 404)
 
-  const today = localParts(new Date(), subs[0].timezone).day
-  const digest = await digestFor(userId, today)
+  const local = localParts(new Date(), subs[0].timezone)
+  // La prueba se envía siempre (aunque no haya nada o esté silenciado): así se
+  // ve que llega y, si está silenciado, el aviso lo dice.
+  const digest = await digestFor(userId, local.day, local.hour * 60 + local.minute)
   const results = await Promise.all(subs.map((s) => send(s, digestMessage(digest), keys)))
   return json({ ok: results.includes('ok'), results })
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, TriangleAlert, X } from 'lucide-react'
+import { Archive, ArchiveRestore, Plus, Trash2, TriangleAlert, X } from 'lucide-react'
 
 import { checkWeights } from '@/domain/grades'
 import { newId } from '@/domain/id'
@@ -11,6 +11,7 @@ import { useSubjects } from '@/state/selectors'
 import { Field, Input, NumberField, NumberInput } from '@/ui/fields'
 import { ConfirmDialog, Modal } from '@/ui/Modal'
 import { Button, IconButton, cx } from '@/ui/primitives'
+import { useToast } from '@/ui/Toast'
 
 const SCHEDULE_DAYS: { value: ScheduleSlot['day']; label: string }[] = [
   { value: 1, label: 'Lunes' },
@@ -32,6 +33,7 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
   const dispatch = useDispatch()
   const settings = useSettings()
   const existing = useSubjects()
+  const toast = useToast()
 
   const [name, setName] = useState('')
   const [shortName, setShortName] = useState('')
@@ -103,6 +105,25 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
     onClose()
   }
 
+  /**
+   * Archivar saca la asignatura de las vistas activas (horario, medias,
+   * sugerencias) pero conserva sus notas, exámenes y tareas. Se recupera
+   * desde Asignaturas › Archivadas o con «Deshacer».
+   */
+  const toggleArchived = () => {
+    if (!subject) return
+    const archived = !subject.archived
+    dispatch({ type: 'subject/update', id: subject.id, patch: { archived } })
+    onClose()
+    toast({
+      text: archived ? `«${subject.name}» archivada` : `«${subject.name}» recuperada`,
+      action: {
+        label: 'Deshacer',
+        run: () => dispatch({ type: 'subject/update', id: subject.id, patch: { archived: !archived } }),
+      },
+    })
+  }
+
   return (
     <>
       <Modal
@@ -111,10 +132,12 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
         title={subject ? 'Editar asignatura' : 'Nueva asignatura'}
         footer={
           <>
+            {/* Archivar es lo reversible y va a mano; borrar del todo queda
+                al final del formulario, lejos del pulgar. */}
             {subject && (
-              <Button variant="danger" onClick={() => setConfirmDelete(true)} className="mr-auto">
-                <Trash2 className="size-4" />
-                Eliminar
+              <Button variant="secondary" onClick={toggleArchived} className="mr-auto">
+                {subject.archived ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
+                {subject.archived ? 'Recuperar' : 'Archivar'}
               </Button>
             )}
             <Button variant="ghost" onClick={onClose}>
@@ -422,6 +445,18 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
               </p>
             )}
           </div>
+
+          {subject && (
+            <div className="border-t border-hairline pt-4">
+              <p className="text-[0.8125rem] text-ink-3 leading-snug mb-2">
+                ¿Ya no la tienes? Mejor archívala: deja de aparecer, pero conservas sus notas y exámenes.
+              </p>
+              <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>
+                <Trash2 className="size-3.5" />
+                Eliminar definitivamente
+              </Button>
+            </div>
+          )}
         </div>
       </Modal>
 
@@ -433,9 +468,9 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
           setConfirmDelete(false)
           onClose()
         }}
-        title="Eliminar asignatura"
-        message={`Se borrarán «${subject?.name}», sus notas y sus exámenes. Las tareas se conservarán, pero se quedarán sin asignatura. No se puede deshacer.`}
-        confirmLabel="Eliminar"
+        title="¿Eliminar para siempre?"
+        message={`Se borrarán «${subject?.name}», todas sus notas y todos sus exámenes, también en tus otros dispositivos. Las tareas se conservarán sin asignatura. No se puede deshacer. Si solo quieres quitarla de en medio, usa «Archivar».`}
+        confirmLabel="Eliminar para siempre"
         destructive
       />
     </>

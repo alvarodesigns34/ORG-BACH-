@@ -61,6 +61,7 @@ import { TaskEditor } from '@/features/tasks/TaskEditor'
 import { TaskList } from '@/features/tasks/TaskRow'
 import { ExamEditor } from '@/features/exams/ExamEditor'
 import { ExamCard } from '@/features/exams/ExamCard'
+import { ExamFollowUp } from '@/features/exams/ExamFollowUp'
 import { Ring, Sparkline } from '@/ui/charts'
 import { exitFast, haptic, spring } from '@/ui/motion'
 import { Button, CountUp, cx } from '@/ui/primitives'
@@ -289,6 +290,9 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
 
       {/* --- Recordatorio de copia, solo sin cuenta y de tarde en tarde --- */}
       <BackupNudge />
+
+      {/* --- «¿Qué tal te fue?»: la nota de un examen ya hecho --- */}
+      <ExamFollowUp />
 
       {/* --- Tablero --- */}
       <div className="grid grid-cols-2 md:grid-cols-4 grid-flow-dense gap-3 sm:gap-4 lg:gap-5">

@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { detectAlerts, type Alert } from '../domain/alerts.ts'
-import { clockOf, pendingExams } from '../domain/exams.ts'
+import { clockOf, examsAwaitingGrade, pendingExams } from '../domain/exams.ts'
 import { goalProgress, type GoalContext, type GoalProgress } from '../domain/goals.ts'
 import { daysUntil, startOfWeek, toDay } from '../domain/dates.ts'
 import { globalAverage, subjectResult, type SubjectResult } from '../domain/grades.ts'
@@ -140,15 +140,17 @@ export function useTaskSummary(): TaskSummary {
 export function useUpcomingExams(limit?: number): Exam[] {
   const { data, today } = useStore()
   return useMemo(() => {
+    const archived = new Set(data.subjects.filter((s) => s.archived).map((s) => s.id))
     const list = data.exams
+      .filter((e) => !archived.has(e.subjectId))
       .filter((e) => e.date >= today || !e.gradeEntryId)
       .sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))
     return limit ? list.slice(0, limit) : list
-  }, [data.exams, today, limit])
+  }, [data.exams, data.subjects, today, limit])
 }
 
 /** Minuto actual (hora local), que avanza solo cada minuto. */
-function useMinuteClock(): number {
+export function useMinuteClock(): number {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const tick = () => setNow(Date.now())
@@ -176,6 +178,23 @@ export function usePendingExams(limit?: number): Exam[] {
     // `today` también cuenta: cambia a medianoche aunque el reloj vaya parado.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.exams, data.subjects, minute, today, limit])
+}
+
+/** Exámenes ya hechos que siguen sin nota (para preguntar «¿qué tal?»). */
+export function useExamsAwaitingGrade(): Exam[] {
+  const { data, today } = useStore()
+  const minute = useMinuteClock()
+  return useMemo(
+    () =>
+      examsAwaitingGrade(
+        data.exams,
+        data.subjects,
+        new Set(data.grades.map((g) => g.id)),
+        clockOf(new Date(minute * 60_000)),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data.exams, data.subjects, data.grades, minute, today],
+  )
 }
 
 // ---------------------------------------------------------------------------
