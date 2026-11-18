@@ -12,6 +12,7 @@ import { ExamEditor } from '@/features/exams/ExamEditor'
 import { GradeEditor } from '@/features/grades/GradeEditor'
 import { EventEditor } from '@/features/events/EventEditor'
 import { Onboarding } from '@/features/onboarding/Onboarding'
+import { prewarmStudyMap, scheduleStudyMapPrewarm } from '@/features/study/prewarm'
 import { DashboardView } from '@/views/DashboardView'
 import { TasksView } from '@/views/TasksView'
 import { SubjectsView } from '@/views/SubjectsView'
@@ -84,6 +85,18 @@ function Shell() {
   // La sincronización arranca dentro del proveedor: necesita el puente con el
   // almacén. Sin cuenta configurada no hace nada.
   useEffect(() => syncEngine.start(), [])
+
+  // El globo de Estudio se descarga en reposo, con Inicio ya pintado; y si se
+  // abre Estudio antes, su descarga arranca a la vez que la de la vista.
+  const onStudy = route.id === 'estudio'
+  useEffect(() => {
+    if (!settings.onboarded) return
+    if (onStudy) {
+      void prewarmStudyMap()
+      return
+    }
+    return scheduleStudyMapPrewarm()
+  }, [onStudy, settings.onboarded])
 
   // Atajos de teclado (iPad con teclado y ordenador) y su hoja de ayuda.
   const flightActive = data.sessions.some((s) => s.status === 'en_vuelo')

@@ -26,7 +26,19 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 
 setWorkerUrl(workerUrl)
 
-import { buildStyle, MAP_LABEL_LAYERS, type MapLookOptions } from './mapStyle'
+/**
+ * Deja en caché (HTTP y Service Worker) lo que el mapa pide nada más crearse:
+ * el worker y el descriptor de las teselas vectoriales. No arranca workers ni
+ * WebGL: solo descarga, para no gastar memoria si al final no se abre Estudio.
+ */
+export async function warmUpMapAssets(): Promise<void> {
+  await Promise.allSettled([
+    fetch(workerUrl, { credentials: 'same-origin' }),
+    fetch(VECTOR_TILEJSON, { mode: 'cors', credentials: 'omit' }),
+  ])
+}
+
+import { buildStyle, MAP_LABEL_LAYERS, VECTOR_TILEJSON, type MapLookOptions } from './mapStyle'
 import {
   arc,
   bearing,
@@ -185,9 +197,16 @@ export class FlightMap {
   private waitForTiles(): void {
     window.clearTimeout(this.loadTimeout)
     this.onStatus(navigator.onLine ? 'cargando' : 'sin_cartografia')
-    this.loadTimeout = window.setTimeout(() => {
-      if (!this.hasTiles) this.onStatus('sin_cartografia')
-    }, 5000)
+    // Con red, una conexión móvil lenta puede tardar más de 5 s en traer las
+    // primeras teselas: antes eso se anunciaba como «no disponible» con el
+    // mapa a punto de llegar. Se espera más, y si llegan después igualmente
+    // se muestran (el aviso de `sourcedata` no depende de este plazo).
+    this.loadTimeout = window.setTimeout(
+      () => {
+        if (!this.hasTiles) this.onStatus('sin_cartografia')
+      },
+      navigator.onLine ? 15000 : 5000,
+    )
   }
 
   resize(): void {

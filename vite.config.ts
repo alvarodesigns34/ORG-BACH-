@@ -97,6 +97,39 @@ export default defineConfig({
               expiration: { maxEntries: 8, maxAgeSeconds: 30 * 24 * 60 * 60 },
             },
           },
+          // Cartografía del globo. El descriptor de OpenFreeMap apunta a una
+          // versión fechada de las teselas: se sirve desde caché y se renueva
+          // en segundo plano. Las teselas de cada versión no cambian, así que
+          // se sirven siempre desde caché: el globo aparece al momento la
+          // segunda vez y, sin conexión, se ve lo que ya se visitó.
+          // Solo respuestas 200 (CORS): una opaca ocuparía megas de cuota.
+          {
+            urlPattern: ({ url }) => url.origin === 'https://tiles.openfreemap.org' && url.pathname === '/planet',
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'orbita-mapa-indice-v1',
+              expiration: { maxEntries: 4 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
+            urlPattern: ({ url }) => url.origin === 'https://tiles.openfreemap.org',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'orbita-mapa-teselas-v1',
+              expiration: { maxEntries: 600, maxAgeSeconds: 60 * 24 * 60 * 60, purgeOnQuotaError: true },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
+            urlPattern: ({ url }) => url.origin === 'https://tiles.maps.eox.at',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'orbita-mapa-satelite-v1',
+              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 24 * 60 * 60, purgeOnQuotaError: true },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
           {
             urlPattern: ({ url }) => url.pathname.includes('/sounds/') && url.pathname.endsWith('.m4a'),
             handler: 'CacheFirst',

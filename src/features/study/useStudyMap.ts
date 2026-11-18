@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import type { LatLon } from '@/domain/flights'
 import type { FlightMap, MapLookOptions, MapStatus } from './flightMap'
+import { prewarmStudyMap } from './prewarm'
 
 export function useStudyMap(
   enabled: boolean,
@@ -26,6 +27,9 @@ export function useStudyMap(
     let instance: FlightMap | undefined
     let observer: ResizeObserver | undefined
     setStatus('cargando')
+    // La descarga empieza ya (o ya terminó en reposo, desde Inicio); solo se
+    // aplaza crear el mapa.
+    void prewarmStudyMap(true)
 
     // Deja pintar primero el reloj y los controles. MapLibre y su CSS se
     // descargan y evalúan en un bloque independiente de la vista de estudio.

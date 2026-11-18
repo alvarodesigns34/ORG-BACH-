@@ -81,6 +81,9 @@ const PALETTE: Record<MapTone, Palette> = {
 const ATTRIBUTION_OSM =
   '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
 
+/** Descriptor (TileJSON) de las teselas vectoriales de OpenFreeMap. */
+export const VECTOR_TILEJSON = 'https://tiles.openfreemap.org/planet'
+
 export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): StyleSpecification {
   const p = PALETTE[tone]
   const onImagery = kind === 'satelite'
@@ -88,7 +91,7 @@ export function buildStyle({ kind, tone, labels, globe }: MapLookOptions): Style
   const sources: StyleSpecification['sources'] = {
     omt: {
       type: 'vector',
-      url: 'https://tiles.openfreemap.org/planet',
+      url: VECTOR_TILEJSON,
       attribution: ATTRIBUTION_OSM,
     },
   }
