@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { motion } from 'motion/react'
+import { m as motion } from 'motion/react'
 
 import { cx } from './primitives'
 

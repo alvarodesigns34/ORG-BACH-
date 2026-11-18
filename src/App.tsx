@@ -14,7 +14,6 @@ import { EventEditor } from '@/features/events/EventEditor'
 import { Onboarding } from '@/features/onboarding/Onboarding'
 import { prewarmStudyMap, scheduleStudyMapPrewarm } from '@/features/study/prewarm'
 import { DashboardView } from '@/views/DashboardView'
-import { TasksView } from '@/views/TasksView'
 import { SubjectsView } from '@/views/SubjectsView'
 
 import { Button } from '@/ui/primitives'
@@ -25,6 +24,7 @@ import { ChromeProvider, type CreateKind } from '@/layout/chrome'
 import { FlightController } from '@/features/study/FlightController'
 import { ShortcutsSheet, useKeyboardShortcuts } from '@/layout/shortcuts'
 
+const TasksView = lazy(() => import('@/views/TasksView').then((m) => ({ default: m.TasksView })))
 const StudyView = lazy(() => import('@/views/StudyView'))
 const CalendarView = lazy(() => import('@/views/CalendarView').then((m) => ({ default: m.CalendarView })))
 

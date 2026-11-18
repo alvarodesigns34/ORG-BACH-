@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, m as motion } from 'motion/react'
 import { Check, ChevronLeft, Plane } from 'lucide-react'
 
 import { formatFlightTime, type Airport } from '@/domain/flights'

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
-import { motion, useScroll, useTransform } from 'motion/react'
+import { m as motion, useScroll, useTransform } from 'motion/react'
 import { TriangleAlert, X } from 'lucide-react'
 
 import { useStore } from '@/state/StoreProvider'
