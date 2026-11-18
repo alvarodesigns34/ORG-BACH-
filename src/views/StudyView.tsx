@@ -468,40 +468,59 @@ export default function StudyView() {
   }
 
   // --- Despegue rápido: `#/estudio?despegar=25` -----------------------------
-  // Llega del atajo de teclado, de los accesos directos de la app instalada o
-  // del asistente («ponme 45 min de Mates con lluvia»). Deja el vuelo listo en
-  // la pantalla de cabina: falta un toque, que además es el que Safari exige
-  // para poder encender el sonido.
+  // Llega de «Despegar ahora», de «Con qué estudiar ahora», del atajo de
+  // teclado, de los accesos directos de la app instalada o del asistente
+  // («ponme 45 min de Mates con lluvia»). Despega directamente, sin pantalla
+  // intermedia: destino a la distancia justa, ventanilla en la fila 7 y lo
+  // que venga en el enlace (tarea, examen, asignatura) o estudio libre.
+  // El sonido se intenta encender ya; si Safari no lo deja por no venir de
+  // un toque directo, lo enciende el primer toque (ver FlightController).
   const quickSearch = route.params.toString()
   useEffect(() => {
     const params = new URLSearchParams(quickSearch)
     const duration = params.get('despegar')
     if (!duration) return
-    // El parámetro se consume: recargar no debe volver a preparar el vuelo.
+    // El parámetro se consume: recargar no debe volver a despegar.
     navigate('estudio', undefined, true)
     const wanted = focusMinutes(Number(duration))
     if (active || wanted === null) return
+    const destination = destinationsFor(origin, AIRPORTS, wanted, 1)[0]
+    if (!destination) return
     const exam = data.exams.find((e) => e.id === params.get('examen'))
     const task = data.tasks.find((t) => t.id === params.get('tarea') && t.status !== 'completada')
     const subject = subjects.find((s) => s.id === params.get('asignatura'))
     const wantedSound = params.get('sonido')
+    const audio = { ...prefs }
     if (wantedSound === 'ninguno' || SOUNDS.some((x) => x.id === wantedSound)) {
-      setPrefs({ sound: wantedSound as SoundId | 'ninguno' })
+      audio.sound = wantedSound as SoundId | 'ninguno'
+      setPrefs({ sound: audio.sound })
     }
-    setDestIata(null)
-    setMinutes(wanted)
-    setPassId(newId('pase'))
+    beginFlightAudio(audio)
+    chime('megafonia')
+    haptic('success')
+    setPrefs({ minutes: wanted })
+    tookOff.current = false
+    cinematicStart.current = true
+    setFollowing(false)
     setLandedId(null)
-    setExamId(exam?.id)
-    setSeat({
-      // Ventanilla en la fila 7: el asiento de quien no quiere elegir.
-      seat: '07A',
-      cabin: 'Turista',
-      subjectId: exam?.subjectId ?? task?.subjectId ?? subject?.id,
-      taskId: task?.id,
+    setActivity(false)
+    setQuick(false)
+    setExamId(undefined)
+    dispatch({
+      type: 'session/start',
+      session: {
+        from: origin.iata,
+        to: destination.airport.iata,
+        distanceKm: Math.round(destination.km),
+        plannedMinutes: wanted,
+        seat: '07A',
+        subjectId: exam?.subjectId ?? task?.subjectId ?? subject?.id,
+        taskId: task?.id,
+        examId: exam?.id,
+        ...layoverPlan(prefs, wanted),
+      },
     })
-    setQuick(true)
-    setStage('despegue')
+    setStage('vuelo')
     // Solo reacciona al parámetro: el resto se lee en ese instante.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quickSearch])
