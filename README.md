@@ -454,9 +454,15 @@ apuntar…» de Inicio y en el menú lateral.
   campo a su valor anterior si nadie lo ha vuelto a tocar después.
 - **Modelos (Mistral)**: la voz se transcribe con el servicio de transcripción
   de Voxtral (`voxtral-mini-latest`, en español y con los nombres de tus
-  asignaturas como pistas de vocabulario) y la interpreta el modelo grande
-  (`mistral-large-latest`; el mediano y el pequeño quedan de reserva). Tu
-  mensaje de voz aparece transcrito en el chat para que veas lo que entendió.
+  asignaturas como pistas de vocabulario) y la interpreta el modelo mediano
+  (`mistral-medium-latest`). Si no ha respondido en 8 s, o falla, entra en
+  paralelo el grande (`mistral-large-latest`) y luego el pequeño, y gana el
+  primero que conteste. Cada llamada tiene un tope de 15 s y el filtro de
+  alcance, 6 s. Tu mensaje de voz aparece transcrito en el chat para que veas
+  lo que entendió.
+- **Tiempos**: cada petición deja en los registros de la función una línea
+  `tiempos` con lo que tardó cada fase (sesión, límite, transcripción, modelo,
+  filtro, revisiones) y los tokens de cada llamada, sin el contenido.
 - **Voz**: se graba con el micrófono y la app la convierte a WAV de 16 kHz
   mono, venga del iPhone (MP4/AAC) o de Chrome (WebM/Opus).
 - **Servidor**: la Edge Function `assistant` exige sesión, cuenta un máximo de
@@ -470,7 +476,9 @@ apuntar…» de Inicio y en el menú lateral.
 - **Defensas**: alcance cerrado (solo la app, organizar estudios y dudas
   académicas), los datos del alumno nunca son órdenes, nadie cambia las reglas
   desde el chat («soy el dueño», «tengo permiso», «modo depuración»), un
-  clasificador independiente decide por su cuenta y el servidor sustituye por
+  clasificador independiente decide por su cuenta (si dice que no y el modelo
+  principal que sí, desempata un segundo clasificador más capaz; si este no
+  decide, se rechaza) y el servidor sustituye por
   una respuesta fija todo lo de fuera o lo que deje ver las instrucciones.
   Probado contra la función desplegada con intentos de saltárselas (falso
   desarrollador, revelar o traducir las instrucciones, órdenes en el título
