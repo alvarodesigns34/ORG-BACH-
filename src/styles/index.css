@@ -856,6 +856,48 @@ html {
   animation-delay: 160ms;
 }
 
+/* Cambio de sección (View Transitions, ver `router.ts`).
+   La pantalla nueva está debajo, ya viva, con sus bloques subiendo en
+   cascada (`.page-enter`); la vieja es una foto encima que se levanta un
+   poco y se desvanece. Salida rápida y sin rebote, entrada con muelle: se
+   solapan, así que el cambio no añade espera. Barra lateral y barra de
+   pestañas no forman parte de la foto: se quedan quietas y solo se mueve la
+   marca de la sección. Todo es opacidad y transform en el compositor. */
+:root[data-nav='section'] .app-sidebar {
+  view-transition-name: sidebar;
+}
+:root[data-nav='section'] .app-tabbar {
+  view-transition-name: tabbar;
+}
+::view-transition-group(sidebar),
+::view-transition-group(tabbar),
+::view-transition-new(sidebar),
+::view-transition-new(tabbar),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-old(sidebar),
+::view-transition-old(tabbar) {
+  display: none;
+}
+::view-transition-old(root) {
+  z-index: 1;
+  mix-blend-mode: normal;
+  animation: screen-out 160ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+:root[data-nav='immersive']::view-transition-old(root) {
+  animation-duration: 280ms;
+}
+::view-transition-new(root) {
+  mix-blend-mode: normal;
+}
+@keyframes screen-out {
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.992);
+  }
+}
+
 /* Trazo que se dibuja (gráficos, anillos). Requiere pathLength="1". */
 @keyframes draw {
   from {

@@ -126,7 +126,7 @@ export function SeatPicker({
         initial={{ x: 30, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ ...spring.smooth, delay: 0.08 }}
-          className="liquid study-seat-form min-w-0 rounded-[30px] flex flex-col"
+          className="liquid liquid-thick study-seat-form min-w-0 rounded-[30px] flex flex-col"
       >
         <div className="relative z-[2] flex flex-col min-h-0">
           <div className="flex items-center gap-2 px-4 pt-4">

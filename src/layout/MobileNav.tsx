@@ -203,7 +203,7 @@ export function MobileNav({ current, badges }: MobileNavProps) {
 
       <div
         className={cx(
-          'lg:hidden fixed inset-x-0 z-30 flex items-end justify-center gap-2.5 pointer-events-none',
+          'app-tabbar lg:hidden fixed inset-x-0 z-30 flex items-end justify-center gap-2.5 pointer-events-none',
           'bottom-[max(0.75rem,calc(env(safe-area-inset-bottom)-0.625rem))]',
           'pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]',
         )}

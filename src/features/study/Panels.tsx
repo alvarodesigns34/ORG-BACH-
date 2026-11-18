@@ -47,7 +47,7 @@ export function SidePanel({ children }: { children: ReactNode }) {
         'bottom-[max(1rem,env(safe-area-inset-bottom))] w-[min(380px,calc(100vw-2rem))]',
       )}
     >
-      <div className="liquid h-full rounded-[30px] flex flex-col overflow-hidden">
+      <div className="liquid liquid-thick h-full rounded-[30px] flex flex-col overflow-hidden">
         <div className="relative z-[2] flex flex-col h-full min-h-0">{children}</div>
       </div>
     </motion.div>
@@ -87,8 +87,6 @@ function Figure({ value, unit, label }: { value: string; unit?: string; label: s
 
 export type HomeTab = 'resumen' | 'diario' | 'pasaporte'
 
-const QUICK = [25, 45, 60, 90]
-
 /** Un examen se prepara en bloques más largos que una tarea suelta. */
 const EXAM_BLOCK = 45
 /** Exámenes que ya merece la pena preparar. */
@@ -110,7 +108,7 @@ interface Suggestion {
  * asignatura y la tarea o el examen ya puestos. En iPad es una lista; en
  * iPhone, una fila que se desliza para no empujar los botones de despegue.
  */
-function StudyNext({ subjects, today }: { subjects: Map<string, Subject>; today: string }) {
+export function StudyNext({ subjects, today }: { subjects: Map<string, Subject>; today: string }) {
   const summary = useTaskSummary()
   const exams = useUpcomingExams()
 
@@ -130,7 +128,7 @@ function StudyNext({ subjects, today }: { subjects: Map<string, Subject>; today:
         urgent: days <= 2,
       })
     }
-    for (const task of summary.today.slice(0, exam ? 3 : 4)) {
+    for (const task of summary.today.slice(0, exam ? 1 : 2)) {
       const minutes = focusMinutes(task.estimatedMinutes ?? 25) ?? 25
       const late = !!task.dueDate && task.dueDate < today
       out.push({
@@ -149,14 +147,14 @@ function StudyNext({ subjects, today }: { subjects: Map<string, Subject>; today:
   if (!items.length) return null
 
   return (
-    <section className="mt-4 min-[720px]:mt-5" aria-label="Con qué estudiar ahora">
-      <p aria-hidden="true" className="eyebrow px-6 mb-2">Con qué estudiar ahora</p>
+    <section className="liquid rounded-[26px] py-2" aria-label="Con qué estudiar ahora">
+      <p aria-hidden="true" className="relative z-[2] eyebrow px-4.5 pt-1 mb-1.5">Con qué estudiar ahora</p>
       <ul
         className={cx(
           // iPhone: fila deslizable con tarjetas compactas.
-          'flex gap-2 overflow-x-auto no-scrollbar snap-x snap-mandatory px-4 scroll-px-4',
+          'relative z-[2] flex gap-2 overflow-x-auto no-scrollbar snap-x snap-mandatory px-2 scroll-px-2',
           // iPad y escritorio (panel lateral): lista vertical.
-          'min-[720px]:flex-col min-[720px]:overflow-visible',
+          'min-[720px]:flex-col min-[720px]:gap-1 min-[720px]:overflow-visible',
         )}
       >
         {items.map((item) => (
@@ -198,9 +196,7 @@ export function HomePanel({
   today,
   tab,
   onTab,
-  onExit,
-  onStart,
-  onQuick,
+  onClose,
   onShowFlight,
 }: {
   origin: Airport
@@ -209,17 +205,12 @@ export function HomePanel({
   today: string
   tab: HomeTab
   onTab: (tab: HomeTab) => void
-  onExit: () => void
-  onStart: () => void
-  onQuick: (minutes: number) => void
+  onClose: () => void
   onShowFlight: (session: FocusSession) => void
 }) {
   return (
     <>
       <div className="flex items-center gap-2 px-4 pt-4">
-        <IconButton label="Salir del modo estudio" size="sm" onClick={onExit}>
-          <ChevronLeft className="size-5" strokeWidth={2.4} />
-        </IconButton>
         <Segmented<HomeTab>
           label="Sección"
           size="sm"
@@ -235,6 +226,9 @@ export function HomePanel({
           ]}
           className="min-w-0 flex-1 [&>button]:flex-1"
         />
+        <IconButton label="Cerrar actividad" size="sm" onClick={onClose}>
+          <X className="size-5" strokeWidth={2.4} />
+        </IconButton>
       </div>
 
       <AnimatePresence mode="wait" initial={false}>
@@ -247,7 +241,7 @@ export function HomePanel({
           className="flex-1 min-h-0 flex flex-col"
         >
           {tab === 'resumen' && (
-            <Summary origin={origin} sessions={sessions} subjects={subjects} today={today} onStart={onStart} onQuick={onQuick} />
+            <Summary origin={origin} sessions={sessions} subjects={subjects} today={today} />
           )}
           {tab === 'diario' && (
             <Logbook sessions={sessions} subjects={subjects} today={today} onShow={onShowFlight} />
@@ -264,15 +258,11 @@ function Summary({
   sessions,
   subjects,
   today,
-  onStart,
-  onQuick,
 }: {
   origin: Airport
   sessions: FocusSession[]
   subjects: Map<string, Subject>
   today: string
-  onStart: () => void
-  onQuick: (minutes: number) => void
 }) {
   const stats = useMemo(() => {
     const weekStart = new Date()
@@ -307,8 +297,8 @@ function Summary({
     <>
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar page-enter">
         <div className="px-6 pt-6">
-          <p className="eyebrow">Focus Flight</p>
-          <h1 className="display text-[2.75rem] leading-[1.02] mt-0.5 tracking-[-0.03em]">{origin.city}</h1>
+          <p className="eyebrow">Tu actividad · ahora en</p>
+          <h2 className="display text-[2rem] leading-[1.05] mt-0.5 tracking-[-0.03em]">{origin.city}</h2>
           <p className="mt-2 text-[0.875rem] text-ink-2 flex items-center gap-2">
             <span className="font-mono font-bold tracking-wide text-[0.8125rem] px-1.5 py-0.5 rounded-[6px] bg-[var(--glass-tint)]">
               {origin.iata}
@@ -378,31 +368,7 @@ function Summary({
           </div>
         )}
 
-        <StudyNext subjects={subjects} today={today} />
-
-        <div className="px-4 mt-5 pb-4">
-          <p className="eyebrow px-2 mb-2">Despegar ahora</p>
-          <div className="grid grid-cols-4 gap-2">
-            {QUICK.map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => onQuick(m)}
-                className="pressable h-14 rounded-[16px] bg-[var(--glass-tint)] hover:bg-[color-mix(in_srgb,var(--glass-tint)_100%,var(--c-ink)_4%)] flex flex-col items-center justify-center"
-              >
-                <span className="numeral text-[1.0625rem]">{m < 60 ? m : m % 60 ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}` : m / 60}</span>
-                <span className="text-[0.6875rem] font-medium text-ink-3 mt-1">{m < 60 ? 'min' : m === 60 ? 'hora' : 'horas'}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="p-4 pt-2">
-        <Button variant="secondary" size="lg" block onClick={onStart}>
-          <Plane className="size-[18px]" strokeWidth={2.4} />
-          Planear vuelo
-        </Button>
+        <div className="h-5" />
       </div>
     </>
   )
