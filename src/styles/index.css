@@ -1287,3 +1287,49 @@ button:active > .switch-thumb {
     inset -2px -3px 5px -2px rgb(0 0 0 / 0.15),
     0 4px 12px rgb(0 0 0 / 0.18);
 }
+
+/* ==========================================================================
+   HOJAS (iOS 26)
+   ========================================================================== */
+
+/* Cristal grueso para hojas: casi opaco (hay formularios que leer), con el
+   canto de luz de Liquid Glass y una sombra honda. */
+.sheet-glass {
+  background:
+    linear-gradient(180deg, var(--glass-sheen), transparent 30%),
+    color-mix(in srgb, var(--c-surface) 93%, transparent);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: blur(40px) saturate(180%);
+  box-shadow:
+    inset 1.5px 1.5px 1px -1px var(--glass-rim),
+    inset 0 0 0 0.5px var(--glass-edge),
+    0 2px 8px rgb(0 0 0 / 0.08),
+    0 30px 80px rgb(0 0 0 / 0.25);
+}
+[data-theme='dark'] .sheet-glass {
+  background:
+    linear-gradient(180deg, var(--glass-sheen), transparent 30%),
+    color-mix(in srgb, #1c1c1e 93%, transparent);
+  box-shadow:
+    inset 1.5px 1.5px 1px -1px var(--glass-rim),
+    inset 0 0 0 0.5px var(--glass-edge),
+    0 30px 80px rgb(0 0 0 / 0.6);
+}
+.sheet-footer::before {
+  content: '';
+  position: absolute;
+  inset: -20px 0 auto 0;
+  height: 20px;
+  pointer-events: none;
+  background: linear-gradient(transparent, color-mix(in srgb, var(--c-surface) 70%, transparent));
+}
+[data-theme='dark'] .sheet-footer::before {
+  background: linear-gradient(transparent, color-mix(in srgb, #1c1c1e 70%, transparent));
+}
+@media (prefers-reduced-transparency: reduce) {
+  .sheet-glass {
+    background: var(--c-surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}

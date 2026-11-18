@@ -134,7 +134,7 @@ export function Modal({
     ? { opacity: 0 }
     : sheet
       ? { y: '100%' }
-      : { opacity: 0, scale: 0.94, y: 12 }
+      : { opacity: 0, scale: 0.96, y: 64 }
   const shown = { opacity: 1, scale: 1, y: 0 }
 
   return createPortal(
@@ -166,10 +166,12 @@ export function Modal({
             aria-describedby={description ? descId : undefined}
             tabIndex={-1}
             className={cx(
-              'relative w-full flex flex-col outline-none',
-              'bg-surface shadow-lg',
-              'rounded-t-[32px] sm:rounded-[32px] sm:mx-4',
-              'max-h-[94dvh] sm:max-h-[86dvh]',
+              // Hoja de iOS 26: cristal denso que flota separado de los bordes
+              // (también en el iPhone, con las esquinas concéntricas a las de
+              // la pantalla) y deja adivinar la página atenuada de detrás.
+              'sheet-glass relative w-full flex flex-col outline-none',
+              'rounded-[34px] mx-2 mb-[max(0.5rem,env(safe-area-inset-bottom))] sm:mb-0 sm:mx-4',
+              'max-h-[calc(94dvh-env(safe-area-inset-bottom))] sm:max-h-[86dvh]',
               widths[size],
             )}
             initial={hidden}
@@ -191,12 +193,8 @@ export function Modal({
           >
             {/* En la hoja, el fondo se prolonga por debajo para que el rebote
                 del muelle no enseñe la página por el hueco inferior. */}
-            <span
-              aria-hidden
-              className="sm:hidden absolute inset-x-0 top-full h-24 bg-surface pointer-events-none"
-            />
             <header
-              className="relative shrink-0 px-5 sm:px-6 pt-2 sm:pt-5 pb-3 touch-none sm:touch-auto"
+              className="relative z-[2] shrink-0 px-5 sm:px-6 pt-2 sm:pt-5 pb-3 touch-none sm:touch-auto"
               onPointerDown={(event) => {
                 if (!sheet || (event.target as HTMLElement).closest('button, a, input')) return
                 dragControls.start(event)
@@ -211,7 +209,7 @@ export function Modal({
                 <div className="min-w-0 pt-1">
                   <h2
                     id={titleId}
-                    className="text-[1.25rem] font-bold tracking-[-0.022em] leading-tight"
+                    className="text-[1.375rem] font-bold tracking-[-0.025em] leading-tight"
                   >
                     {title}
                   </h2>
@@ -225,12 +223,11 @@ export function Modal({
                   {headerAction}
                   <IconButton
                     label="Cerrar"
-                    size="sm"
                     variant="secondary"
                     onClick={onClose}
-                    className="shrink-0"
+                    className="shrink-0 !size-10"
                   >
-                    <X className="size-[18px]" strokeWidth={2.4} />
+                    <X className="size-[19px]" strokeWidth={2.4} />
                   </IconButton>
                 </div>
               </div>
@@ -238,7 +235,7 @@ export function Modal({
 
             <div
               ref={content}
-              className="overflow-y-auto overscroll-contain px-5 sm:px-6 pt-2 pb-5 grow"
+              className="relative z-[2] overflow-y-auto overscroll-contain px-5 sm:px-6 pt-2 pb-5 grow"
             >
               {children}
             </div>
@@ -247,9 +244,10 @@ export function Modal({
               <footer
                 ref={actions}
                 className={cx(
-                  'flex items-center justify-end gap-2 px-5 sm:px-6 pt-3 shrink-0',
-                  'border-t border-hairline',
-                  'pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:pb-5',
+                  // Sin línea divisoria: el contenido se disuelve al pasar
+                  // por debajo de las acciones (borde de desplazamiento).
+                  'sheet-footer relative z-[2] flex items-center justify-end gap-2 px-5 sm:px-6 pt-3 shrink-0',
+                  'pb-4 sm:pb-5',
                 )}
               >
                 {footer}
@@ -295,16 +293,20 @@ export function ConfirmDialog({
       size="sm"
       footer={
         <>
-          <Button variant="ghost" onClick={onCancel}>
+          <Button variant="secondary" className="flex-1" onClick={onCancel}>
             Cancelar
           </Button>
-          <Button variant={destructive ? 'dangerFill' : 'primary'} onClick={onConfirm}>
+          <Button
+            variant={destructive ? 'dangerFill' : 'primary'}
+            className="flex-1"
+            onClick={onConfirm}
+          >
             {confirmLabel}
           </Button>
         </>
       }
     >
-      <p className="text-[0.875rem] text-ink-2 leading-relaxed">{message}</p>
+      <p className="text-[0.9375rem] text-ink-2 leading-relaxed">{message}</p>
     </Modal>
   )
 }
