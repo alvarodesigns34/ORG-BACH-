@@ -449,6 +449,13 @@ apuntar…» de Inicio y en el menú lateral.
     corrija una vez antes de contestarte.
   - Y la app vuelve a validar al aplicar (`src/assistant/actions.ts`, con
     pruebas): lo dudoso se descarta con un aviso en lugar de inventarse.
+- **Conversaciones**: se guardan en el dispositivo. Al abrir el asistente
+  tras 15 min sin mensajes empieza una nueva; las anteriores están en el
+  historial (icono del reloj) para retomarlas o borrarlas.
+- **Charla libre**: modo para hablar de cualquier tema, sin datos del curso,
+  sin guía de la app, sin filtro de alcance y sin acciones (más rápido). Solo
+  aparece para las cuentas cuyo id de usuario está en el secreto
+  `ASSISTANT_FREE_CHAT_USERS` de la función; lo comprueba el servidor.
 - **Deshacer por respuesta**: cada respuesta que cambió algo tiene su
   «Deshacer», que revierte creaciones, ediciones y borrados. Solo devuelve un
   campo a su valor anterior si nadie lo ha vuelto a tocar después.
