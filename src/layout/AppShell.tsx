@@ -9,6 +9,7 @@ import { TopBar, useScrolledPast, type BackLink } from './chrome'
 import { MobileNav } from './MobileNav'
 import { Sidebar } from './Sidebar'
 import { NAV_ITEMS } from './navigation'
+import { useEdgeSwipeBack } from './edgeSwipe'
 
 interface AppShellProps {
   current: RouteId
@@ -20,6 +21,8 @@ interface AppShellProps {
    */
   restoreScroll?: boolean
   badges: Partial<Record<RouteId, number>>
+  /** En una ficha: adónde lleva el gesto de volver desde el borde. */
+  backHref?: string
   children: ReactNode
 }
 
@@ -112,10 +115,13 @@ export function AppShell({
   screenKey,
   restoreScroll = true,
   badges,
+  backHref,
   children,
 }: AppShellProps) {
   useScrollMemory(screenKey, restoreScroll)
   const main = useRef<HTMLElement>(null)
+  const screen = useRef<HTMLDivElement>(null)
+  useEdgeSwipeBack(screen, backHref, screenKey)
   const immersive = current === 'estudio'
   useEffect(() => {
     const title = NAV_ITEMS.find(({ id }) => id === current)?.label
@@ -156,7 +162,7 @@ export function AppShell({
         >
           {/* La clave remonta la pantalla y con ello su entrada en cascada
               (ver `.page-enter`). */}
-          <div key={screenKey}>{children}</div>
+          <div key={screenKey} ref={screen}>{children}</div>
         </main>
       </div>
 

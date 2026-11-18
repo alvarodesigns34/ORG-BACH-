@@ -88,6 +88,11 @@ let running: { skipTransition(): void } | null = null
 /** El sistema ya ha animado esta vuelta atrás (gesto de deslizar en Safari). */
 let systemAnimated = false
 
+/** La próxima navegación ya la ha animado otro (el gesto de volver). */
+export function skipNextTransition(): void {
+  systemAnimated = true
+}
+
 /** Lo registra la app: devuelve la descarga del código de una ruta. */
 export function setRoutePreloader(fn: (route: Route) => Promise<unknown> | undefined): void {
   preloadFor = fn

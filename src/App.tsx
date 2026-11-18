@@ -208,6 +208,7 @@ function Shell() {
           screenKey={`${route.id}:${route.params.get('id') ?? ''}`}
           restoreScroll={![...route.params.keys()].some((k) => k !== 'id')}
           badges={badges}
+          backHref={route.id === 'asignaturas' && route.params.get('id') ? hrefFor('asignaturas') : undefined}
         >
           <ErrorBoundary fallback={<RouteFailure study={route.id === 'estudio'} />}>
             <Suspense fallback={<RouteLoading study={route.id === 'estudio'} />}>
