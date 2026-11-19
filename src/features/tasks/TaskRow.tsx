@@ -169,10 +169,13 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className, reorder
           else if (info.offset.x < -SWIPE_COMMIT) remove()
         }}
         className={cx(
-          'task-body relative flex items-start gap-3 pl-4 pr-2 py-3 bg-surface touch-pan-y',
-          'transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--c-ink)_3%,var(--c-surface))]',
+          // Transparente en reposo: se ve el cristal del panel que la contiene.
+          // Solo al deslizarla se vuelve opaca (ver .task-body en index.css)
+          // para tapar las acciones que asoman debajo.
+          'task-body relative flex items-start gap-3 pl-4 pr-2 py-3 touch-pan-y',
+          'transition-colors duration-150 hover:bg-[color-mix(in_srgb,var(--c-ink)_3%,transparent)]',
           // Al pulsar, la fila se ilumina como una celda de iOS.
-          'has-[button.task-open:active]:bg-[color-mix(in_srgb,var(--c-ink)_7%,var(--c-surface))]',
+          'has-[button.task-open:active]:bg-[color-mix(in_srgb,var(--c-ink)_7%,transparent)]',
         )}
       >
       <div className="pt-0.5 shrink-0">

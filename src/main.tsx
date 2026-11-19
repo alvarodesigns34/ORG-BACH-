@@ -6,6 +6,7 @@ import { LazyMotion, MotionConfig } from 'motion/react'
 import { App } from './App'
 import { ErrorBoundary } from './ui/ErrorBoundary'
 import { installGlassLight } from './ui/glassLight'
+import { installLiquid } from './ui/liquid'
 import { cleanLandingParams, isLandingPreview, setLandingIntent, shouldShowLanding, type LandingIntent } from './landing/entry'
 import './styles/index.css'
 
@@ -17,6 +18,7 @@ const motionFeatures = import('./ui/motionFeatures').then((mod) => mod.default)
 const loadMotionFeatures = () => motionFeatures
 
 installGlassLight()
+installLiquid()
 
 // Web de presentación (ver landing/entry.ts): un bloque aparte que solo se
 // descarga si se va a mostrar. Mientras no se estrene, solo con ?presentacion.

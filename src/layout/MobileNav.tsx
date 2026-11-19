@@ -100,6 +100,11 @@ export function MobileNav({ current, badges }: MobileNavProps) {
   // --- Gesto -------------------------------------------------------------
   const [pressing, setPressing] = useState(false)
   const [dragX, setDragX] = useState<number | null>(null)
+  // Estiramiento por velocidad mientras se arrastra: la lente se alarga en
+  // la dirección del dedo y se adelgaza, como una gota que corre.
+  const [stretch, setStretch] = useState(0)
+  const lastMove = useRef<{ x: number; t: number } | null>(null)
+  const relax = useRef<number | undefined>(undefined)
   const gesture = useRef<{ id: number; startX: number; moved: boolean; index: number } | null>(null)
   /** El último gesto ya navegó: el `click` que lo sigue no debe repetir. */
   const handledClick = useRef(false)
@@ -152,12 +157,23 @@ export function MobileNav({ current, badges }: MobileNavProps) {
       g.index = index
       haptic()
     }
+    const now = performance.now()
+    const prev = lastMove.current
+    if (prev && now > prev.t) {
+      const v = Math.abs(x - prev.x) / (now - prev.t) // px/ms
+      setStretch((s) => s * 0.5 + Math.min(1, v / 2.2) * 0.5)
+    }
+    lastMove.current = { x, t: now }
+    window.clearTimeout(relax.current)
+    relax.current = window.setTimeout(() => setStretch(0), 70)
     setDragX(x)
   }
 
   const finish = (commit: boolean) => {
     const g = gesture.current
     gesture.current = null
+    lastMove.current = null
+    setStretch(0)
     setPressing(false)
     setDragX(null)
     if (g && commit) {
@@ -187,13 +203,14 @@ export function MobileNav({ current, badges }: MobileNavProps) {
     width: lensW,
     height: lensH,
     transform: `translate3d(${centerX - lensW / 2}px, -50%, 0)`,
+    scale: `${1 + stretch * 0.28} ${1 - stretch * 0.16}`,
     opacity: pressing || resting ? 1 : 0,
     // Mientras se arrastra, la lente va pegada al dedo: sin transición en la
     // posición, pero sí en el tamaño. Al soltar, todo vuelve con muelle.
     transitionProperty:
       dragX !== null && pressing
-        ? 'width, height, background-color, box-shadow, opacity'
-        : 'transform, width, height, background-color, box-shadow, opacity',
+        ? 'width, height, scale, background-color, box-shadow, opacity'
+        : 'transform, width, height, scale, background-color, box-shadow, opacity',
   }
 
   return (

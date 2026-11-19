@@ -134,7 +134,7 @@ export function Modal({
     ? { opacity: 0 }
     : sheet
       ? { y: '100%' }
-      : { opacity: 0, scale: 0.96, y: 64 }
+      : { opacity: 0, scale: 0.88, y: 36 }
   const shown = { opacity: 1, scale: 1, y: 0 }
 
   return createPortal(
@@ -177,7 +177,9 @@ export function Modal({
             initial={hidden}
             animate={shown}
             exit={{ ...hidden, transition: sheet ? { ...spring.smooth, bounce: 0 } : exitFast }}
-            transition={spring.smooth}
+            // En el iPad la hoja «brota» del centro con un muelle con algo de
+            // rebote, como las hojas de formulario de iPadOS 26.
+            transition={sheet ? spring.smooth : { type: 'spring', visualDuration: 0.44, bounce: 0.2 }}
             // Arrastre: solo en la hoja y solo desde la cabecera (el cuerpo
             // tiene su propio desplazamiento).
             drag={sheet && !reduce ? 'y' : false}

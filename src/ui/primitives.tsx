@@ -1,7 +1,8 @@
-import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import { animate, m as motion, useReducedMotion } from 'motion/react'
 
 import { haptic, spring } from './motion'
+import { createLiquidIndicator, type LiquidIndicator } from './liquid'
 
 import { colorVar, quietVar } from '@/domain/palette'
 import type { Priority, Subject } from '@/domain/types'
@@ -22,7 +23,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
   primary: 'glass-tinted text-accent-ink hover:brightness-[1.08]',
   // Botón de cristal: el control secundario de iOS 26.
   secondary: 'glass-btn text-ink',
-  ghost: 'bg-transparent text-accent hover:bg-fill',
+  ghost: 'liquid-press bg-transparent text-accent hover:bg-fill',
   danger: 'bg-transparent text-danger hover:bg-danger-quiet',
   dangerFill: 'bg-danger text-white hover:brightness-110',
 }
@@ -90,7 +91,7 @@ export function IconButton({
         'pressable inline-flex items-center justify-center rounded-full shrink-0',
         'disabled:pointer-events-none disabled:opacity-40',
         variant === 'ghost'
-          ? 'bg-transparent text-ink-2 hover:bg-fill hover:text-ink'
+          ? 'liquid-press bg-transparent text-ink-2 hover:bg-fill hover:text-ink'
           : VARIANTS[variant],
         size === 'sm' ? 'size-9' : 'size-11',
         className,
@@ -189,7 +190,7 @@ export function SubjectTag({ subject, className }: { subject?: Subject; classNam
   return (
     <span
       className={cx(
-        'inline-flex items-center rounded-full px-2 py-0.5',
+        'tag-glass inline-flex items-center rounded-full px-2 py-0.5',
         'text-[0.6875rem] font-semibold whitespace-nowrap',
         className,
       )}
@@ -313,31 +314,128 @@ export function Segmented<T extends string>({
   className,
   size = 'md',
 }: SegmentedProps<T>) {
-  // El indicador es UN elemento compartido entre opciones (`layoutId`): al
-  // cambiar, Motion lo lleva de un botón a otro con un muelle, midiendo los
-  // dos, así que se desliza bien aunque las etiquetas tengan anchos distintos.
+  // Una sola lente de cristal que viaja entre opciones con un muelle propio
+  // (ui/liquid.ts) y se estira según su velocidad. Se puede ARRASTRAR, como
+  // en iOS 26: se agarra la opción activa, se desliza y al soltar se elige la
+  // más cercana.
   const track = useRef<HTMLDivElement>(null)
-  const thumbId = useId()
+  const lensRef = useRef<HTMLSpanElement>(null)
+  const lens = useRef<LiquidIndicator | null>(null)
+  const drag = useRef<{ id: number; startX: number; fromX: number; moved: boolean } | null>(null)
+  const suppressClick = useRef(false)
 
-  // El activo siempre a la vista si la tira se desplaza.
+  const boxOf = (button: HTMLElement | null | undefined) =>
+    button ? { x: button.offsetLeft, w: button.offsetWidth } : null
+
+  const activeButton = () =>
+    track.current?.querySelector<HTMLElement>('[aria-checked="true"]') ?? null
+
+  useLayoutEffect(() => {
+    if (!lensRef.current) return
+    lens.current = createLiquidIndicator(lensRef.current)
+    return () => lens.current?.destroy()
+  }, [])
+
+  useLayoutEffect(() => {
+    const box = boxOf(activeButton())
+    if (box) lens.current?.to(box)
+    activeButton()?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  }, [value, options.length])
+
+  // Si cambia el ancho (fuente, contador, giro), la lente se recoloca sin animar.
   useEffect(() => {
-    track.current
-      ?.querySelector<HTMLElement>('[aria-checked="true"]')
-      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-  }, [value])
+    const el = track.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => {
+      const box = boxOf(activeButton())
+      if (box && !drag.current) lens.current?.to(box, true)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const buttons = () => Array.from(track.current?.querySelectorAll<HTMLElement>('[role="radio"]') ?? [])
 
   return (
-    <motion.div
+    <div
       ref={track}
-      layoutScroll
       role="radiogroup"
       aria-label={label}
       className={cx(
-        'relative inline-flex items-center p-[3px] rounded-full bg-fill',
+        'segmented relative inline-flex items-center p-[3px] rounded-full',
         'overflow-x-auto no-scrollbar max-w-full',
         className,
       )}
+      onPointerDown={(event) => {
+        if (event.button !== 0) return
+        const target = (event.target as Element).closest<HTMLElement>('[role="radio"]')
+        if (!target) return
+        lens.current?.press(true)
+        if (target.getAttribute('aria-checked') === 'true') {
+          drag.current = { id: event.pointerId, startX: event.clientX, fromX: target.offsetLeft, moved: false }
+          track.current?.setPointerCapture?.(event.pointerId)
+        }
+      }}
+      onPointerMove={(event) => {
+        const d = drag.current
+        if (!d || d.id !== event.pointerId) return
+        const dx = event.clientX - d.startX
+        if (!d.moved && Math.abs(dx) < 4) return
+        d.moved = true
+        const list = buttons()
+        const first = list[0]
+        const lastBtn = list[list.length - 1]
+        const active = activeButton()
+        if (!first || !lastBtn || !active) return
+        const min = first.offsetLeft
+        const max = lastBtn.offsetLeft + lastBtn.offsetWidth - active.offsetWidth
+        const raw = d.fromX + dx
+        // Más allá de los extremos, resistencia elástica.
+        const over = raw < min ? raw - min : raw > max ? raw - max : 0
+        const x = Math.min(max, Math.max(min, raw)) + (over ? Math.sign(over) * 14 * (1 - 1 / (Math.abs(over) / 14 + 1)) : 0)
+        lens.current?.drag(x)
+      }}
+      onPointerUp={(event) => {
+        const d = drag.current
+        drag.current = null
+        lens.current?.press(false)
+        if (!d || d.id !== event.pointerId || !d.moved) return
+        suppressClick.current = true
+        const active = activeButton()
+        const center = d.fromX + (event.clientX - d.startX) + (active?.offsetWidth ?? 0) / 2
+        let best: HTMLElement | null = null
+        let bestDist = Infinity
+        for (const b of buttons()) {
+          const dist = Math.abs(b.offsetLeft + b.offsetWidth / 2 - center)
+          if (dist < bestDist) {
+            bestDist = dist
+            best = b
+          }
+        }
+        const next = options.find((o) => o.value === best?.dataset.value)
+        if (next && next.value !== value) {
+          haptic()
+          onChange(next.value)
+        } else {
+          const box = boxOf(active)
+          if (box) lens.current?.to(box)
+        }
+      }}
+      onPointerCancel={() => {
+        drag.current = null
+        lens.current?.press(false)
+        const box = boxOf(activeButton())
+        if (box) lens.current?.to(box)
+      }}
+      onClickCapture={(event) => {
+        if (suppressClick.current) {
+          suppressClick.current = false
+          event.stopPropagation()
+          event.preventDefault()
+        }
+      }}
     >
+      <span ref={lensRef} aria-hidden className="lens liquid-lens absolute left-0 top-[3px] bottom-[3px] rounded-full pointer-events-none" />
       {options.map((option) => {
         const active = option.value === value
         return (
@@ -346,6 +444,8 @@ export function Segmented<T extends string>({
             role="radio"
             type="button"
             aria-checked={active}
+            data-value={option.value}
+            data-liquid="off"
             onClick={() => {
               if (!active) haptic()
               onChange(option.value)
@@ -353,18 +453,11 @@ export function Segmented<T extends string>({
             className={cx(
               'relative shrink-0 inline-flex items-center justify-center gap-1.5 rounded-full whitespace-nowrap',
               'transition-colors duration-200',
+              active && 'touch-pan-y cursor-grab active:cursor-grabbing',
               size === 'sm' ? 'h-7 px-3 text-[0.75rem]' : 'h-9 px-4 text-[0.875rem]',
               active ? 'text-ink font-semibold' : 'text-ink-2 font-medium hover:text-ink',
             )}
           >
-            {active && (
-              <motion.span
-                aria-hidden
-                layoutId={thumbId}
-                transition={spring.snappy}
-                className="lens absolute inset-0 rounded-full"
-              />
-            )}
             <span className="relative">{option.label}</span>
             {option.count !== undefined && (
               <span className="relative tabular-nums text-[0.6875rem] font-semibold text-ink-3">
@@ -374,7 +467,7 @@ export function Segmented<T extends string>({
           </button>
         )
       })}
-    </motion.div>
+    </div>
   )
 }
 
