@@ -8,10 +8,12 @@ import {
   Check,
   Database,
   Download,
+  FileText,
   GraduationCap,
   Hash,
   History,
   Layers,
+  ShieldCheck,
   Sigma,
   SunMoon,
   TriangleAlert,
@@ -365,6 +367,37 @@ export function SettingsView({ section }: { section?: string | null }) {
             e.target.value = ''
           }}
         />
+
+        <ListGroup
+          header="Acerca de"
+          footer={
+            <span className="block space-y-1">
+              <span className="block">
+                Mapa del modo Estudio:{' '}
+                <a className="underline underline-offset-2" href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>
+                , con datos ©{' '}
+                <a className="underline underline-offset-2" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">colaboradores de OpenStreetMap</a>
+                {' '}(ODbL). Contornos del globo: Natural Earth. Aeropuertos: OurAirports (dominio público).
+              </span>
+              <span className="block">
+                Asistente: modelos de Mistral AI (Francia). Sonidos de ambiente: grabaciones de dominio público vía radio aporee e Internet Archive (detalle en el modo Estudio).
+              </span>
+            </span>
+          }
+        >
+          <ListRow
+            icon={ShieldCheck}
+            tint="#30b158"
+            label="Política de privacidad"
+            href={`${import.meta.env.BASE_URL}legal/privacidad.html`}
+          />
+          <ListRow
+            icon={FileText}
+            tint="#8e8e93"
+            label="Condiciones de uso"
+            href={`${import.meta.env.BASE_URL}legal/condiciones.html`}
+          />
+        </ListGroup>
 
         <p className="text-center text-[0.75rem] text-ink-3 pb-2">
           {APP_NAME} · {courseLine(settings)}

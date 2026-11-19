@@ -11,11 +11,12 @@ import { SnapshotsSheet } from '@/features/backup/Backups'
 import { listSnapshots } from '@/storage/snapshots'
 import { importJSON } from '@/storage/persistence'
 import { APP_NAME, BrandMark } from '@/layout/Brand'
-import { Field, Input } from '@/ui/fields'
+import { Checkbox, Field, Input } from '@/ui/fields'
 import { Button, cx } from '@/ui/primitives'
 import { Modal } from '@/ui/Modal'
 import { AuthForm } from '@/features/account/Account'
 import { SYNC_AVAILABLE } from '@/sync/config'
+import { recordConsent } from '@/legal/consent'
 
 type Step = 'perfil' | 'asignaturas'
 
@@ -41,6 +42,8 @@ export function Onboarding() {
   const [custom, setCustom] = useState<string[]>([])
   const [customDraft, setCustomDraft] = useState('')
   // «Iniciar sesión» desde la web de presentación abre directamente el acceso.
+  const [accepted, setAccepted] = useState(false)
+  const [consentError, setConsentError] = useState(false)
   const [signingIn, setSigningIn] = useState(() => SYNC_AVAILABLE && takeLandingIntent() === 'signin')
 
   const catalogByName = useMemo(() => {
@@ -69,6 +72,11 @@ export function Onboarding() {
   }
 
   const finish = () => {
+    if (!accepted) {
+      setConsentError(true)
+      return
+    }
+    recordConsent()
     const chosen = [...picked, ...custom]
     if (chosen.length > 0) {
       const used: SubjectColor[] = []
@@ -331,7 +339,37 @@ export function Onboarding() {
                   </Button>
                 </div>
 
-                <div className="flex items-center gap-3 mt-8">
+                <div className="flex items-start gap-3 mt-8">
+                  <Checkbox
+                    checked={accepted}
+                    onChange={(v) => {
+                      setAccepted(v)
+                      if (v) setConsentError(false)
+                    }}
+                    label="Tengo al menos 14 años y acepto las condiciones de uso y la política de privacidad"
+                    hideLabel
+                    size="sm"
+                    className="mt-0.5"
+                  />
+                  <p className="text-[0.875rem] leading-snug text-ink-2">
+                    Tengo al menos 14 años y acepto las{' '}
+                    <a href={`${import.meta.env.BASE_URL}legal/condiciones.html`} target="_blank" rel="noopener" className="text-accent underline-offset-2 hover:underline">
+                      condiciones de uso
+                    </a>{' '}
+                    y la{' '}
+                    <a href={`${import.meta.env.BASE_URL}legal/privacidad.html`} target="_blank" rel="noopener" className="text-accent underline-offset-2 hover:underline">
+                      política de privacidad
+                    </a>
+                    .
+                  </p>
+                </div>
+                {consentError && (
+                  <p role="alert" className="text-[0.8125rem] text-danger mt-2 pl-[32px]">
+                    Marca la casilla para empezar.
+                  </p>
+                )}
+
+                <div className="flex items-center gap-3 mt-6">
                   <Button variant="ghost" onClick={() => setStep('perfil')}>
                     <ArrowLeft className="size-4" />
                     Atrás

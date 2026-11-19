@@ -24,8 +24,8 @@
 
 ## 4. Planes
 
-- **Gratuito:** lo esencial para organizar tu curso, con sincronización en [2] dispositivos y [15] mensajes al mes del asistente.
-- **Premium:** más uso del asistente ([250] mensajes al mes) y las funciones que vayamos añadiendo a Premium.
+- **Gratuito:** lo esencial para organizar tu curso, con sincronización entre tus dispositivos y [15] mensajes al mes del asistente.
+- **Premium:** más uso del asistente ([250] mensajes al mes) y las funciones que se vayan añadiendo.
 - Los límites exactos se indican en la web y en la app, y pueden ajustarse; si reducimos algo que ya usas, te avisaremos antes.
 - Premium puede obtenerse **con un código** (de un solo uso). Si un código se publica o se usa de forma fraudulenta, podemos anularlo.
 - **Pagos:** hasta que se active el pago, Premium solo se obtiene con código. Cuando se active, se aplicarán además las condiciones del [Anexo de pagos](pagos.html). Nada se cobrará sin que lo aceptes expresamente.

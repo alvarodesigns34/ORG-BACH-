@@ -136,7 +136,13 @@ export function ListRow({
   return (
     <li className="list-item" data-icon={Icon ? '' : undefined}>
       {href ? (
-        <a href={href} className={rowClass}>
+        // Fuera de la app (legales): pestaña nueva, para no perder la app
+        // instalada, que no tiene botón de volver.
+        <a
+          href={href}
+          className={rowClass}
+          {...(href.startsWith('#') ? {} : { target: '_blank', rel: 'noopener' })}
+        >
           {body}
         </a>
       ) : onClick ? (

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 // @ts-expect-error: script de Node en JavaScript, sin tipos.
-import { build } from '../scripts/legal.mjs'
+import { build, VERSION } from '../scripts/legal.mjs'
+import { LEGAL_VERSION } from '../src/legal/consent.ts'
 
 test('las páginas legales públicas están al día con docs/legal', () => {
   for (const p of build() as { out: string; html: string }[]) {
@@ -18,4 +19,8 @@ test('la web no promete cifrado de extremo a extremo ni nombra otras apps', () =
     assert.match(line, /\bno\b|nada de|¿/i, `Afirma cifrado de extremo a extremo: ${line.trim()}`)
   }
   assert.doesNotMatch(content, /Focus Flight/i)
+})
+
+test('la casilla del alta guarda la versión publicada de los legales', () => {
+  assert.equal(LEGAL_VERSION, VERSION)
 })

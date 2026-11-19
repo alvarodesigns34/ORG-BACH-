@@ -10,6 +10,7 @@
  * quieto con «Reducir movimiento». El globo es WebGL y se pausa fuera de
  * pantalla. No se carga MapLibre: el globo real se reserva para la app.
  */
+import { trackVisit } from './visits'
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   ArrowRight,
@@ -1008,6 +1009,11 @@ export default function Landing({ onEnter, onSignIn, preview }: { onEnter: () =>
   const root = useRef<HTMLDivElement>(null)
   const [dark, setDark] = useState(true)
   const [compact, setCompact] = useState(false)
+
+  // Fuente de la visita (`?ref=tiktok-3`): ver visits.ts.
+  useEffect(() => {
+    if (!preview) trackVisit()
+  }, [preview])
 
   // Mientras se ve la web: título, color de la barra del sistema y fondo del
   // documento (el rebote de Safari arriba enseña el cielo, no el gris).

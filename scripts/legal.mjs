@@ -19,7 +19,7 @@ export const PAGES = [
 const CONTACT = process.env.CONTACT_EMAIL ?? ''
 const SITE = (process.env.SITE_URL ?? 'https://alvarodesigns34.github.io/ORG-BACH-').replace(/\/$/, '')
 const PUBLISHED = '19 de noviembre de 2026'
-const VERSION = '2026-11-19'
+export const VERSION = '2026-11-19'
 
 export function fillMarkers(md) {
   return md

@@ -74,7 +74,7 @@ No tomamos decisiones automatizadas con efectos jurídicos sobre ti ni hacemos p
 |---|---|---|---|
 | **Supabase** (Supabase, Inc., EE. UU.) | Cuentas, base de datos (tu curso sincronizado, suscripciones de notificaciones) y funciones del servidor | Región del proyecto: **UE (París, Francia)** | Contrato de encargo (DPA) con cláusulas contractuales tipo de la Comisión Europea |
 | **Mistral AI** (Francia) | Genera las respuestas del asistente y transcribe la voz | UE | Contrato de encargo (DPA). |
-| **GitHub Pages** (GitHub, Inc., EE. UU.) | Aloja la web y la app (archivos de la aplicación, sin tus datos) | Red mundial | Marco de Privacidad de Datos UE-EE. UU. |
+| **Proveedor de alojamiento web** (hoy GitHub Pages, de GitHub, Inc., EE. UU.; lo indicaremos aquí si cambia) | Aloja la web y la app (archivos de la aplicación, sin tus datos) | Red mundial | Marco de Privacidad de Datos UE-EE. UU. |
 
 ### 4.2 Terceros que reciben datos sin ser encargados nuestros
 
