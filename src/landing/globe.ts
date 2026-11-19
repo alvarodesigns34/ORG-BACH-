@@ -295,6 +295,17 @@ export class DotGlobe {
     if (!this.running) this.draw(performance.now())
   }
 
+  /** Punto que mira a la cámara (para una cámara que sigue al avión). */
+  setView(lat: number, lon: number) {
+    this.yaw = -lon * DEG
+    this.pitch = lat * DEG
+  }
+
+  /** Vuelve a pintar ahora (si no está en marcha el bucle). */
+  redraw() {
+    if (!this.running) this.draw(performance.now())
+  }
+
   setProgress(p: number) {
     this.progress = Math.min(1, Math.max(0, p))
     if (!this.running) this.draw(performance.now())
@@ -322,6 +333,7 @@ export class DotGlobe {
 
   private draw(now: number) {
     if (this.disposed) return
+    this.onBeforeFrame?.(now)
     this.lastNow = now
     const gl = this.gl
     const { r, cx, cy } = this.geometry()
@@ -337,6 +349,9 @@ export class DotGlobe {
     gl.drawArrays(gl.POINTS, 0, this.count)
     this.onFrame?.(now)
   }
+
+  /** Se llama antes de cada fotograma (para mover la cámara). */
+  onBeforeFrame?: (now: number) => void
 
   /** Se llama tras cada fotograma (para mover lo que va encima del globo). */
   onFrame?: (now: number) => void

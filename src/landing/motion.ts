@@ -70,29 +70,73 @@ export function useGsap(scope: RefObject<HTMLElement | null>, setup: (root: HTML
 }
 
 /**
- * Botón magnético: con ratón, se inclina hacia el cursor unos píxeles y
- * vuelve con un muelle al salir. Con el dedo no hace nada (ahí manda la
- * pulsación, que ya hunde el botón).
+ * Botón de cristal vivo, como los de iOS 26:
+ * - Con ratón, se inclina unos píxeles hacia el cursor (magnético).
+ * - Al pulsar (dedo o ratón), se hincha un poco; si arrastras sin soltar, se
+ *   estira hacia ese lado con resistencia de goma; al soltar vuelve con un
+ *   muelle.
+ * Solo transform, con `gsap.quickTo`: nada de reflujo.
  */
-export function useMagnetic(ref: RefObject<HTMLElement | null>, strength = 0.28) {
+export function useLiquidButton(ref: RefObject<HTMLElement | null>, strength = 0.26) {
   useEffect(() => {
     const el = ref.current
-    if (!el || reducedMotion() || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return
-    const x = gsap.quickTo(el, 'x', { duration: 0.6, ease: 'elastic.out(1, 0.45)' })
-    const y = gsap.quickTo(el, 'y', { duration: 0.6, ease: 'elastic.out(1, 0.45)' })
+    if (!el || reducedMotion()) return
+    const fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches
+    const spring = { duration: 0.7, ease: 'elastic.out(1, 0.42)' }
+    const follow = { duration: 0.35, ease: 'power3.out' }
+    const to = (vars: gsap.TweenVars, how = spring) => gsap.to(el, { ...vars, ...how, overwrite: 'auto' })
+    let down: { x: number; y: number } | null = null
+    // Goma: cuanto más tiras, menos cede.
+    const rubber = (d: number, max: number) => (max * d) / (Math.abs(d) + max)
+
     const move = (e: PointerEvent) => {
       const r = el.getBoundingClientRect()
-      x((e.clientX - (r.left + r.width / 2)) * strength)
-      y((e.clientY - (r.top + r.height / 2)) * strength)
+      if (down) {
+        const dx = e.clientX - down.x
+        const dy = e.clientY - down.y
+        const sx = Math.abs(rubber(dx, r.width)) / r.width
+        const sy = Math.abs(rubber(dy, r.height)) / r.height
+        to(
+          {
+            x: rubber(dx, 22),
+            y: rubber(dy, 14),
+            scaleX: 1.07 + sx * 0.22 - sy * 0.08,
+            scaleY: 1.07 + sy * 0.22 - sx * 0.08,
+          },
+          follow,
+        )
+      } else if (fine) {
+        to({ x: (e.clientX - (r.left + r.width / 2)) * strength, y: (e.clientY - (r.top + r.height / 2)) * strength }, follow)
+      }
+    }
+    const press = (e: PointerEvent) => {
+      down = { x: e.clientX, y: e.clientY }
+      try {
+        el.setPointerCapture(e.pointerId)
+      } catch {
+        /* sin captura: el estirado acaba al salir del botón */
+      }
+      to({ scaleX: 1.07, scaleY: 1.07 }, { duration: 0.28, ease: 'power3.out' })
+    }
+    const release = () => {
+      if (!down) return
+      down = null
+      to({ x: 0, y: 0, scaleX: 1, scaleY: 1 })
     }
     const leave = () => {
-      x(0)
-      y(0)
+      down = null
+      to({ x: 0, y: 0, scaleX: 1, scaleY: 1 })
     }
     el.addEventListener('pointermove', move)
+    el.addEventListener('pointerdown', press)
+    window.addEventListener('pointerup', release)
+    window.addEventListener('pointercancel', release)
     el.addEventListener('pointerleave', leave)
     return () => {
       el.removeEventListener('pointermove', move)
+      el.removeEventListener('pointerdown', press)
+      window.removeEventListener('pointerup', release)
+      window.removeEventListener('pointercancel', release)
       el.removeEventListener('pointerleave', leave)
     }
   }, [ref, strength])

@@ -160,11 +160,11 @@ export const FLIGHT = {
     { title: 'Escalas para descansar', text: 'Las pausas también cuentan.' },
     { title: 'Sonido de ambiente', text: 'Cabina, lluvia u olas para aislarte.' },
   ],
-  // Datos de la ilustración («Hoy: Madrid → Roma · 50 min»; Lisboa quedaba
-  // demasiado cerca para verse el arco en el globo).
+  // Datos de la ilustración. Con la velocidad de la app (10 km por minuto
+  // de estudio, domain/flights.ts), Madrid–Roma son 2 h 13 min.
   from: { code: 'MAD', city: 'Madrid', lat: 40.47, lon: -3.56 },
   to: { code: 'FCO', city: 'Roma', lat: 41.8, lon: 12.25 },
-  minutes: 50,
+  minutes: 133,
   seat: '12A',
   gate: 'B7',
 }
@@ -247,3 +247,68 @@ export const BENTO = {
   ads: { title: 'Sin anuncios.', text: 'Ni ahora ni en el plan gratuito.' },
   install: { title: 'Sin tienda de apps.', text: 'En Safari: Compartir → «Añadir a pantalla de inicio».' },
 }
+
+/* ---------------------------------------------------------------- v4 ---- */
+
+/** Lo que gira alrededor del planeta en la portada (ilustración). */
+export const ORBIT = [
+  { kind: 'Examen', title: 'Biología', meta: 'En 3 días', color: 'var(--sub-sky)' },
+  { kind: 'Tarea', title: 'Ejercicios 12–18', meta: 'Hoy · 16:00', color: 'var(--sub-terracotta)' },
+  { kind: 'Vuelo', title: 'Madrid → Roma', meta: '2 h 13 min de estudio', color: 'var(--c-accent-fill)' },
+  { kind: 'Notas', title: 'Necesitas un 6,4', meta: 'Física · examen final', color: 'var(--sub-teal)' },
+  { kind: 'Asistente', title: '«Tengo mates el viernes»', meta: 'Apuntado', color: 'var(--sub-plum)' },
+]
+
+export const STORY_TITLE = ['Una app.', 'Todo tu curso.']
+
+export type StoryId = 'today' | 'voice' | 'grades' | 'offline'
+export const STORY: { id: StoryId; kicker: string; title: string; text: string; note?: string }[] = [
+  {
+    id: 'today',
+    kicker: 'Hoy',
+    title: 'Abres Órbita y sabes qué toca.',
+    text: 'Tareas con subtareas, exámenes, calendario y horario. Lo de hoy, arriba. Lo que se acerca, avisado con tiempo.',
+  },
+  {
+    id: 'voice',
+    kicker: 'Asistente',
+    title: 'Lo dices y queda apuntado.',
+    text: '«Tengo mates el viernes» y se crea el examen. «Mueve la entrega al jueves» y la mueve. Siempre con Deshacer.',
+    note: 'Usa IA y puede equivocarse: revisa lo que crea. 15 mensajes al mes gratis.',
+  },
+  {
+    id: 'grades',
+    kicker: 'Notas',
+    title: 'La nota que necesitas, antes del examen.',
+    text: 'Medias ponderadas por categorías y la calculadora del examen final. Mueve las barras: es la de verdad.',
+  },
+  {
+    id: 'offline',
+    kicker: 'Sin conexión',
+    title: 'Modo avión, sin problema.',
+    text: 'Tareas, exámenes, calendario y notas funcionan sin internet. Sin cuenta, tus datos no salen de tu dispositivo.',
+  },
+]
+
+/** El vuelo del Modo Estudio, contado en pantalla completa. */
+export const FLIGHT_STORY = {
+  title: ['Cada sesión de estudio', 'es un vuelo.'],
+  lead: 'Eliges destino según el tiempo que quieres estudiar, despegas y no paras hasta aterrizar.',
+  beats: [
+    { kicker: 'Despegue', text: 'Empieza la cuenta atrás. Hasta Roma, solo estudiar.' },
+    { kicker: 'En ruta', text: 'Sonido de ambiente: cabina, lluvia u olas.' },
+    { kicker: 'Escala', text: 'Las pausas también cuentan. Descansas y sigues.' },
+  ],
+  landed: 'Bienvenido a Roma.',
+  landedNote: 'Tu tiempo estudiado, sumado a tu semana.',
+}
+
+export const DETAILS_TITLE = 'Y lo que no se ve.'
+export const DETAILS: { title: string; text: string }[] = [
+  { title: 'Sin cuenta para empezar', text: 'Tus datos se quedan en tu dispositivo. Con cuenta, se sincronizan.' },
+  { title: 'Copias automáticas', text: 'Una al día, y antes de importar o borrar.' },
+  { title: 'Todo tuyo', text: 'Exporta una copia o pásalo a Calendario cuando quieras.' },
+  { title: 'Sin anuncios', text: 'Ni ahora ni en el plan gratuito.' },
+  { title: 'Sin tienda de apps', text: 'En Safari: Compartir → «Añadir a pantalla de inicio».' },
+  { title: 'Para cualquier etapa', text: 'ESO, Bachillerato, FP, universidad y oposiciones.' },
+]
