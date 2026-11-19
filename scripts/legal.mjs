@@ -13,6 +13,26 @@ export const PAGES = [
   { src: 'condiciones-uso.md', out: 'condiciones.html' },
 ]
 
+// Datos que aún no existen (marcadores de docs/legal). Mientras falten, la
+// página publicada no enseña el marcador: dice que se publicará en breve.
+// Cuando existan, ponerlos aquí (o por entorno) y volver a generar.
+const CONTACT = process.env.CONTACT_EMAIL ?? ''
+const SITE = (process.env.SITE_URL ?? 'https://alvarodesigns34.github.io/ORG-BACH-').replace(/\/$/, '')
+const PUBLISHED = '19 de noviembre de 2026'
+const VERSION = '2026-11-19'
+
+export function fillMarkers(md) {
+  return md
+    .replace('[FECHA DE PUBLICACIÓN]', PUBLISHED)
+    .replace(/Versión \S*borrador\S*/g, `Versión ${VERSION}`)
+    .replace(/\| \[CORREO_CONTACTO\] \|/g, `| ${CONTACT || 'Se publicará aquí en breve'} |`)
+    .replace(/\[CORREO_CONTACTO\]/g, CONTACT || 'nuestro correo de contacto (lo publicaremos aquí en breve)')
+    .replace(/\[DOMINIO\]/g, SITE)
+    .replace(/\[(\d+)\]/g, '$1')
+    // El anexo de pagos solo se publica al activar los pagos.
+    .replace('[Anexo de pagos](pagos.html)', 'Anexo de pagos (se publicará al activar los pagos)')
+}
+
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const inline = (s) =>
   esc(s)
@@ -85,7 +105,7 @@ ${toHtml(md)}
 }
 
 export function build() {
-  return PAGES.map((p) => ({ ...p, html: page(p, readFileSync(`${ROOT}docs/legal/${p.src}`, 'utf8')) }))
+  return PAGES.map((p) => ({ ...p, html: page(p, fillMarkers(readFileSync(`${ROOT}docs/legal/${p.src}`, 'utf8'))) }))
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

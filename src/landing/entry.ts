@@ -12,7 +12,7 @@
  */
 import { STORAGE_KEY } from '@/data/defaults'
 
-export const LANDING_IS_ENTRY = false
+export const LANDING_IS_ENTRY = true
 
 const INTENT_KEY = 'orbita.landing.intent'
 

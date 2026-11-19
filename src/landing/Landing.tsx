@@ -990,11 +990,7 @@ function Footer() {
         <nav aria-label="Legal y contacto">
           <a href={`${BASE}${LEGAL.privacy}`}>Privacidad</a>
           <a href={`${BASE}${LEGAL.terms}`}>Condiciones</a>
-          {CONTACT_READY ? (
-            <a href={`mailto:${CONTACT_EMAIL}`}>Contacto</a>
-          ) : (
-            <span className="lp-placeholder" title="Correo pendiente">Contacto {CONTACT_EMAIL}</span>
-          )}
+          {CONTACT_READY && <a href={`mailto:${CONTACT_EMAIL}`}>Contacto</a>}
         </nav>
         <small>© {year} {OWNER}</small>
       </div>

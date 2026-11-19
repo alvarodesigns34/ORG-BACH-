@@ -155,7 +155,9 @@ export const PRICING = {
 export const OFFER = {
   eyebrow: 'Oferta de lanzamiento',
   title: '12 meses de Premium gratis para los 3 primeros.',
-  text: `Escríbenos a ${CONTACT_EMAIL} contando para qué quieres Órbita. Las 3 plazas se asignan por orden de llegada y se canjean con un código.`,
+  text: CONTACT_READY
+    ? `Escríbenos a ${CONTACT_EMAIL} contando para qué quieres Órbita. Las 3 plazas se asignan por orden de llegada y se canjean con un código.`
+    : 'Las 3 plazas se asignan por orden de llegada y se canjean con un código. Muy pronto contaremos aquí cómo pedir el tuyo.',
   seats: 3,
   code: 'ORBITA-····-····',
 }
@@ -170,7 +172,7 @@ export const FAQ: [string, string][] = [
   ['¿Para qué etapa vale?', 'ESO, Bachillerato, FP, universidad y oposiciones. Las etapas y asignaturas son configurables.'],
   ['¿Puedo borrar mis datos?', 'Sí, desde Ajustes: exportar todo y eliminar tu cuenta en el momento.'],
   ['¿Qué edad hay que tener?', 'Al menos 14 años.'],
-  ['¿Quién está detrás?', `${OWNER}. Escríbenos a ${CONTACT_EMAIL}.`],
+  ['¿Quién está detrás?', CONTACT_READY ? `${OWNER}. Escríbenos a ${CONTACT_EMAIL}.` : `${OWNER}. Muy pronto publicaremos aquí un correo de contacto.`],
 ]
 
 export const CLOSING = {

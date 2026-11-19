@@ -72,11 +72,9 @@ No tomamos decisiones automatizadas con efectos jurídicos sobre ti ni hacemos p
 
 | Proveedor | Qué hace | Dónde | Garantías |
 |---|---|---|---|
-| **Supabase** (Supabase, Inc., EE. UU.) | Cuentas, base de datos (tu curso sincronizado, suscripciones de notificaciones) y funciones del servidor | Región del proyecto: **[REGIÓN: confirmar en Supabase]** | Contrato de encargo (DPA) con cláusulas contractuales tipo de la Comisión Europea |
-| **Mistral AI** (Francia) | Genera las respuestas del asistente y transcribe la voz | UE | Contrato de encargo (DPA). [Confirmar: entrenamiento con tus datos desactivado] |
-| **[SERVICIO DE CORREO, p. ej. Resend]** | Envía los correos de la cuenta (recuperar contraseña) | [región] | DPA con cláusulas tipo |
-| **[HOSTING, p. ej. Cloudflare]** | Aloja la web y la app | Red mundial | DPA; Marco de Privacidad de Datos UE-EE. UU. |
-| **[PASARELA DE PAGO, p. ej. Paddle]** | Solo cuando se activen los pagos: vende, cobra y factura | [ver Anexo de pagos] | — |
+| **Supabase** (Supabase, Inc., EE. UU.) | Cuentas, base de datos (tu curso sincronizado, suscripciones de notificaciones) y funciones del servidor | Región del proyecto: **UE (París, Francia)** | Contrato de encargo (DPA) con cláusulas contractuales tipo de la Comisión Europea |
+| **Mistral AI** (Francia) | Genera las respuestas del asistente y transcribe la voz | UE | Contrato de encargo (DPA). |
+| **GitHub Pages** (GitHub, Inc., EE. UU.) | Aloja la web y la app (archivos de la aplicación, sin tus datos) | Red mundial | Marco de Privacidad de Datos UE-EE. UU. |
 
 ### 4.2 Terceros que reciben datos sin ser encargados nuestros
 
@@ -93,12 +91,12 @@ No cedemos datos a terceros salvo obligación legal (por ejemplo, un requerimien
 | Dato | Plazo |
 |---|---|
 | Datos de la cuenta y tu curso sincronizado | Mientras tengas la cuenta. Al borrarla se eliminan en el momento |
-| Suscripciones de notificaciones y vuelos programados | Mientras la cuenta exista o hasta que desactives los avisos; los vuelos programados se eliminan cuando ya no hacen falta [confirmar en la tabla flight_alerts] |
+| Suscripciones de notificaciones y vuelos programados | Mientras la cuenta exista o hasta que desactives los avisos; los vuelos programados se eliminan cuando ya no hacen falta |
 | Contador de mensajes del asistente | Se conserva con la cuenta (solo fecha y número) |
 | Conversación con el asistente | No se guarda en nuestro servidor; Mistral, según sus condiciones |
 | Intentos de canje de códigos | Se borran al día siguiente |
 | Registros técnicos de nuestros proveedores | Los plazos cortos que fijan ellos |
-| Copias de seguridad del servidor | [Confirmar según plan de Supabase: con el plan gratuito no hay copias; conviene que hagas tus propias copias desde la app] |
+| Copias de seguridad del servidor | Con el plan actual de nuestro proveedor no hay copias automáticas en el servidor: conviene que hagas tus propias copias desde la app (Ajustes → Exportar copia) |
 
 Si hubiera una reclamación u obligación legal concreta, los datos necesarios se conservarían **bloqueados** solo el tiempo que exija (art. 32 LOPDGDD).
 
