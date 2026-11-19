@@ -1,0 +1,26 @@
+/* Páginas legales de Órbita: legibles, claras y oscuras, sin nada de terceros. */
+:root { color-scheme: light dark; --bg: #f2f2f7; --card: #fff; --label: #1d1d1f; --label-2: #606065; --line: rgb(60 60 67 / 0.18); --tint: #005fbf; }
+@media (prefers-color-scheme: dark) { :root { --bg: #000; --card: #1c1c1e; --label: #f5f5f7; --label-2: #a1a1a8; --line: rgb(84 84 88 / 0.6); --tint: #5aa8ff; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--label); font: 17px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased; }
+header { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: calc(env(safe-area-inset-top) + 12px) max(20px, env(safe-area-inset-right)) 12px max(20px, env(safe-area-inset-left));
+  background: color-mix(in srgb, var(--bg) 82%, transparent); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); border-bottom: 0.5px solid var(--line); }
+header a { color: var(--label); text-decoration: none; font-weight: 600; }
+header .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 18px; letter-spacing: -0.02em; }
+header .brand img { border-radius: 7px; }
+header nav { display: flex; gap: 18px; font-size: 15px; }
+header nav a { color: var(--tint); font-weight: 500; }
+main { max-width: 760px; margin: 0 auto; padding: 32px max(20px, env(safe-area-inset-left)) calc(env(safe-area-inset-bottom) + 72px); }
+h1 { font-size: clamp(30px, 6vw, 40px); line-height: 1.1; letter-spacing: -0.03em; margin: 8px 0 8px; }
+h2 { font-size: 23px; line-height: 1.25; letter-spacing: -0.02em; margin: 44px 0 10px; }
+h3 { font-size: 18px; margin: 28px 0 8px; }
+h1 + p { color: var(--label-2); font-size: 15px; }
+ul, ol { padding-left: 22px; }
+li { margin: 6px 0; }
+a { color: var(--tint); }
+mark { background: color-mix(in srgb, #ff9500 22%, transparent); color: inherit; padding: 0 4px; border-radius: 4px; font-size: 0.92em; }
+.table { overflow-x: auto; margin: 16px 0; border-radius: 16px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line); }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { text-align: left; vertical-align: top; padding: 11px 14px; border-bottom: 0.5px solid var(--line); }
+th { font-size: 13px; color: var(--label-2); font-weight: 600; }
+tr:last-child td { border-bottom: 0; }

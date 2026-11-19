@@ -1,10 +1,41 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
 
-const base = process.env.GITHUB_PAGES === 'true' ? '/ORG-BACH-/' : '/'
+// BASE_PATH manda (en el dominio propio será '/'); si no, GitHub Pages sirve
+// el repositorio bajo /ORG-BACH-/.
+const base = process.env.BASE_PATH ?? (process.env.GITHUB_PAGES === 'true' ? '/ORG-BACH-/' : '/')
+
+// Dirección pública, para Open Graph, la URL canónica y el sitemap. MARCADOR:
+// cuando exista el dominio, fijar SITE_URL (p. ej. https://[DOMINIO]) en el
+// despliegue; mientras, la de GitHub Pages.
+const SITE_URL = (process.env.SITE_URL ?? 'https://alvarodesigns34.github.io/ORG-BACH-').replace(/\/$/, '')
+
+/** Metadatos de la web pública: URL absoluta en el HTML, robots.txt y sitemap.xml. */
+function publicSite(): Plugin {
+  return {
+    name: 'orbita-public-site',
+    transformIndexHtml: (html) => html.replaceAll('%SITE_URL%', SITE_URL),
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'robots.txt',
+        source: `User-agent: *\nAllow: /\n\nSitemap: ${SITE_URL}/sitemap.xml\n`,
+      })
+      const urls = ['/', '/legal/privacidad.html', '/legal/condiciones.html']
+      this.emitFile({
+        type: 'asset',
+        fileName: 'sitemap.xml',
+        source:
+          '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+          urls.map((u) => `  <url><loc>${SITE_URL}${u}</loc></url>`).join('\n') +
+          '\n</urlset>\n',
+      })
+    },
+  }
+}
 
 export default defineConfig({
   // GitHub Pages sirve un repositorio de proyecto bajo /<repo>/, no en la raíz
@@ -12,6 +43,7 @@ export default defineConfig({
   // (`npm run dev` / `npm run build`) el base sigue siendo '/'.
   base,
   plugins: [
+    publicSite(),
     react(),
     tailwindcss(),
     VitePWA({
@@ -83,6 +115,9 @@ export default defineConfig({
         // navegador es siempre la misma URL de documento, así que basta con
         // que esa página se sirva desde el caché cuando no hay red.
         navigateFallback: `${base}index.html`,
+        // Los textos legales son páginas de verdad: el Service Worker no debe
+        // contestar con la app cuando se piden.
+        navigateFallbackDenylist: [/\/legal\//],
         // Los dos avisos de megafonía (unos 70 KB) sí van precargados: tienen
         // que sonar al aterrizar aunque no haya red.
         // Los ambientes del modo estudio (2–3 MB cada uno) no se precargan:

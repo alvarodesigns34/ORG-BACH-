@@ -49,12 +49,14 @@ function hasCourse(): boolean {
 
 /** `?presentacion` fuerza la vista previa (también con la app instalada). */
 export function isLandingPreview(): boolean {
-  return params().has('presentacion')
+  return params().has('presentacion') || import.meta.env.VITE_LANDING_PREVIEW === '1'
 }
 
 export function shouldShowLanding(): boolean {
   const p = params()
   if (p.has('presentacion')) return true
+  // Compilación de vista previa (VITE_LANDING_PREVIEW=1): siempre la web.
+  if (import.meta.env.VITE_LANDING_PREVIEW === '1') return !p.has('app')
   if (!LANDING_IS_ENTRY) return false
   if (p.has('app')) return false
   // Un enlace directo a una sección de la app (#/tareas, accesos directos).
