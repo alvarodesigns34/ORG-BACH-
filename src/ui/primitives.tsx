@@ -190,7 +190,7 @@ export function SubjectTag({ subject, className }: { subject?: Subject; classNam
   return (
     <span
       className={cx(
-        'inline-flex items-center rounded-full px-2 py-0.5',
+        'tag-glass inline-flex items-center rounded-full px-2 py-0.5',
         'text-[0.6875rem] font-semibold whitespace-nowrap',
         className,
       )}

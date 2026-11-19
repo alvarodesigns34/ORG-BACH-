@@ -372,10 +372,11 @@ export function Checkbox({
           box,
           'relative grid place-items-center rounded-full border-[1.75px] shrink-0',
           'transition-[background-color,border-color,transform] duration-300 ease-[var(--spring)]',
-          'group-active:scale-90',
+          // Como una gota de cristal: al pulsar se hincha, no se hunde.
+          'group-active:scale-[1.18]',
           'peer-focus-visible:outline peer-focus-visible:outline-[2.5px] peer-focus-visible:outline-accent peer-focus-visible:outline-offset-2',
           checked
-            ? 'bg-accent-fill border-accent-fill text-white'
+            ? 'bg-accent-fill border-accent-fill text-white shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.55),inset_0_-1px_1.5px_rgb(0_0_0/0.15),0_2px_8px_color-mix(in_srgb,var(--c-accent-fill)_40%,transparent)]'
             : 'bg-transparent border-hairline-strong group-hover:border-ink-3',
         )}
       >
