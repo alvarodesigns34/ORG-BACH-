@@ -682,7 +682,7 @@ function NowWidget({ hasSubjects }: { hasSubjects: boolean }) {
       id="ahora"
       style={{
         background: focus
-          ? `linear-gradient(140deg, color-mix(in srgb, ${tint} 15%, var(--c-surface)), var(--c-surface) 62%)`
+          ? `linear-gradient(140deg, color-mix(in srgb, ${tint} 18%, transparent), transparent 62%), var(--pane)`
           : undefined,
       }}
       action={

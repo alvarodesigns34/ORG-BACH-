@@ -1,12 +1,12 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { m as motion } from 'motion/react'
 import { ChevronDown, Mic, PanelLeft } from 'lucide-react'
 
 import { courseLine } from '@/data/defaults'
 import { useSettings } from '@/state/StoreProvider'
 import { hrefFor, type RouteId } from '@/router'
 import { SyncBadge } from '@/features/account/SyncBadge'
-import { haptic, spring } from '@/ui/motion'
+import { haptic } from '@/ui/motion'
+import { createLiquidIndicator, type LiquidIndicator } from '@/ui/liquid'
 import { cx } from '@/ui/primitives'
 import { AccountAvatar, AssistantIcon, useChrome } from './chrome'
 import { BrandMark } from './Brand'
@@ -105,15 +105,7 @@ export function Sidebar({ current, badges }: SidebarProps) {
               `fixed` y Motion mide las animaciones compartidas en coordenadas
               de página, así que al cambiar de sección con la página desplazada
               el indicador salía disparado y luego volvía. */}
-          {indicator.box && (
-            <motion.span
-              aria-hidden
-              initial={false}
-              animate={{ y: indicator.box.top, height: indicator.box.height, opacity: 1 }}
-              transition={indicator.animate ? spring.snappy : { duration: 0 }}
-              className="lens absolute left-3 right-3 top-0 rounded-[18px] pointer-events-none"
-            />
-          )}
+          <SidebarLens box={indicator.box} animate={indicator.animate} />
           {NAV_GROUPS.map((group) => {
             const items = NAV_ITEMS.filter(
               (item) => item.group === group.id && item.id !== 'ajustes',
@@ -249,4 +241,27 @@ function useActiveIndicator(current: RouteId, folded: string[]) {
       if (event.target === event.currentTarget) setTick((t) => t + 1)
     },
   }
+}
+
+/** La lente de la sección activa: viaja con un muelle y se estira en vertical
+ *  según su velocidad, como una gota que se desliza (ver ui/liquid.ts). */
+function SidebarLens({ box, animate }: { box: { top: number; height: number } | null; animate: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const lens = useRef<LiquidIndicator | null>(null)
+  useLayoutEffect(() => {
+    if (!ref.current) return
+    lens.current = createLiquidIndicator(ref.current)
+    return () => lens.current?.destroy()
+  }, [])
+  useLayoutEffect(() => {
+    if (box) lens.current?.to({ y: box.top, h: box.height }, !animate)
+  }, [box?.top, box?.height, animate])
+  return (
+    <span
+      ref={ref}
+      aria-hidden
+      className="lens absolute left-3 right-3 top-0 rounded-[18px] pointer-events-none origin-center will-change-transform"
+      style={{ opacity: box ? 1 : 0, transition: 'opacity 200ms var(--ease-std)' }}
+    />
+  )
 }
