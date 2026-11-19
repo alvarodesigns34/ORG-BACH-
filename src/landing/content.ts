@@ -227,3 +227,23 @@ export const SEO = {
   description:
     'Tareas, exámenes y notas en un solo sitio, con un asistente de IA que te organiza la semana. Gratis, sin cuenta y sin conexión.',
 }
+
+/* ---------------------------------------------------------------- v3 ---- */
+
+export const HIGHLIGHTS_TITLE = 'Cuatro cosas que vas a usar cada día.'
+export const HIGHLIGHTS = [
+  { id: 'today', kicker: 'Hoy', title: 'Abres Órbita y sabes qué toca.', text: 'Tareas con subtareas, exámenes, calendario y horario. Lo de hoy arriba; lo que se acerca, avisado.' },
+  { id: 'voice', kicker: 'Asistente', title: 'Dilo en voz alta. Queda apuntado.', text: '«Tengo mates el viernes» y se crea el examen. Siempre con Deshacer.' },
+  { id: 'grades', kicker: 'Notas', title: 'La nota que necesitas, antes del examen.', text: 'Medias ponderadas por categorías y la calculadora del examen final.' },
+  { id: 'flight', kicker: 'Modo Estudio', title: 'Cada sesión de estudio es un vuelo.', text: 'Elige destino y duración, despega y estudia hasta aterrizar.' },
+] as const
+
+export const BENTO_TITLE = ['Funciona donde estés.', 'Incluso sin internet.']
+export const BENTO = {
+  offline: { title: 'Modo avión, sin problema.', text: 'Tareas, exámenes, calendario y notas funcionan sin conexión. Toca el interruptor.' },
+  account: { title: 'Sin cuenta para empezar.', text: 'Tus datos se quedan en tu dispositivo. Con cuenta, se sincronizan.' },
+  backups: { title: 'Copias automáticas.', text: 'Una al día, y antes de importar o borrar.' },
+  export: { title: 'Todo tuyo.', text: 'Exporta una copia o pásalo a Calendario cuando quieras.' },
+  ads: { title: 'Sin anuncios.', text: 'Ni ahora ni en el plan gratuito.' },
+  install: { title: 'Sin tienda de apps.', text: 'En Safari: Compartir → «Añadir a pantalla de inicio».' },
+}

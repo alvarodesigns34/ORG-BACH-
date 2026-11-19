@@ -152,10 +152,10 @@ void main() {
     col = vec3(0.93, 0.97, 1.0);
   } else if (vKind < 1.5) {
     a = smoothstep(0.5, 0.0, r);
-    col = mix(vec3(1.0, 0.78, 0.42), vec3(1.0, 0.98, 0.92), vHead);
+    col = mix(vec3(0.36, 0.66, 1.0), vec3(0.92, 0.97, 1.0), vHead);
   } else {
     a = smoothstep(0.5, 0.42, r) * smoothstep(0.28, 0.4, r);
-    col = vec3(1.0, 0.86, 0.6);
+    col = vec3(0.55, 0.8, 1.0);
   }
   gl_FragColor = vec4(col * a * vAlpha, a * vAlpha);
 }`
