@@ -277,7 +277,7 @@ export function SettingsView({ section }: { section?: string | null }) {
 
         <ListGroup
           header="Avisos en Inicio"
-          footer="Exámenes cercanos, tareas atrasadas, asignaturas por debajo de su objetivo y semanas con demasiadas tareas juntas, dentro de la app. El resumen diario por notificación va aparte, en Notificaciones."
+          footer="Exámenes cercanos, tareas atrasadas, asignaturas por debajo de su objetivo y semanas con demasiadas tareas juntas, en Inicio. Si lo apagas, tampoco te llega el resumen diario por notificación."
         >
           <RowSwitch
             icon={TriangleAlert}
