@@ -9,6 +9,7 @@ import {
   Database,
   Download,
   FileText,
+  Globe,
   GraduationCap,
   Hash,
   History,
@@ -385,6 +386,13 @@ export function SettingsView({ section }: { section?: string | null }) {
             </span>
           }
         >
+          <ListRow
+            icon={Globe}
+            tint="#0a84ff"
+            label="Ver la presentación de Órbita"
+            detail="La web que ve quien llega por primera vez"
+            onClick={() => window.location.assign(`${import.meta.env.BASE_URL}?presentacion`)}
+          />
           <ListRow
             icon={ShieldCheck}
             tint="#30b158"
