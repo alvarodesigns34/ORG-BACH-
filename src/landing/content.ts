@@ -35,7 +35,7 @@ export const HERO = {
   lead:
     'Tareas, exámenes, notas y un asistente que te organiza la semana con solo decírselo. Funciona sin cuenta y sin conexión.',
   primary: 'Empezar gratis',
-  secondary: 'Iniciar sesión',
+  secondary: 'Ya tengo cuenta',
   note: ['Gratis', 'Sin anuncios', 'Se instala desde el navegador, sin tienda de apps'],
   chips: [
     { title: 'Habla y lo apunta', detail: '«Tengo mates el viernes»' },
@@ -43,6 +43,48 @@ export const HERO = {
     { title: '¿Qué nota necesito?', detail: 'Necesitas un 6,4' },
   ],
 }
+
+/**
+ * Panel de salidas de la portada: la semana de un alumno contada como un
+ * aeropuerto (ilustración, no datos de nadie). Mayúsculas: es un panel.
+ */
+export type BoardStatus = 'ontime' | 'boarding' | 'done' | 'need'
+export const BOARD: { day: string; time: string; to: string; status: string; tone: BoardStatus; note: string; gate: string }[] = [
+  { day: 'LUN', time: '08:30', to: 'MATEMÁTICAS', status: 'EN HORA', tone: 'ontime', note: 'Examen · temas 4 y 5', gate: 'A3' },
+  { day: 'MAR', time: '16:00', to: 'LENGUA', status: 'EMBARCANDO', tone: 'boarding', note: 'Comentario de texto', gate: 'B1' },
+  { day: 'MIÉ', time: '17:30', to: 'HISTORIA', status: 'HECHO', tone: 'done', note: 'Resumen del tema 6', gate: 'C2' },
+  { day: 'JUE', time: '19:00', to: 'INGLÉS', status: 'EN HORA', tone: 'ontime', note: 'Vocabulario unidad 6', gate: 'A1' },
+  { day: 'VIE', time: '09:00', to: 'FÍSICA', status: 'NECESITAS 6,4', tone: 'need', note: 'Parcial · cuenta un 40 %', gate: 'D4' },
+]
+export const BOARD_TITLE = 'SALIDAS · ESTA SEMANA'
+export const CLOSING_BOARD = { to: 'TU CURSO', gate: 'Ó', status: 'EMBARCANDO' }
+
+/** Frase que se ilumina palabra a palabra al desplazar. */
+export const MANIFESTO =
+  'La agenda en una app, las notas en otra y el examen del viernes en la cabeza. Órbita lo junta todo en un sitio y cada mañana te dice qué toca hoy.'
+
+/** Los tres capítulos de la maqueta que responde al desplazamiento. */
+export const CHAPTERS = [
+  {
+    id: 'plan',
+    kicker: 'Hoy',
+    title: 'Diez segundos y sabes qué toca.',
+    text: 'Tareas con subtareas, exámenes, calendario y horario. Lo de hoy, arriba; lo que se acerca, avisado.',
+  },
+  {
+    id: 'assistant',
+    kicker: 'Asistente',
+    title: 'Dilo y queda apuntado.',
+    text: '«Tengo mates el viernes» y se crea el examen. «Mueve la entrega al jueves» y la mueve. Siempre con Deshacer.',
+    note: 'Usa IA y puede equivocarse: revisa lo que crea. 15 mensajes al mes gratis.',
+  },
+  {
+    id: 'grades',
+    kicker: 'Notas',
+    title: 'La nota que necesitas, antes del examen.',
+    text: 'Medias ponderadas, categorías con su peso y la calculadora del final. Mueve las barras: es la de verdad.',
+  },
+] as const
 
 /** Franja que se desplaza sola (decorativa). */
 export const MARQUEE = [
@@ -134,7 +176,7 @@ export const PAYMENTS_ENABLED = false
 export type Billing = 'monthly' | 'annual'
 
 export const PRICING = {
-  title: 'Empieza gratis. Crece cuando quieras.',
+  title: 'Gratis de verdad. Premium, si quieres más asistente.',
   free: [
     'Tareas, exámenes, calendario, notas y objetivos',
     'Modo Estudio con vuelos',
