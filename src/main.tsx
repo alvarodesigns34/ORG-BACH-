@@ -7,6 +7,7 @@ import { App } from './App'
 import { ErrorBoundary } from './ui/ErrorBoundary'
 import { installGlassLight } from './ui/glassLight'
 import { installLiquid } from './ui/liquid'
+import { installStaleVersionReload } from './ui/staleVersion'
 import { cleanLandingParams, isLandingPreview, setLandingIntent, shouldShowLanding, type LandingIntent } from './landing/entry'
 import './styles/index.css'
 
@@ -17,6 +18,7 @@ import './styles/index.css'
 const motionFeatures = import('./ui/motionFeatures').then((mod) => mod.default)
 const loadMotionFeatures = () => motionFeatures
 
+installStaleVersionReload()
 installGlassLight()
 installLiquid()
 

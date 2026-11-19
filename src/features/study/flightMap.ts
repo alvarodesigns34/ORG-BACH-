@@ -55,7 +55,7 @@ import {
 } from '@/domain/flights'
 
 export type { MapLookOptions }
-export type MapStatus = 'cargando' | 'listo' | 'sin_cartografia' | 'no_disponible'
+export type MapStatus = 'cargando' | 'listo' | 'sin_cartografia' | 'no_disponible' | 'sin_webgl'
 
 /** Colores de lo que se dibuja encima, según el mapa de debajo. */
 function inkFor(look: MapLookOptions) {

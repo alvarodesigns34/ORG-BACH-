@@ -577,8 +577,12 @@ export default function StudyView() {
         />
         {mapEnabled && showToolbar && mapStatus !== 'listo' && (
           <div className="study-map-status" role="status">
-            {mapStatus === 'cargando' ? 'Cargando cartografía…' : 'Mapa temporalmente no disponible'}
-            {mapStatus !== 'cargando' && (
+            {mapStatus === 'cargando'
+              ? 'Cargando cartografía…'
+              : mapStatus === 'sin_webgl'
+                ? 'Este navegador no puede dibujar el mapa: activa la aceleración por hardware (WebGL)'
+                : 'Mapa temporalmente no disponible'}
+            {mapStatus !== 'cargando' && mapStatus !== 'sin_webgl' && (
               <button type="button" className="font-semibold underline underline-offset-4" onClick={retryMap}>
                 Reintentar
               </button>
