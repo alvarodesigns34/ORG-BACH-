@@ -82,11 +82,11 @@ export function StudyHome({
         inert={hidden}
         className="study-home-title absolute z-10 pointer-events-none"
       >
-        <p className="text-[1.375rem] min-[720px]:text-[1.75rem] font-medium tracking-[-0.02em] text-ink-3 leading-tight">
+        <p className="text-[1.375rem] min-[720px]:text-[1.75rem] font-medium tracking-[-0.012em] text-ink-3 leading-tight">
           {greeting()}
           {name ? `, ${name}` : ''}
         </p>
-        <h1 className="display text-[2.75rem] min-[720px]:text-[3.5rem] leading-[1.02] tracking-[-0.035em] mt-0.5">
+        <h1 className="display text-[2.75rem] min-[720px]:text-[3.5rem] leading-[1.02] tracking-[-0.012em] mt-0.5">
           {origin.city}
         </h1>
         <p className="mt-1.5 text-[0.875rem] font-medium text-ink-2 flex items-center gap-2">
@@ -107,7 +107,7 @@ export function StudyHome({
             haptic()
             onStart()
           }}
-          className="study-home-cta pressable h-[3.75rem] rounded-full flex items-center justify-center gap-2.5 text-[1.0625rem] font-semibold"
+          className="glass-tinted pressable h-[3.75rem] rounded-full flex items-center justify-center gap-2.5 text-[1.0625rem] font-semibold text-white"
         >
           <Plane className="size-[19px]" strokeWidth={2.3} />
           Planear vuelo

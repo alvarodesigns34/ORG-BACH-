@@ -19,7 +19,7 @@ import {
 import { daysUntil, relativeDay } from '@/domain/dates'
 import { focusMinutes } from '@/domain/flights'
 import { studyHref } from '@/router'
-import { useTaskSummary, useUpcomingExams } from '@/state/selectors'
+import { usePendingExams, useTaskSummary } from '@/state/selectors'
 import type { FocusSession, Subject } from '@/domain/types'
 import { colorVar } from '@/domain/palette'
 import { haptic, spring } from '@/ui/motion'
@@ -110,7 +110,8 @@ interface Suggestion {
  */
 export function StudyNext({ subjects, today, flat = false }: { subjects: Map<string, Subject>; today: string; flat?: boolean }) {
   const summary = useTaskSummary()
-  const exams = useUpcomingExams()
+  // Solo exámenes por hacer: uno de hoy cuya clase ya pasó no se sugiere.
+  const exams = usePendingExams()
 
   const items = useMemo(() => {
     const out: Suggestion[] = []
@@ -299,7 +300,7 @@ function Summary({
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar page-enter">
         <div className="px-6 pt-6">
           <p className="eyebrow">Tu actividad · ahora en</p>
-          <h2 className="display text-[2rem] leading-[1.05] mt-0.5 tracking-[-0.03em]">{origin.city}</h2>
+          <h2 className="display text-[2rem] leading-[1.05] mt-0.5 tracking-[-0.018em]">{origin.city}</h2>
           <p className="mt-2 text-[0.875rem] text-ink-2 flex items-center gap-2">
             <span className="font-mono font-bold tracking-wide text-[0.8125rem] px-1.5 py-0.5 rounded-[6px] bg-[var(--glass-tint)]">
               {origin.iata}
@@ -698,7 +699,7 @@ export function BookingPanel({
           >
             <div className="px-6">
               <p className="text-[0.875rem] font-medium text-ink-3">¿Cuánto vas a estudiar?</p>
-              <p className="display text-[2.5rem] leading-[1.1] tabular-nums tracking-[-0.03em]">
+              <p className="display text-[2.5rem] leading-[1.1] tabular-nums tracking-[-0.018em]">
                 {formatFlightTime(minutes)}
               </p>
             </div>

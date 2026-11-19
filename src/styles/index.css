@@ -292,7 +292,8 @@
     font-family: var(--font-sans);
     font-size: 0.9375rem;
     line-height: 1.5;
-    letter-spacing: -0.006em;
+    /* SF ya trae su propio espaciado óptico por tamaño: apenas se toca. */
+    letter-spacing: -0.003em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: 'kern';
@@ -301,8 +302,8 @@
   h1,
   h2,
   h3 {
-    font-weight: 650;
-    letter-spacing: -0.02em;
+    font-weight: 700;
+    letter-spacing: -0.012em;
     text-wrap: balance;
   }
 
@@ -353,7 +354,9 @@ html {
 @utility display {
   font-family: var(--font-display);
   font-weight: 700;
-  letter-spacing: -0.025em;
+  /* Los títulos de iOS 26: negrita y sin apretar de más (SF Display ya
+     ajusta el espaciado a su tamaño). */
+  letter-spacing: -0.015em;
 }
 
 /* Cifras académicas: redondeadas, tabulares, sin baile al actualizarse. */
@@ -981,8 +984,48 @@ html {
   mix-blend-mode: normal;
   animation: screen-out 160ms cubic-bezier(0.4, 0, 1, 1) both;
 }
-:root[data-nav='immersive']::view-transition-old(root) {
-  animation-duration: 280ms;
+/* Entrar en Estudio: el globo se acerca desde un poco más grande mientras
+   la app se aparta hacia el fondo (como abrir una app desde su icono).
+   Salir: el globo se aleja y la app vuelve al frente. */
+:root[data-nav='study-in']::view-transition-old(root) {
+  z-index: 1;
+  animation: study-app-away 360ms var(--ease-std) both;
+}
+:root[data-nav='study-in']::view-transition-new(root) {
+  z-index: 2;
+  animation: study-come 620ms var(--spring) both;
+}
+:root[data-nav='study-out']::view-transition-old(root) {
+  z-index: 2;
+  animation: study-go 380ms cubic-bezier(0.4, 0, 0.9, 0.6) both;
+}
+:root[data-nav='study-out']::view-transition-new(root) {
+  z-index: 1;
+  animation: study-app-back 560ms var(--spring) both;
+}
+@keyframes study-app-away {
+  to {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+@keyframes study-come {
+  from {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+@keyframes study-go {
+  to {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+}
+@keyframes study-app-back {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
 }
 ::view-transition-new(root) {
   mix-blend-mode: normal;
@@ -1379,5 +1422,24 @@ button:active > .switch-thumb {
     background: var(--c-surface);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
+  }
+}
+
+/* ==========================================================================
+   ASISTENTE (Mensajes de iOS)
+   ========================================================================== */
+
+/* El azul de Mensajes: un degradado vertical apenas perceptible. */
+.bubble-me {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c-accent-fill) 85%, white), var(--c-accent-fill));
+}
+/* Cada burbuja brota desde su esquina (la del envío, la de la respuesta). */
+.bubble-in {
+  animation: bubble-in 460ms var(--spring) both;
+}
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.86);
   }
 }

@@ -123,3 +123,51 @@ describe('texto del resumen', () => {
     assert.match(digest.body, /y 3 tareas más/)
   })
 })
+
+describe('resumen: avisos apagados y exámenes ya hechos', () => {
+  // 2026-11-02 es lunes (1). Mates el lunes de 9:00 a 9:55.
+  const mat = row('subjects', 'mat', {
+    name: 'Matemáticas I',
+    schedule: [{ id: 's', day: 1, start: '09:00', end: '09:55' }],
+  })
+  const examHoy = row('exams', 'e', { title: 'Tema 2', subjectId: 'mat', date: TODAY })
+
+  it('con «Mostrar avisos» apagado no se envía', () => {
+    const digest = buildDigest(
+      [mat, examHoy, row('settings', 'settings', { alertsEnabled: false })],
+      TODAY,
+      17 * 60,
+    )
+    assert.equal(digest.empty, true)
+    assert.equal(digest.muted, true)
+  })
+
+  it('a las 17:00 no anuncia el examen de hoy cuya clase ya terminó', () => {
+    assert.equal(buildDigest([mat, examHoy], TODAY, 17 * 60).empty, true)
+  })
+
+  it('a las 8:00 sí lo anuncia', () => {
+    assert.equal(buildDigest([mat, examHoy], TODAY, 8 * 60).body, 'Examen de Matemáticas I hoy')
+  })
+
+  it('un examen de hoy con hora de tarde sigue en el resumen de las 17:00', () => {
+    const tarde = row('exams', 't', { title: 'Oral', subjectId: 'mat', date: TODAY, time: '18:00' })
+    assert.equal(buildDigest([mat, tarde], TODAY, 17 * 60).empty, false)
+  })
+
+  it('no anuncia exámenes con nota ni de asignaturas archivadas', () => {
+    const archivada = row('subjects', 'his', { name: 'Historia', archived: true })
+    const rows = [
+      mat,
+      archivada,
+      row('exams', 'n', { title: 'Con nota', subjectId: 'mat', date: '2026-11-03', gradeEntryId: 'g' }),
+      row('exams', 'h', { title: 'Hist', subjectId: 'his', date: '2026-11-03' }),
+    ]
+    assert.equal(buildDigest(rows, TODAY, 8 * 60).empty, true)
+  })
+
+  it('da los minutos locales', () => {
+    const local = localParts(new Date('2026-11-02T16:05:00Z'), 'Europe/Madrid')
+    assert.equal(local.hour * 60 + local.minute, 17 * 60 + 5)
+  })
+})

@@ -7,6 +7,7 @@
  */
 
 import { daysUntil, formatDuration, relativeDay } from './dates.ts'
+import { clockOf, isExamOver } from './exams.ts'
 import { formatGrade } from './grades.ts'
 import type { SubjectResult } from './grades.ts'
 import { isOverdue } from './tasks.ts'
@@ -60,7 +61,14 @@ export function detectAlerts(input: AlertInput): Alert[] {
   }
 
   // --- Exámenes inminentes ---
+  // Un examen de hoy que ya pasó (su clase terminó) o ya con nota no se
+  // anuncia, ni los de asignaturas archivadas. La hora solo se mira si `now`
+  // cae en el mismo día que `today`.
+  const clock = clockOf(new Date(now))
+  const archived = new Set(subjects.filter((s) => s.archived).map((s) => s.id))
   const upcoming = exams
+    .filter((e) => !archived.has(e.subjectId) && !e.gradeEntryId)
+    .filter((e) => clock.day !== today || !isExamOver(e, subjects, clock))
     .filter((e) => {
       const d = daysUntil(e.date, today)
       return d >= 0 && d <= examAlertDays

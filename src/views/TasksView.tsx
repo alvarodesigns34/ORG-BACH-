@@ -311,7 +311,7 @@ export function TasksView() {
             >
               <h2
                 className={cx(
-                  'flex items-baseline gap-2 mb-2 px-1 text-[1.125rem] font-bold tracking-[-0.02em]',
+                  'flex items-baseline gap-2 mb-2 px-1 text-[1.125rem] font-bold tracking-[-0.012em]',
                   group.tone === 'danger'
                     ? 'text-danger'
                     : group.tone === 'warn'

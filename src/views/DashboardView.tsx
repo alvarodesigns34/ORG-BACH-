@@ -15,8 +15,6 @@ import {
   Minus,
   NotebookPen,
   Plus,
-  SlidersHorizontal,
-  Sparkle,
   Sparkles,
   Target,
   TriangleAlert,
@@ -54,14 +52,16 @@ import {
   useSubjectMap,
   useSubjects,
   useTaskSummary,
+  usePendingExams,
   useUpcomingExams,
 } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
-import { useAmbient, useChrome } from '@/layout/chrome'
+import { useAmbient } from '@/layout/chrome'
 import { TaskEditor } from '@/features/tasks/TaskEditor'
 import { TaskList } from '@/features/tasks/TaskRow'
 import { ExamEditor } from '@/features/exams/ExamEditor'
 import { ExamCard } from '@/features/exams/ExamCard'
+import { ExamFollowUp } from '@/features/exams/ExamFollowUp'
 import { Ring, Sparkline } from '@/ui/charts'
 import { exitFast, haptic, spring } from '@/ui/motion'
 import { Button, CountUp, cx } from '@/ui/primitives'
@@ -150,7 +150,6 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
 
   const dispatch = useDispatch()
   const today = useToday()
-  const { openAssistant } = useChrome()
   const summary = useTaskSummary()
   const exams = useUpcomingExams(3)
   const subjects = useSubjectMap()
@@ -208,7 +207,8 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
   }
 
   const firstName = settings.userName.split(' ')[0]
-  const nextExam = exams.find((e) => e.date >= today)
+  // El próximo examen por hacer: uno de hoy que ya pasó no cuenta.
+  const nextExam = usePendingExams(1)[0]
 
   // Una frase que resume el día, bajo el saludo.
   const brief = useMemo(() => {
@@ -271,6 +271,18 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
         title={`${greeting()}${firstName ? `, ${firstName}` : ''}`}
         subtitle={brief}
         compactTitle="Inicio"
+        large
+        actions={
+          <Button
+            variant={editing ? 'primary' : 'secondary'}
+            onClick={() => {
+              haptic()
+              setEditing((v) => !v)
+            }}
+          >
+            {editing ? 'Listo' : 'Editar'}
+          </Button>
+        }
       />
 
       {/* --- Vuelo en curso del modo estudio --- */}
@@ -279,8 +291,11 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
       {/* --- Recordatorio de copia, solo sin cuenta y de tarde en tarde --- */}
       <BackupNudge />
 
+      {/* --- «¿Qué tal te fue?»: la nota de un examen ya hecho --- */}
+      <ExamFollowUp />
+
       {/* --- Tablero --- */}
-      <div className="grid grid-cols-2 md:grid-cols-4 grid-flow-dense gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 grid-flow-dense gap-3 sm:gap-4 lg:gap-5">
         <AnimatePresence initial={false} mode="popLayout">
           {shown.map((id, index) => (
             <WidgetFrame
@@ -306,26 +321,9 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
 
       {shown.length === 0 && !editing && (
         <p className="text-center text-[0.9375rem] text-ink-3 py-10">
-          Has quitado todas las tarjetas. Toca «Personalizar» para volver a poner alguna.
+          Has quitado todas las tarjetas. Toca «Editar» para volver a poner alguna.
         </p>
       )}
-
-      <div className="flex flex-wrap justify-center gap-2 mt-7">
-        {!editing && <Button size="sm" onClick={() => openAssistant()}>
-          <Sparkle className="size-3.5" strokeWidth={2.1} aria-hidden="true" />
-          Asistente
-        </Button>}
-        <Button
-          size="sm"
-          onClick={() => {
-            haptic()
-            setEditing((v) => !v)
-          }}
-        >
-          <SlidersHorizontal className="size-3.5" strokeWidth={2.4} />
-          {editing ? 'Terminar' : 'Personalizar Inicio'}
-        </Button>
-      </div>
 
       <EditTray
         open={editing}
@@ -542,19 +540,19 @@ function WidgetCard({
   style?: React.CSSProperties
 }) {
   const meta = WIDGETS[id]
+  // Cabecera de las tarjetas de Salud o de los widgets: el símbolo y el
+  // nombre en el color de la tarjeta, sin ficha; el contenido manda.
+  const color = `color-mix(in srgb, ${meta.tint} 82%, var(--c-ink))`
   const head = (
     <>
-      <span
-        aria-hidden
-        className="grid place-items-center size-[26px] rounded-full text-white shrink-0"
-        style={{ background: meta.tint }}
+      <meta.icon aria-hidden className="size-[18px] shrink-0" strokeWidth={2.4} style={{ color }} />
+      <h2
+        className="text-[0.9375rem] font-semibold tracking-[-0.01em] truncate"
+        style={{ color }}
       >
-        <meta.icon className="size-[14px]" strokeWidth={2.5} />
-      </span>
-      <h2 className="text-[0.9375rem] font-semibold tracking-[-0.01em] text-ink truncate">
         {meta.label}
       </h2>
-      {meta.href && <ChevronRight className="size-4 text-ink-3 -ml-1" strokeWidth={2.6} />}
+      {meta.href && <ChevronRight className="size-4 text-ink-3 -ml-0.5" strokeWidth={2.6} />}
     </>
   )
   return (
@@ -563,7 +561,7 @@ function WidgetCard({
       style={style}
       aria-label={meta.label}
     >
-      <header className="flex items-center justify-between gap-2 pl-4 pr-3 pt-3.5 pb-2 min-h-[3rem]">
+      <header className="flex items-center justify-between gap-2 pl-[1.125rem] pr-3.5 pt-4 pb-2 min-h-[3.25rem]">
         {meta.href ? (
           <a href={meta.href} className="pressable flex items-center gap-2 min-w-0 rounded-full">
             {head}
@@ -573,7 +571,7 @@ function WidgetCard({
         )}
         {action && <div className="widget-action shrink-0">{action}</div>}
       </header>
-      <div className={cx('flex-1 min-h-0 flex flex-col', !flush && 'px-4 pb-4')}>{children}</div>
+      <div className={cx('flex-1 min-h-0 flex flex-col', !flush && 'px-[1.125rem] pb-[1.125rem]')}>{children}</div>
     </section>
   )
 }

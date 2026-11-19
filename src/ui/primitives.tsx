@@ -134,7 +134,7 @@ export function SectionHeader({ title, hint, action, className }: SectionHeaderP
   return (
     <header className={cx('flex items-baseline justify-between gap-4', className)}>
       <div className="min-w-0">
-        <h2 className="text-[1.0625rem] font-semibold tracking-[-0.02em]">{title}</h2>
+        <h2 className="text-[1.0625rem] font-semibold tracking-[-0.012em]">{title}</h2>
         {hint && <p className="text-[0.8125rem] text-ink-3 mt-0.5">{hint}</p>}
       </div>
       {action && <div className="shrink-0">{action}</div>}
@@ -160,7 +160,7 @@ export function GroupTitle({
   return (
     <div className={cx('flex items-end justify-between gap-4 px-1 mb-2.5', className)}>
       <div className="min-w-0">
-        <h2 className="text-[1.375rem] font-bold tracking-[-0.022em] leading-tight">{title}</h2>
+        <h2 className="text-[1.375rem] font-bold tracking-[-0.014em] leading-tight">{title}</h2>
         {hint && <p className="text-[0.8125rem] text-ink-3 mt-0.5">{hint}</p>}
       </div>
       {action && <div className="shrink-0 pb-0.5">{action}</div>}

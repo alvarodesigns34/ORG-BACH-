@@ -209,7 +209,7 @@ export function Modal({
                 <div className="min-w-0 pt-1">
                   <h2
                     id={titleId}
-                    className="text-[1.375rem] font-bold tracking-[-0.025em] leading-tight"
+                    className="text-[1.375rem] font-bold tracking-[-0.015em] leading-tight"
                   >
                     {title}
                   </h2>

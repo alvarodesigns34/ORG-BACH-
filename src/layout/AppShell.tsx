@@ -208,6 +208,8 @@ interface PageHeaderProps {
   back?: BackLink
   /** Título de la barra compacta, si no es el mismo (p. ej. «Inicio»). */
   compactTitle?: string
+  /** Título aún mayor, para la portada (Inicio). */
+  large?: boolean
 }
 
 /**
@@ -222,6 +224,7 @@ export function PageHeader({
   toolbar,
   back,
   compactTitle,
+  large,
 }: PageHeaderProps) {
   const heading = useRef<HTMLHeadingElement>(null)
   const { past, scrolled } = useScrolledPast(heading)
@@ -248,7 +251,12 @@ export function PageHeader({
           <motion.h1
             ref={heading}
             style={{ scale: stretch, transformOrigin: 'left bottom' }}
-            className="display text-[2.125rem] sm:text-[2.5rem] leading-[1.08]"
+            className={cx(
+              'display leading-[1.06]',
+              large
+                ? 'text-[2.25rem] sm:text-[3rem] tracking-[-0.012em]'
+                : 'text-[2.125rem] sm:text-[2.5rem] tracking-[-0.018em]',
+            )}
           >
             {title}
           </motion.h1>

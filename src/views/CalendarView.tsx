@@ -156,7 +156,7 @@ export function CalendarView() {
         toolbar={
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center justify-between gap-3 md:justify-start md:gap-4 min-w-0">
-              <h2 className="text-[1.5rem] font-bold tracking-[-0.025em] first-letter:uppercase truncate">
+              <h2 className="text-[1.5rem] font-bold tracking-[-0.015em] first-letter:uppercase truncate">
                 {heading}
               </h2>
               <div className="glass-btn flex items-center gap-0.5 shrink-0 rounded-full p-[3px]">
@@ -261,7 +261,7 @@ export function CalendarView() {
           {unplanned.length > 0 && (
             <section aria-label="Por planificar">
               <div className="flex items-baseline justify-between px-1 mb-2.5">
-                <h2 className="text-[1.125rem] font-bold tracking-[-0.02em]">Por planificar</h2>
+                <h2 className="text-[1.125rem] font-bold tracking-[-0.012em]">Por planificar</h2>
                 <span className="text-[0.75rem] text-ink-3">Arrastra a un día</span>
               </div>
               <ul className="card overflow-hidden">
@@ -378,10 +378,12 @@ function MonthGrid({
           <abbr
             key={i}
             title={headerNames[i]}
-            className="text-center lg:text-left lg:pl-3 text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-ink-3"
+            className="text-center lg:text-right lg:pr-3 text-[0.6875rem] lg:text-[0.8125rem] font-semibold max-lg:uppercase max-lg:tracking-[0.06em] text-ink-3"
             style={{ textDecoration: 'none' }}
           >
-            {label}
+            <span className="lg:hidden">{label}</span>
+            {/* En el iPad, «lun», «mar»…, como Calendario. */}
+            <span className="max-lg:hidden">{headerNames[i].slice(0, 3).toLowerCase()}</span>
           </abbr>
         ))}
       </div>
@@ -393,6 +395,7 @@ function MonthGrid({
           const isToday = day === today
           const isSelected = day === selected
           const date = parseDay(day)
+          const weekend = date.getDay() === 0 || date.getDay() === 6
           const { shown, hidden, done } = cellItems(items, 3)
 
           return (
@@ -411,23 +414,24 @@ function MonthGrid({
                 'lg:border-t lg:border-hairline',
                 i % 7 !== 6 && 'lg:border-r',
                 'transition-colors duration-200 lg:hover:bg-fill/50',
-                !inMonth && 'lg:bg-fill/30',
-                isSelected && 'lg:bg-accent-quiet/70 lg:hover:bg-accent-quiet',
+                // Como Calendario: el fin de semana, apenas sombreado; el
+                // día elegido se marca solo con el círculo.
+                weekend && 'lg:bg-fill/35',
                 drag?.over === day && 'bg-accent-quiet ring-2 ring-accent ring-inset',
               )}
             >
               <span
                 className={cx(
                   'grid place-items-center size-[2.125rem] rounded-full text-[1.0625rem] tabular-nums shrink-0',
-                  'lg:self-start lg:size-[1.75rem] lg:text-[0.875rem] lg:ml-0.5',
+                  'lg:self-end lg:size-[1.875rem] lg:text-[1rem] lg:mr-0.5',
                   'transition-[background-color,color,transform] duration-300 ease-[var(--spring)] group-active:scale-90',
                   isToday
                     ? 'bg-accent-fill text-white font-semibold'
                     : isSelected
                       ? 'bg-ink text-canvas font-semibold'
                       : inMonth
-                        ? 'text-ink font-medium'
-                        : 'text-ink-3/60',
+                        ? 'text-ink font-semibold'
+                        : 'text-ink-3/50 font-medium',
                 )}
               >
                 {date.getDate()}
@@ -657,7 +661,7 @@ function DayPanel({
           <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.04em] text-ink-3">
             {isToday ? 'Hoy' : WEEKDAYS_LONG[date.getDay()]}
           </p>
-          <h2 className="text-[1.375rem] font-bold tracking-[-0.022em] leading-tight">
+          <h2 className="text-[1.375rem] font-bold tracking-[-0.014em] leading-tight">
             {date.getDate()} de {MONTHS_LONG[date.getMonth()]}
           </h2>
         </div>
