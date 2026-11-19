@@ -730,7 +730,10 @@ function NowWidget({ hasSubjects }: { hasSubjects: boolean }) {
                 initial={{ opacity: 0, scaleX: 0.4 }}
                 animate={{ opacity: 1, scaleX: 1 }}
                 transition={{ ...spring.smooth, delay: 0.04 * i }}
-                className="absolute inset-y-0 rounded-[9px] grid place-items-center overflow-hidden origin-left"
+                className={cx(
+                  'absolute inset-y-0 rounded-[10px] grid place-items-center overflow-hidden origin-left',
+                  state === 'now' ? 'glass-chip-now' : 'tag-glass',
+                )}
                 style={{
                   left: `calc(${pct(item.start)} + 1.5px)`,
                   width: `calc(${((item.end - item.start) / span) * 100}% - 3px)`,
@@ -747,7 +750,7 @@ function NowWidget({ hasSubjects }: { hasSubjects: boolean }) {
           })}
           {minutes > first && minutes < last && (
             <motion.div
-              className="absolute -inset-y-1.5 w-[2.5px] -ml-[1.25px] rounded-full bg-ink shadow-[0_0_0_2px_var(--c-surface)]"
+              className="absolute -inset-y-1.5 w-[2.5px] -ml-[1.25px] rounded-full bg-ink shadow-[0_0_0_2px_var(--pane-solid)]"
               initial={false}
               animate={{ left: pct(minutes) }}
               transition={spring.smooth}

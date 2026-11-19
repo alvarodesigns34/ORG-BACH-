@@ -135,14 +135,14 @@ function tick(now: number): void {
     write(st)
     if (
       !pressed &&
-      !st.hovering &&
       settled(st.x, 0.05) &&
       settled(st.y, 0.05) &&
       settled(st.sx, 0.0008) &&
       settled(st.sy, 0.0008) &&
       settled(st.glow, 0.004)
     ) {
-      clear(st)
+      // En reposo bajo el cursor se queda levantado, pero sin gastar fotogramas.
+      if (!st.hovering) clear(st)
       st.running = false
       active.delete(st)
     }
