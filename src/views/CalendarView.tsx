@@ -397,10 +397,19 @@ function MonthGrid({
           const date = parseDay(day)
           const weekend = date.getDay() === 0 || date.getDay() === 6
           const { shown, hidden, done } = cellItems(items, 3)
+          // El día de examen «brilla» con el color de su asignatura: se ve la
+          // forma del mes (dónde se acumulan) antes de leer nada.
+          const exam = inMonth ? items.find((item) => item.kind === 'examen' && !item.done) : undefined
+          const examColor = exam ? dotColor(exam, subjects) : null
 
           return (
             <button
               key={day}
+              style={
+                examColor
+                  ? { backgroundImage: `radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, ${examColor} 16%, transparent), transparent 70%)` }
+                  : undefined
+              }
               type="button"
               onClick={() => onSelect(day)}
               aria-label={`${formatDayMonth(day)}${items.length ? `, ${items.length} elementos` : ', sin nada'}`}
@@ -424,11 +433,12 @@ function MonthGrid({
                 className={cx(
                   'grid place-items-center size-[2.125rem] rounded-full text-[1.0625rem] tabular-nums shrink-0',
                   'lg:self-end lg:size-[1.875rem] lg:text-[1rem] lg:mr-0.5',
-                  'transition-[background-color,color,transform] duration-300 ease-[var(--spring)] group-active:scale-90',
+                  'relative transition-[background-color,color,transform] duration-300 ease-[var(--spring)] group-active:scale-[1.14]',
+                  // Hoy: una gota de cristal teñido. El elegido: una lente.
                   isToday
-                    ? 'bg-accent-fill text-white font-semibold'
+                    ? 'glass-tinted text-white font-semibold'
                     : isSelected
-                      ? 'bg-ink text-canvas font-semibold'
+                      ? 'lens text-ink font-semibold'
                       : inMonth
                         ? 'text-ink font-semibold'
                         : 'text-ink-3/50 font-medium',
@@ -520,8 +530,9 @@ function ItemChip({ item, subject }: { item: DayItem; subject?: Subject }) {
   return (
     <span
       className={cx(
-        'relative flex items-center gap-1.5 min-w-0 h-[1.375rem] pl-2 pr-1.5 rounded-[6px] overflow-hidden',
+        'relative flex items-center gap-1.5 min-w-0 h-[1.375rem] pl-2 pr-1.5 rounded-[7px] overflow-hidden',
         'text-[0.75rem] leading-none',
+        !event && 'tag-glass',
         exam ? 'font-semibold' : 'font-medium',
         item.done && 'opacity-50',
       )}
