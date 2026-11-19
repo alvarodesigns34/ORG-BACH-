@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { takeLandingIntent } from '@/landing/entry'
 import { ArrowLeft, ArrowRight, Check, Plus } from 'lucide-react'
 
 import { LEVELS, levelOf, type CatalogSubject, type StudyLevel } from '@/data/defaults'
@@ -38,7 +40,8 @@ export function Onboarding() {
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [custom, setCustom] = useState<string[]>([])
   const [customDraft, setCustomDraft] = useState('')
-  const [signingIn, setSigningIn] = useState(false)
+  // «Iniciar sesión» desde la web de presentación abre directamente el acceso.
+  const [signingIn, setSigningIn] = useState(() => SYNC_AVAILABLE && takeLandingIntent() === 'signin')
 
   const catalogByName = useMemo(() => {
     const map = new Map<string, CatalogSubject>()
