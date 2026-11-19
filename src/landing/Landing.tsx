@@ -113,7 +113,7 @@ function GlassButton({
   useLiquidButton(ref, size === 'sm' ? 0.16 : 0.24)
   const cls = tone === 'tinted' ? 'glass-tinted' : 'glass-btn'
   return (
-    <button ref={ref} type="button" onClick={onClick} className={`lp-btn lp-btn-${size} lp-btn-${tone} ${cls} ${className}`}>
+    <button ref={ref} type="button" data-liquid="off" onClick={onClick} className={`lp-btn lp-btn-${size} lp-btn-${tone} ${cls} ${className}`}>
       <span className="lp-btn-label">{children}</span>
     </button>
   )
