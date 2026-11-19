@@ -120,41 +120,28 @@ export function StatsView() {
         }
       />
 
-      {/* --- Cifras principales --- */}
-      <div className="card overflow-hidden">
-        <dl className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-hairline">
-          <Stat
-            label="Media global"
-            value={formatGrade(average, scale)}
-            tone={numeralTone(average, scale)}
-          />
-          <Stat
-            label="Mejor asignatura"
-            value={ranking.length > 0 ? formatGrade(ranking[0].average, scale) : '—'}
-            hint={ranking.length > 0 ? ranking[0].subject.shortName : undefined}
-          />
-          <Stat label="Tareas completadas" value={String(tasks.completed)} />
-          <Stat
-            label="A tiempo"
-            value={tasks.onTimeRate === null ? '—' : `${tasks.onTimeRate} %`}
-            hint={tasks.judged > 0 ? `de ${tasks.judged}` : undefined}
-          />
-        </dl>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 mt-5 items-start">
         {/* --- Evolución --- */}
         <div className="lg:col-span-7">
           <Card>
-            <SectionHeader
-              title="Evolución de la media"
-              hint={
-                timeline.length < 2
+            {/* La cifra vive con su curva: la media global encabeza su propia
+                evolución, en vez de ser una casilla más de una tabla. */}
+            <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 mb-5">
+              <div>
+                <p className="text-[0.8125rem] font-semibold text-ink-3">Media global</p>
+                <Numeral
+                  value={formatGrade(average, scale)}
+                  size="xl"
+                  tone={numeralTone(average, scale)}
+                  className="grade-hero-figure mt-1"
+                />
+              </div>
+              <p className="text-[0.8125rem] text-ink-3 max-w-[22rem] text-balance pb-2">
+                {timeline.length < 2
                   ? 'Hará falta más de una nota para dibujar una evolución.'
-                  : 'Cómo ha ido cambiando tu media a medida que entraban notas.'
-              }
-              className="mb-5"
-            />
+                  : `Cómo ha ido cambiando desde ${formatShort(timeline[0].date)}, nota a nota.`}
+              </p>
+            </div>
             {timeline.length < 2 ? (
               <EmptyState
                 compact
@@ -183,6 +170,19 @@ export function StatsView() {
                 }}
               />
             )}
+            <dl className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-hairline -mx-5 sm:-mx-6 -mb-5 sm:-mb-6 mt-5 border-t border-hairline">
+              <Stat
+                label="Mejor asignatura"
+                value={ranking.length > 0 ? formatGrade(ranking[0].average, scale) : '—'}
+                hint={ranking.length > 0 ? ranking[0].subject.shortName : undefined}
+              />
+              <Stat label="Tareas completadas" value={String(tasks.completed)} />
+              <Stat
+                label="A tiempo"
+                value={tasks.onTimeRate === null ? '—' : `${tasks.onTimeRate} %`}
+                hint={tasks.judged > 0 ? `de ${tasks.judged}` : undefined}
+              />
+            </dl>
           </Card>
         </div>
 
