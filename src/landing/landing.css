@@ -511,7 +511,7 @@ html.lp-active body {
   }
   .lp-hero-art {
     order: -1;
-    width: min(108vw, 50svh, 560px);
+    width: min(100vw, 42svh, 560px);
     justify-self: center;
     margin: 0 0 -28px;
   }

@@ -124,7 +124,7 @@ void main() {
       a = d >= 0.0 ? 0.95 : 0.18 * step(0.5, fract(t * 48.0));
     }
     vHead = smoothstep(0.03, 0.0, abs(head - t));
-    size *= 1.25 + vHead * 3.0;
+    size *= 1.6 + vHead * 3.2;
     alpha = a * mix(0.15, 1.0, visible);
   } else {
     // Aeropuertos: un pulso que se abre y se apaga.
@@ -152,7 +152,7 @@ void main() {
     col = vec3(0.93, 0.97, 1.0);
   } else if (vKind < 1.5) {
     a = smoothstep(0.5, 0.0, r);
-    col = mix(vec3(1.0, 0.82, 0.52), vec3(1.0, 0.97, 0.9), vHead);
+    col = mix(vec3(1.0, 0.78, 0.42), vec3(1.0, 0.98, 0.92), vHead);
   } else {
     a = smoothstep(0.5, 0.42, r) * smoothstep(0.28, 0.4, r);
     col = vec3(1.0, 0.86, 0.6);
