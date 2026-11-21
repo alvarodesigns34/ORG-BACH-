@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { AnimatePresence, m as motion } from 'motion/react'
 import {
+  Activity,
+  AudioLines,
   AudioWaveform,
+  Headphones,
+  Info,
   Check,
   ChevronLeft,
   CloudLightning,
@@ -32,15 +36,26 @@ import { ConfirmDialog } from '@/ui/Modal'
 import { haptic, spring } from '@/ui/motion'
 import { Button, CountUp, cx } from '@/ui/primitives'
 import type { MapKind } from './mapStyle'
+import { flightAltitude, flightPhase } from './telemetry'
 import type { StudyAppearance } from './prefs'
 import {
   CHIME_CREDIT,
   SOUNDS,
   SOUND_CREDITS,
+  WAVES,
   loadingSound,
   subscribeSound,
   type SoundId,
+  type WaveId,
+  type WaveMode,
 } from './soundscape'
+
+/** Capa de ondas: qué suena, cómo y con qué intensidad. */
+export interface WaveSettings {
+  waves: WaveId | 'ninguna'
+  waveMode: WaveMode
+  waveLevel: number
+}
 
 // ---------------------------------------------------------------------------
 // Piezas
@@ -250,7 +265,11 @@ function SoundPanel({
   onVolume,
   onKeepAwake,
   onLockCard,
+  wave,
+  onWave,
 }: {
+  wave: WaveSettings
+  onWave: (patch: Partial<WaveSettings>) => void
   sound: SoundId | 'ninguno'
   volume: number
   keepAwake: boolean
@@ -263,10 +282,10 @@ function SoundPanel({
   const loading = useSyncExternalStore(subscribeSound, loadingSound, () => null)
   return (
     <>
-      <p className="text-[0.9375rem] font-semibold mb-3">Sonido de fondo</p>
+      <p className="text-[0.9375rem] font-semibold mb-3">Ambiente</p>
       {/* Rejilla de iconos, como el Centro de control: icono arriba,
           nombre debajo. El activo, en azul y con barritas que se mueven. */}
-      <div className="grid grid-cols-4 gap-x-2 gap-y-3">
+      <div className="grid grid-cols-3 gap-x-2 gap-y-3">
         {[...SOUNDS, { id: 'ninguno' as const, label: 'Silencio' }].map((s) => {
           const active = sound === s.id
           const Icon = SOUND_ICONS[s.id]
@@ -284,7 +303,7 @@ function SoundPanel({
             >
               <span
                 className={cx(
-                  'pressable relative grid place-items-center size-[3.75rem] rounded-[18px] transition-colors duration-200',
+                  'pressable relative grid place-items-center w-full h-14 rounded-[18px] transition-colors duration-200',
                   active
                     ? s.id === 'ninguno'
                       ? 'bg-ink text-canvas'
@@ -331,6 +350,8 @@ function SoundPanel({
         <Volume2 className="size-4 text-ink-3 shrink-0" strokeWidth={2.2} />
       </div>
 
+      <WavesSection wave={wave} onWave={onWave} />
+
       <div className="flex items-center justify-between mt-3 pt-3.5 border-t border-[var(--glass-edge)]">
         <span className="min-w-0">
           <span className="block text-[0.875rem] font-medium">Pantalla siempre encendida</span>
@@ -372,6 +393,133 @@ function SoundPanel({
   )
 }
 
+/**
+ * Ondas: una capa que suena por encima del ambiente elegido (lluvia con ondas
+ * alfa, por ejemplo). Isocrónicas por defecto, que funcionan en el altavoz;
+ * binaurales solo con auriculares. La nota dice lo que se sabe de verdad.
+ */
+function WavesSection({ wave, onWave }: { wave: WaveSettings; onWave: (patch: Partial<WaveSettings>) => void }) {
+  const [about, setAbout] = useState(false)
+  const selected = WAVES.find((w) => w.id === wave.waves)
+  return (
+    <div className="mt-4 pt-3.5 border-t border-[var(--glass-edge)]">
+      <div className="flex items-center justify-between mb-2.5">
+        <p className="text-[0.9375rem] font-semibold flex items-center gap-1.5">
+          <Activity className="size-4 text-ink-3" strokeWidth={2.2} aria-hidden="true" />
+          Ondas
+        </p>
+        <button
+          type="button"
+          aria-expanded={about}
+          onClick={() => setAbout(!about)}
+          className="pressable inline-flex items-center gap-1 text-[0.75rem] font-medium text-ink-3 hover:text-ink-2"
+        >
+          <Info className="size-3.5" strokeWidth={2.2} aria-hidden="true" />
+          ¿Funcionan?
+        </button>
+      </div>
+
+      <div role="radiogroup" aria-label="Ondas" className="grid grid-cols-5 gap-1 p-1 rounded-[16px] bg-[var(--glass-tint)]">
+        {[{ id: 'ninguna' as const, label: 'No', beat: 0 }, ...WAVES].map((w) => {
+          const active = wave.waves === w.id
+          return (
+            <button
+              key={w.id}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              aria-label={w.id === 'ninguna' ? 'Sin ondas' : `${w.label}, ${w.beat} hercios`}
+              onClick={() => {
+                haptic()
+                onWave({ waves: w.id })
+              }}
+              className={cx(
+                'pressable h-12 rounded-[12px] flex flex-col items-center justify-center transition-colors duration-200',
+                active
+                  ? w.id === 'ninguna'
+                    ? 'bg-surface text-ink shadow-[0_1px_3px_rgb(0_0_0/0.15)]'
+                    : 'bg-[#0a84ff] text-white shadow-[0_4px_12px_rgb(10_132_255/0.35)]'
+                  : 'text-ink-2 hover:text-ink',
+              )}
+            >
+              <span className="text-[0.75rem] font-semibold leading-none">{w.label}</span>
+              {w.beat > 0 && (
+                <span className={cx('text-[0.625rem] tabular-nums mt-1 leading-none', active ? 'text-white/80' : 'text-ink-3')}>
+                  {w.beat} Hz
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      <AnimatePresence initial={false}>
+        {selected && (
+          <motion.div
+            key="ajustes"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ ...spring.smooth, bounce: 0 }}
+            className="overflow-hidden"
+          >
+            <p className="text-[0.75rem] text-ink-3 mt-2 px-1">
+              {selected.hint} · {wave.waveMode === 'binaural' ? 'binaurales' : 'isocrónicas'}
+            </p>
+            <div className="flex items-center gap-3 mt-2.5">
+              <span className="text-[0.75rem] text-ink-3 w-16 shrink-0">Intensidad</span>
+              <input
+                type="range"
+                min={0.05}
+                max={1}
+                step={0.01}
+                value={wave.waveLevel}
+                aria-label="Intensidad de las ondas"
+                onChange={(e) => onWave({ waveLevel: Number(e.target.value) })}
+                className="study-range"
+                style={{ '--fill': `${((wave.waveLevel - 0.05) / 0.95) * 100}%` } as React.CSSProperties}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3 mt-3">
+              <span className="min-w-0 flex items-center gap-2">
+                <Headphones className="size-4 text-ink-3 shrink-0" strokeWidth={2.2} aria-hidden="true" />
+                <span>
+                  <span className="block text-[0.875rem] font-medium">Binaurales</span>
+                  <span className="block text-[0.75rem] text-ink-3 leading-snug">Solo con auriculares</span>
+                </span>
+              </span>
+              <Switch
+                checked={wave.waveMode === 'binaural'}
+                onChange={(on) => onWave({ waveMode: on ? 'binaural' : 'isocronico' })}
+                label="Ondas binaurales (con auriculares)"
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence initial={false}>
+        {about && (
+          <motion.p
+            key="nota"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ ...spring.smooth, bounce: 0 }}
+            className="overflow-hidden text-[0.75rem] leading-relaxed text-ink-2"
+          >
+            <span className="block mt-2.5 rounded-[14px] bg-[var(--glass-tint)] px-3 py-2.5">
+              La evidencia es limitada y mixta. Algunos estudios encuentran mejoras pequeñas en atención o
+              ansiedad con ondas binaurales, y otros no ven ningún efecto. Lo que sí está bien establecido es que un
+              sonido constante tapa las distracciones. Pruébalas y quédate con lo que te ayude.
+            </span>
+          </motion.p>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 const SOUND_ICONS: Record<SoundId | 'ninguno', typeof Plane> = {
   cabina: Plane,
   lluvia: CloudRain,
@@ -380,6 +528,7 @@ const SOUND_ICONS: Record<SoundId | 'ninguno', typeof Plane> = {
   viento: Wind,
   chimenea: Flame,
   marron: AudioWaveform,
+  rosa: AudioLines,
   ninguno: VolumeX,
 }
 
@@ -422,7 +571,11 @@ export function MapToolbar({
   appearance,
   onAppearance,
   flight,
+  wave,
+  onWave,
 }: {
+  wave: WaveSettings
+  onWave: (patch: Partial<WaveSettings>) => void
   appearance: StudyAppearance
   onAppearance: (value: StudyAppearance) => void
   map: MapKind
@@ -486,8 +639,10 @@ export function MapToolbar({
             </Popover>
           )}
           {open === 'sonido' && (
-            <Popover key="sonido" className="w-[320px]">
+            <Popover key="sonido" className="w-[328px] max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto overscroll-contain no-scrollbar">
               <SoundPanel
+                wave={wave}
+                onWave={onWave}
                 sound={sound}
                 volume={volume}
                 keepAwake={keepAwake}
@@ -533,10 +688,10 @@ export function MapToolbar({
         <RoundButton
           label="Sonido"
           expanded={open === 'sonido'}
-          active={sound !== 'ninguno'}
+          active={sound !== 'ninguno' || wave.waves !== 'ninguna'}
           onClick={() => setOpen(open === 'sonido' ? null : 'sonido')}
         >
-          {sound === 'ninguno' ? (
+          {sound === 'ninguno' && wave.waves === 'ninguna' ? (
             <VolumeX className="size-[19px]" strokeWidth={2.2} />
           ) : (
             <Volume2 className="size-[19px]" strokeWidth={2.2} />
@@ -651,21 +806,16 @@ export function FlightHud({
         className="study-flight-hud absolute z-10"
       >
         <div className="study-flight-card liquid rounded-[30px] overflow-hidden">
-          <div className="relative z-[2] h-[3px] bg-[var(--glass-tint)]">
-            <motion.div
-              className="h-full bg-[#0a84ff]"
-              animate={{ width: `${progress * 100}%` }}
-              transition={{ duration: 1, ease: 'linear' }}
-            />
-            {layoverMarks.map((at) => (
-              <span
-                key={at}
-                aria-hidden
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 size-2 rounded-full bg-[#ff9f0a] ring-2 ring-[var(--c-surface)]"
-                style={{ left: `${at * 100}%` }}
-              />
-            ))}
-          </div>
+          <FlightTrack
+            from={session.from}
+            to={session.to}
+            progress={progress}
+            layoverMarks={layoverMarks}
+            remainingMs={remainingMs}
+            paused={paused}
+            distanceKm={session.distanceKm}
+            speedKmh={session.plannedMinutes > 0 ? (session.distanceKm / session.plannedMinutes) * 60 : 0}
+          />
           <div className="study-flight-grid relative z-[2] grid items-center">
             <div className="study-flight-clock">
               <p className="text-sm font-medium text-ink-3 mb-1.5">
@@ -749,6 +899,86 @@ export function FlightHud({
         }}
       />
     </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Pista del vuelo y telemetría
+// ---------------------------------------------------------------------------
+
+/**
+ * Arriba de la tarjeta: origen y destino unidos por la pista, con el avión
+ * avanzando sobre ella, las escalas que quedan y una línea de telemetría
+ * (llegada, fase, altitud y velocidad).
+ */
+function FlightTrack({
+  from,
+  to,
+  progress,
+  layoverMarks,
+  remainingMs,
+  paused,
+  speedKmh,
+  distanceKm,
+}: {
+  distanceKm: number
+  from: string
+  to: string
+  progress: number
+  layoverMarks: number[]
+  remainingMs: number
+  paused: boolean
+  speedKmh: number
+}) {
+  const p = Math.min(1, Math.max(0, progress))
+  const arrival = new Date(Date.now() + remainingMs).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
+  const phase = flightPhase(p)
+  const altitude = flightAltitude(p, distanceKm)
+  return (
+    <div className="study-flight-track relative z-[2] px-5 pt-4">
+      <div className="flex items-center gap-3">
+        <span className="font-mono text-[0.8125rem] font-bold tracking-wide text-ink-2">{from}</span>
+        <div className="relative flex-1 h-6" role="progressbar" aria-label="Avance del vuelo" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(p * 100)}>
+          <span aria-hidden className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[2px] rounded-full track-dashes" />
+          <span
+            aria-hidden
+            className="absolute left-0 top-1/2 -translate-y-1/2 h-[3px] rounded-full track-fill"
+            style={{ width: `${p * 100}%` }}
+          />
+          {layoverMarks.map((at) => (
+            <span
+              key={at}
+              aria-hidden
+              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 size-2 rounded-full bg-[#ff9f0a] ring-2 ring-[var(--c-surface)]"
+              style={{ left: `${at * 100}%` }}
+            />
+          ))}
+          <span
+            aria-hidden
+            className={cx('track-plane absolute top-1/2', paused && 'is-paused')}
+            style={{ left: `${p * 100}%` }}
+          >
+            <Plane className="size-4 rotate-45" fill="currentColor" strokeWidth={1.5} />
+          </span>
+        </div>
+        <span className="font-mono text-[0.8125rem] font-bold tracking-wide text-ink-2">{to}</span>
+      </div>
+      <p className="study-flight-telemetry mt-1.5 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-0.5 text-[0.6875rem] font-medium text-ink-3 tabular-nums">
+        <span>
+          {paused ? 'En pausa' : <>Llegada <span className="text-ink-2 font-semibold">{arrival}</span></>}
+        </span>
+        <span aria-hidden>·</span>
+        <span>{phase}</span>
+        <span aria-hidden className="study-telemetry-extra">·</span>
+        <span className="study-telemetry-extra">{altitude.toLocaleString('es')} m</span>
+        {speedKmh > 0 && (
+          <>
+            <span aria-hidden className="study-telemetry-extra">·</span>
+            <span className="study-telemetry-extra">{Math.round(speedKmh).toLocaleString('es')} km/h</span>
+          </>
+        )}
+      </p>
+    </div>
   )
 }
 

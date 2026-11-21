@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 
 import { MAP_KINDS, type MapKind } from './mapStyle'
 import type { SoundId } from './soundscape'
+import { WAVES, type WaveId, type WaveMode } from './waves'
 
 /** Cómo se reparten los descansos de un vuelo. */
 export type LayoverMode = 'no' | 'mitad' | 'pomodoro'
@@ -23,6 +24,12 @@ export interface StudyPrefs {
   quiet: boolean
   sound: SoundId | 'ninguno'
   volume: number
+  /** Capa de ondas por encima del ambiente. */
+  waves: WaveId | 'ninguna'
+  /** Isocrónicas (altavoz o auriculares) o binaurales (solo auriculares). */
+  waveMode: WaveMode
+  /** Intensidad de las ondas respecto al ambiente (0–1). */
+  waveLevel: number
   keepAwake: boolean
   minutes: number
   /** Minutos de cada descanso. */
@@ -50,6 +57,9 @@ const DEFAULTS: StudyPrefs = {
   quiet: false,
   sound: 'cabina',
   volume: 0.7,
+  waves: 'ninguna',
+  waveMode: 'isocronico',
+  waveLevel: 0.5,
   keepAwake: true,
   minutes: 45,
   layover: 10,
@@ -71,6 +81,11 @@ function read(): StudyPrefs {
     if (!MAP_KINDS.includes(prefs.map)) {
       prefs.map = (raw.map as string | undefined) === 'satelite' ? 'relieve' : DEFAULTS.map
     }
+    // Ondas: valores desconocidos (o de una versión futura), a los de serie.
+    if (prefs.waves !== 'ninguna' && !WAVES.some((w) => w.id === prefs.waves)) prefs.waves = 'ninguna'
+    if (prefs.waveMode !== 'isocronico' && prefs.waveMode !== 'binaural') prefs.waveMode = 'isocronico'
+    if (typeof prefs.waveLevel !== 'number' || !Number.isFinite(prefs.waveLevel)) prefs.waveLevel = DEFAULTS.waveLevel
+    prefs.waveLevel = Math.min(1, Math.max(0.05, prefs.waveLevel))
     // Antes solo existía «escala de N minutos a mitad» (0 = ninguna).
     if (raw.layoverMode === undefined && typeof raw.layover === 'number') {
       prefs.layoverMode = raw.layover > 0 ? 'mitad' : 'no'

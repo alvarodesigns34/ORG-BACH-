@@ -9,7 +9,8 @@
  * frecuencias. Se descargan la primera vez que se usan (2–3 MB cada uno) y
  * quedan en caché para usarlos sin conexión.
  *
- * El ruido marrón sí se genera aquí: es ruido puro, no hay nada que grabar.
+ * Los ruidos marrón y rosa se generan aquí: son ruido puro, no hay nada que
+ * grabar. También las ondas (ver «Ondas»), que suenan por encima del ambiente.
  *
  * Cambiar de ambiente funde uno en otro. Safari solo permite arrancar el
  * audio dentro de un toque: `unlockAudio()` en el gesto.
@@ -27,6 +28,7 @@ export type SoundId =
   | 'viento'
   | 'chimenea'
   | 'marron'
+  | 'rosa'
 
 export const SOUNDS: { id: SoundId; label: string }[] = [
   { id: 'cabina', label: 'Cabina' },
@@ -36,6 +38,7 @@ export const SOUNDS: { id: SoundId; label: string }[] = [
   { id: 'viento', label: 'Viento' },
   { id: 'chimenea', label: 'Chimenea' },
   { id: 'marron', label: 'Ruido marrón' },
+  { id: 'rosa', label: 'Ruido rosa' },
 ]
 
 let ctx: AudioContext | null = null
@@ -255,7 +258,7 @@ export function audioRunning(): boolean {
 // Grabaciones
 // ---------------------------------------------------------------------------
 
-type Recorded = Exclude<SoundId, 'marron'>
+type Recorded = Exclude<SoundId, 'marron' | 'rosa'>
 
 /**
  * Cada archivo lleva medio segundo de margen a cada lado copiado del otro
@@ -329,7 +332,7 @@ function load(c: BaseAudioContext, id: Recorded): Promise<AudioBuffer | null> {
 
 /** Descarga y decodifica por adelantado (al elegir asiento) para que el ambiente entre a la vez que el despegue. */
 export function preloadSound(id: SoundId | 'ninguno'): void {
-  if (id === 'ninguno' || id === 'marron') return
+  if (id === 'ninguno' || id === 'marron' || id === 'rosa') return
   const c = context()
   if (c) void load(c, id)
 }
@@ -403,6 +406,200 @@ function playBrown(c: BaseAudioContext, out: AudioNode) {
   return () => stopNode(src)
 }
 
+// ---------------------------------------------------------------------------
+// Ruido rosa (generado)
+// ---------------------------------------------------------------------------
+
+/**
+ * Ruido rosa por el filtro de Paul Kellet: la misma energía en cada octava.
+ * Más brillante que el marrón (se parece a la lluvia constante o a una
+ * cascada lejana) y menos áspero que el blanco.
+ */
+function pinkInto(data: Float32Array) {
+  let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0
+  for (let i = 0; i < data.length; i++) {
+    const w = Math.random() * 2 - 1
+    b0 = 0.99886 * b0 + w * 0.0555179
+    b1 = 0.99332 * b1 + w * 0.0750759
+    b2 = 0.969 * b2 + w * 0.153852
+    b3 = 0.8665 * b3 + w * 0.3104856
+    b4 = 0.55 * b4 + w * 0.5329522
+    b5 = -0.7616 * b5 - w * 0.016898
+    data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11
+    b6 = w * 0.115926
+  }
+}
+
+let pinkBuffer: AudioBuffer | null = null
+
+function pink(c: BaseAudioContext, seconds = 9): AudioBuffer {
+  if (pinkBuffer && pinkBuffer.sampleRate === c.sampleRate) return pinkBuffer
+  const rate = c.sampleRate
+  const n = Math.floor(rate * seconds)
+  const fade = Math.floor(rate * 0.5)
+  const b = c.createBuffer(2, n, rate)
+  for (let ch = 0; ch < 2; ch++) {
+    const out = b.getChannelData(ch)
+    const raw = new Float32Array(n + fade)
+    pinkInto(raw)
+    for (let i = 0; i < n; i++) out[i] = raw[i]
+    for (let i = 0; i < fade; i++) {
+      const k = i / fade
+      out[i] = raw[n + i] * Math.cos((k * Math.PI) / 2) + raw[i] * Math.sin((k * Math.PI) / 2)
+    }
+  }
+  if (c === ctx) pinkBuffer = b
+  return b
+}
+
+function playPink(c: BaseAudioContext, out: AudioNode) {
+  const src = c.createBufferSource()
+  src.buffer = pink(c)
+  src.loop = true
+  src.start(0, Math.random() * src.buffer.duration)
+  // Se recortan los agudos más finos: en el altavoz del iPad sonarían a siseo.
+  const lp = c.createBiquadFilter()
+  lp.type = 'lowpass'
+  lp.frequency.value = 7000
+  lp.Q.value = 0.4
+  src.connect(lp).connect(out)
+  return () => stopNode(src)
+}
+
+// ---------------------------------------------------------------------------
+// Ondas (generadas): capa que suena por encima del ambiente
+// ---------------------------------------------------------------------------
+
+import { WAVES, waveSpec, type WaveId, type WaveMode } from './waves'
+
+export { WAVES, waveSpec, type WaveId, type WaveMode }
+
+/**
+ * Binaural: un tono puro en cada oído, separados `beat` Hz. La «onda» no
+ * suena en el aire: la percibe el cerebro al juntar los dos oídos, así que
+ * solo funciona con auriculares.
+ */
+function playBinaural(c: BaseAudioContext, id: WaveId, out: AudioNode) {
+  const { beat, carrier } = waveSpec(id)
+  const merger = c.createChannelMerger(2)
+  const left = c.createOscillator()
+  const right = c.createOscillator()
+  left.frequency.value = carrier - beat / 2
+  right.frequency.value = carrier + beat / 2
+  left.connect(merger, 0, 0)
+  right.connect(merger, 0, 1)
+  merger.connect(out)
+  left.start()
+  right.start()
+  return () => {
+    stopNode(left)
+    stopNode(right)
+    merger.disconnect()
+  }
+}
+
+/** De un seno (-1…1) a pulsos suaves (0…1): sube y baja sin chasquidos. */
+function pulseCurve(): Float32Array<ArrayBuffer> {
+  const n = 1024
+  const curve = new Float32Array(new ArrayBuffer(n * 4))
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1
+    curve[i] = Math.pow((x + 1) / 2, 2.2)
+  }
+  return curve
+}
+
+/**
+ * Isocrónico: el tono se enciende y apaga `beat` veces por segundo. Se oye
+ * como un latido claro y funciona también por el altavoz.
+ */
+function playIsochronic(c: BaseAudioContext, id: WaveId, out: AudioNode) {
+  const { beat, carrier } = waveSpec(id)
+  const tone = c.createOscillator()
+  tone.frequency.value = carrier
+  const amp = c.createGain()
+  amp.gain.value = 0
+  const lfo = c.createOscillator()
+  lfo.frequency.value = beat
+  const shaper = c.createWaveShaper()
+  shaper.curve = pulseCurve()
+  lfo.connect(shaper).connect(amp.gain)
+  tone.connect(amp).connect(out)
+  tone.start()
+  lfo.start()
+  return () => {
+    stopNode(tone)
+    stopNode(lfo)
+    shaper.disconnect()
+    amp.disconnect()
+  }
+}
+
+/** Nivel de las ondas a intensidad máxima: siempre por debajo del ambiente. */
+// Medido con renderWaves: a igual ganancia, el binaural (tono continuo) da
+// ~1,75 veces el nivel eficaz del isocrónico (pulsos). Se igualan aquí.
+const WAVE_TRIM: Record<WaveMode, number> = { isocronico: 0.22, binaural: 0.125 }
+
+let waves: { key: string; gain: GainNode; stop: () => void; mode: WaveMode } | null = null
+let waveLevel = 0.5
+
+function waveGain(mode: WaveMode, level = waveLevel) {
+  return WAVE_TRIM[mode] * Math.pow(Math.min(1, Math.max(0, level)), 1.5) * (ducked ? 0.15 : 1)
+}
+
+/** Pone a sonar (o cambia) la capa de ondas. Dentro de un toque, como el ambiente. */
+export function playWaves(id: WaveId, mode: WaveMode, level = waveLevel): void {
+  waveLevel = level
+  const c = context()
+  if (!c || !master) return
+  const key = `${id}:${mode}`
+  if (waves?.key === key) {
+    setWaveLevel(level)
+    return
+  }
+  stopWaves()
+  const g = c.createGain()
+  g.gain.value = 0
+  g.connect(master)
+  const halt = mode === 'binaural' ? playBinaural(c, id, g) : playIsochronic(c, id, g)
+  const t = c.currentTime
+  g.gain.setValueAtTime(0.0001, t)
+  // Entrada lenta: un tono que aparece de golpe sobresalta.
+  g.gain.setTargetAtTime(waveGain(mode), t, 0.6)
+  waves = { key, gain: g, stop: halt, mode }
+  notify()
+}
+
+export function stopWaves(): void {
+  if (!waves) return
+  const { gain: g, stop } = waves
+  waves = null
+  if (ctx) {
+    const t = ctx.currentTime
+    g.gain.cancelScheduledValues(t)
+    g.gain.setValueAtTime(g.gain.value, t)
+    g.gain.linearRampToValueAtTime(0, t + FADE_OUT)
+  }
+  window.setTimeout(() => {
+    stop()
+    g.disconnect()
+  }, FADE_OUT * 1000 + 100)
+  notify()
+}
+
+export function setWaveLevel(level: number): void {
+  waveLevel = Math.min(1, Math.max(0, level))
+  if (!ctx || !waves) return
+  const t = ctx.currentTime
+  waves.gain.gain.cancelScheduledValues(t)
+  waves.gain.gain.setValueAtTime(waves.gain.gain.value, t)
+  waves.gain.gain.linearRampToValueAtTime(waveGain(waves.mode), t + 0.15)
+}
+
+export function playingWaves(): string | null {
+  return waves?.key ?? null
+}
+
 function stopNode(node: AudioScheduledSourceNode) {
   try {
     node.stop()
@@ -434,6 +631,7 @@ const TRIM: Record<SoundId, number> = {
   // El fuego es casi todo chasquidos: con menos nivel medio ya suena presente.
   chimenea: 1.5,
   marron: 0.82,
+  rosa: 0.62,
 }
 
 type Listener = () => void
@@ -543,8 +741,8 @@ export function playSound(id: SoundId): void {
   if (!c || !master) return
   if (current?.id === id) return
   wanted = id
-  if (id === 'marron') {
-    start(c, id, (out) => playBrown(c, out))
+  if (id === 'marron' || id === 'rosa') {
+    start(c, id, (out) => (id === 'marron' ? playBrown(c, out) : playPink(c, out)))
     return
   }
   const ready = decoded.get(id)
@@ -591,6 +789,12 @@ let ducked = false
 /** Atenúa (pausa, escala) o restaura el ambiente sin pararlo. */
 export function duck(on: boolean): void {
   ducked = on
+  if (ctx && waves) {
+    const t = ctx.currentTime
+    waves.gain.gain.cancelScheduledValues(t)
+    waves.gain.gain.setValueAtTime(waves.gain.gain.value, t)
+    waves.gain.gain.linearRampToValueAtTime(waveGain(waves.mode), t + 0.8)
+  }
   if (!ctx || !current) return
   const t = ctx.currentTime
   current.gain.gain.cancelScheduledValues(t)
@@ -729,6 +933,7 @@ export async function renderSound(
     out.connect(limiter(c)).connect(c.destination)
   }
   if (id === 'marron') playBrown(c, out)
+  else if (id === 'rosa') playPink(c, out)
   else {
     const b = await load(c, id)
     if (!b) throw new Error('No se pudo cargar ' + id)
@@ -736,4 +941,24 @@ export async function renderSound(
   }
   const rendered = await c.startRendering()
   return rendered.getChannelData(0)
+}
+
+/**
+ * Renderiza unos segundos de ondas sin altavoz (para comprobarlas en pruebas
+ * del navegador): devuelve los dos canales con el nivel real de la capa.
+ */
+export async function renderWaves(
+  id: WaveId,
+  mode: WaveMode,
+  seconds = 2,
+  level = 1,
+): Promise<[Float32Array, Float32Array]> {
+  const c = new OfflineAudioContext(2, Math.floor(48000 * seconds), 48000)
+  const out = c.createGain()
+  out.gain.value = WAVE_TRIM[mode] * Math.pow(level, 1.5)
+  out.connect(c.destination)
+  if (mode === 'binaural') playBinaural(c, id, out)
+  else playIsochronic(c, id, out)
+  const rendered = await c.startRendering()
+  return [rendered.getChannelData(0), rendered.getChannelData(1)]
 }

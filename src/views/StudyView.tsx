@@ -40,7 +40,7 @@ import { SeatPicker, type SeatChoice } from '@/features/study/SeatPicker'
 import { QuickStart, StudyHome } from '@/features/study/StudyHome'
 import { BoardingPass, Takeoff } from '@/features/study/BoardingPass'
 import { FlightHud, LandedCard, LayoverCard, MapToolbar } from '@/features/study/FlightHud'
-import { beginFlightAudio } from '@/features/study/flightAudio'
+import { beginFlightAudio, previewAudio } from '@/features/study/flightAudio'
 import { useNow, useWakeLock } from '@/features/study/hooks'
 import { useStudyMap } from '@/features/study/useStudyMap'
 import { layoverPlan, useStudyPrefs } from '@/features/study/prefs'
@@ -49,6 +49,7 @@ import {
   chime,
   preloadSound,
   setVolume,
+  setWaveLevel,
   type SoundId,
 } from '@/features/study/soundscape'
 
@@ -363,7 +364,7 @@ export default function StudyView() {
       return
     }
     if (following && !active?.pausedAt && !document.hidden) {
-      map.follow(here, flightHeading(flightFrom, flightTo, prog), undefined, 500)
+      map.follow(here, flightHeading(flightFrom, flightTo, prog), undefined, 1000)
     }
   }, [stage, map, flightFrom, flightTo, prog, following, active?.pausedAt])
 
@@ -747,11 +748,27 @@ export default function StudyView() {
             onSound={(id) => {
               setPrefs({ sound: id })
               // En vuelo, el cambio suena ya (y ajusta la tarjeta de bloqueo).
+              // Fuera del vuelo, se escucha unos segundos para poder elegir.
               if (stage === 'vuelo') beginFlightAudio({ ...prefs, sound: id })
+              else if (!active) previewAudio({ ...prefs, sound: id })
             }}
             onVolume={(v) => {
               setPrefs({ volume: v })
               setVolume(v)
+            }}
+            wave={{ waves: prefs.waves, waveMode: prefs.waveMode, waveLevel: prefs.waveLevel }}
+            onWave={(patch) => {
+              setPrefs(patch)
+              const next = { ...prefs, ...patch }
+              if (stage === 'vuelo') {
+                if (patch.waveLevel !== undefined && patch.waves === undefined && patch.waveMode === undefined) {
+                  setWaveLevel(next.waveLevel)
+                } else beginFlightAudio(next)
+              } else if (!active && (patch.waves !== undefined || patch.waveMode !== undefined)) {
+                previewAudio(next)
+              } else if (!active && patch.waveLevel !== undefined) {
+                setWaveLevel(next.waveLevel)
+              }
             }}
             onKeepAwake={(on) => setPrefs({ keepAwake: on })}
             appearance={prefs.appearance}

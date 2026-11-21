@@ -96,7 +96,14 @@ function nightInkFor(look: MapLookOptions): NightInk {
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] }
 
-const PLANE_SVG = `<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 3c2.2 0 3.6 2.6 3.6 6.4V24l20.4 12.2c.8.5 1.3 1.3 1.3 2.2v3.1L35.6 34.8V49l6.2 4.6c.4.3.7.8.7 1.3V58l-10.5-3-10.5 3v-3.1c0-.5.3-1 .7-1.3l6.2-4.6V34.8L6.7 41.5v-3.1c0-.9.5-1.7 1.3-2.2L28.4 24V9.4C28.4 5.6 29.8 3 32 3z"/></svg>`
+/**
+ * Avión de línea visto desde arriba: fuselaje, alas en flecha con motores,
+ * estabilizadores y luces de navegación (roja a babor, verde a estribor y el
+ * destello blanco de la cola). Una copia difuminada hace de sombra en el
+ * suelo: separada del avión, se nota que vuela.
+ */
+const PLANE_SHAPE = `<path d="M32 2.5c2.4 0 3.9 3 3.9 7.2V25l21.6 13.4c.9.6 1.4 1.5 1.4 2.5v2.6L35.9 36.4v13.4l7 5.2c.5.4.8.9.8 1.5v2.4L32 56.2l-11.7 2.7v-2.4c0-.6.3-1.1.8-1.5l7-5.2V36.4L5.1 43.5v-2.6c0-1 .5-1.9 1.4-2.5L28.1 25V9.7c0-4.2 1.5-7.2 3.9-7.2z"/><path d="M17.6 31.2h3.6v6.6a1.8 1.8 0 0 1-3.6 0zM42.8 31.2h3.6v6.6a1.8 1.8 0 0 1-3.6 0z"/>`
+const PLANE_SVG = `<svg class="fm-plane-shadow" viewBox="0 0 64 64" aria-hidden="true">${PLANE_SHAPE}</svg><svg class="fm-plane-body" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="fm-sheen" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".22"/><stop offset=".42" stop-color="#fff" stop-opacity=".0"/><stop offset=".5" stop-color="#fff" stop-opacity=".55"/><stop offset=".58" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".22"/></linearGradient></defs><g fill="currentColor">${PLANE_SHAPE}</g><path fill="url(#fm-sheen)" d="M32 2.5c2.4 0 3.9 3 3.9 7.2v40.1L32 56.2l-3.9-6.4V9.7c0-4.2 1.5-7.2 3.9-7.2z"/><circle class="fm-light fm-light-port" cx="5.9" cy="42.2" r="1.6"/><circle class="fm-light fm-light-starboard" cx="58.1" cy="42.2" r="1.6"/><circle class="fm-light fm-light-strobe" cx="32" cy="57.6" r="1.4"/></svg>`
 
 const ll = (p: LatLon): [number, number] => [p.lon, p.lat]
 
@@ -139,6 +146,10 @@ export class FlightMap {
   private pins = new Map<string, Marker>()
 
   private climbUntil = 0
+
+  /** El avión se desliza entre dos avisos de posición en vez de saltar. */
+  private glideFrame = 0
+  private planeAt: LatLon | null = null
 
   private nightPixels: ImageData | null = null
   private nightTimer = 0
@@ -219,6 +230,7 @@ export class FlightMap {
   }
 
   destroy(): void {
+    window.cancelAnimationFrame(this.glideFrame)
     window.clearTimeout(this.loadTimeout)
     window.cancelAnimationFrame(this.revealFrame)
     window.clearInterval(this.nightTimer)
@@ -537,8 +549,10 @@ export class FlightMap {
   /** El avión en la fracción `progress` de la ruta, apuntando hacia donde va. */
   setPlane(origin: LatLon | null, dest: LatLon | null, progress: number): LatLon | null {
     if (!origin || !dest) {
+      window.cancelAnimationFrame(this.glideFrame)
       this.planeMarker?.remove()
       this.planeMarker = null
+      this.planeAt = null
       return null
     }
     const p = Math.min(1, Math.max(0, progress))
@@ -552,11 +566,38 @@ export class FlightMap {
       this.planeMarker = new Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map' })
         .setLngLat(ll(here))
         .addTo(this.map)
+      this.planeAt = here
     } else {
-      this.planeMarker.setLngLat(ll(here))
+      this.glideTo(here)
     }
     this.planeMarker.setRotation(heading)
     return here
+  }
+
+  /**
+   * Del sitio anterior al nuevo en un segundo, a velocidad constante: el reloj
+   * avisa una vez por segundo y el avión no debe moverse a tirones. Un salto
+   * grande (abrir la vista a mitad de vuelo, volver de segundo plano) es
+   * directo.
+   */
+  private glideTo(target: LatLon) {
+    const marker = this.planeMarker
+    if (!marker) return
+    window.cancelAnimationFrame(this.glideFrame)
+    const from = this.planeAt ?? target
+    this.planeAt = target
+    const jump = Math.abs(from.lat - target.lat) + Math.abs(from.lon - target.lon)
+    if (reduced() || document.hidden || jump > 0.6 || jump === 0) {
+      marker.setLngLat(ll(target))
+      return
+    }
+    const start = performance.now()
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / 1000)
+      marker.setLngLat([from.lon + (target.lon - from.lon) * t, from.lat + (target.lat - from.lat) * t])
+      if (t < 1) this.glideFrame = window.requestAnimationFrame(step)
+    }
+    this.glideFrame = window.requestAnimationFrame(step)
   }
 
   // -------------------------------------------------------------------------

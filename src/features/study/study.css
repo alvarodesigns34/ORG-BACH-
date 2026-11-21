@@ -231,18 +231,47 @@
 
 /* --- El avión --- */
 .fm-plane {
-  width: 36px;
-  height: 36px;
-  color: #fff;
-  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.5)) drop-shadow(0 10px 16px rgb(0 0 0 / 0.35));
+  position: relative;
+  width: 46px;
+  height: 46px;
+  color: #f5f7fa;
 }
 .fm-plane svg {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  fill: currentColor;
+}
+.fm-plane-shadow {
+  fill: rgb(0 0 0 / .42);
+  translate: 7px 11px;
+  scale: .92;
+  filter: blur(2.5px);
+}
+.fm-plane-body {
+  filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / .45));
 }
 .study-map [data-look='light'] .fm-plane {
   color: #0064d2;
+}
+.study-map [data-look='light'] .fm-plane-shadow { fill: rgb(0 30 70 / .28); }
+/* Luces de navegación: fijas a babor y estribor, destello en la cola. */
+.fm-light-port { fill: #ff3b30; filter: drop-shadow(0 0 2px #ff3b30); }
+.fm-light-starboard { fill: #34c759; filter: drop-shadow(0 0 2px #34c759); }
+.fm-light-strobe {
+  fill: #fff;
+  opacity: 0;
+  animation: fm-strobe 1.6s steps(1, end) infinite;
+  filter: drop-shadow(0 0 3px #fff);
+}
+@keyframes fm-strobe {
+  0% { opacity: 1; }
+  6% { opacity: 0; }
+  12% { opacity: 1; }
+  18%, 100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fm-light-strobe { animation: none; opacity: .8; }
 }
 
 /* --- El avión (elegir asiento) -------------------------------------------
@@ -623,6 +652,30 @@
 .study-flight-distance {
   text-align: right;
 }
+/* Pista del vuelo: lo que queda, en trazos; lo recorrido, una estela azul
+   que se ilumina hacia el avión. */
+.track-dashes {
+  background-image: linear-gradient(90deg, var(--c-ink-3) 0 55%, transparent 55% 100%);
+  background-size: 7px 2px;
+  opacity: .45;
+}
+.track-fill {
+  background: linear-gradient(90deg, rgb(10 132 255 / .15), #0a84ff);
+  box-shadow: 0 0 10px rgb(10 132 255 / .55);
+  transition: width 1s linear;
+}
+.track-plane {
+  translate: -50% -50%;
+  color: #0a84ff;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / .25));
+  transition: left 1s linear;
+}
+.track-plane svg { display: block; }
+.track-plane.is-paused { color: var(--c-ink-3); }
+.study-flight-track + .study-flight-grid { padding-top: .75rem; }
+@media (prefers-reduced-motion: reduce) {
+  .track-fill, .track-plane { transition: none; }
+}
 .study-seat-layout {
   display: grid;
   grid-template-columns: minmax(260px, 420px) minmax(0, 360px);
@@ -690,6 +743,13 @@
     width: auto;
   }
   .study-root:not([data-stage='vuelo']) .study-map-buttons { flex-direction: row; }
+  /* En iPhone los paneles de mapa y sonido se abren debajo de la barra y
+     alineados a su borde derecho: a su izquierda no caben y se cortaban. */
+  .study-map-toolbar {
+    flex-direction: column-reverse;
+    align-items: flex-end;
+    gap: .5rem;
+  }
   .study-flight-route {
     left: max(1rem, env(safe-area-inset-left));
     top: calc(max(1rem, env(safe-area-inset-top)) + 3.5rem);
@@ -734,6 +794,7 @@
     text-align: left;
   }
   .study-flight-distance { display: none; }
+  .study-telemetry-extra { display: none; }
 }
 
 @media (prefers-reduced-transparency: reduce) {
