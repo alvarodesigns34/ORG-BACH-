@@ -620,7 +620,7 @@ export function MapToolbar({
       initial={{ opacity: 0, x: 10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ ...spring.smooth, delay: 0.3 }}
-      className="study-map-toolbar absolute z-20 right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] flex items-start gap-3"
+      className="study-chrome study-map-toolbar absolute z-20 right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] flex items-start gap-3"
     >
       <div className="relative">
         <AnimatePresence>
@@ -763,7 +763,7 @@ export function FlightHud({
         initial={{ opacity: 0, y: -10 }}
         animate={ready ? { opacity: 1, y: 0 } : { opacity: 0, y: -10 }}
         transition={{ ...spring.smooth, delay: ready ? 0.05 : 0 }}
-        className="absolute z-10 left-[max(1rem,env(safe-area-inset-left))] top-[max(1rem,env(safe-area-inset-top))]"
+        className="study-chrome absolute z-10 left-[max(1rem,env(safe-area-inset-left))] top-[max(1rem,env(safe-area-inset-top))]"
       >
         <div className="liquid rounded-full">
           <RoundButton label="Salir (el vuelo sigue en el aire)" onClick={onExit}>
@@ -777,7 +777,7 @@ export function FlightHud({
         initial={{ opacity: 0, y: -10, scale: 0.96 }}
         animate={ready ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: -10, scale: 0.96 }}
         transition={{ ...spring.smooth, delay: ready ? 0.12 : 0 }}
-        className="study-flight-route absolute z-10"
+        className="study-chrome study-flight-route absolute z-10"
       >
         <div className="liquid rounded-full flex items-center gap-2 h-12 pl-4 pr-2">
           <span className="relative z-[2] flex items-center gap-2 font-mono text-[0.9375rem] font-bold shrink-0">

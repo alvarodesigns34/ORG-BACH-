@@ -71,6 +71,9 @@ function homePadding(): Padding {
     : { top: 200, right: 38, bottom: 260, left: 38 }
 }
 
+/** Sin tocar nada durante este tiempo en vuelo, la interfaz se aparta. */
+const IDLE_MS = 8000
+
 const HUD_PADDING: Padding = { top: 110, right: 110, bottom: 200, left: 110 }
 const CENTER_PADDING: Padding = { top: 140, right: 140, bottom: 140, left: 140 }
 
@@ -554,6 +557,31 @@ export default function StudyView() {
   const showToolbar =
     stage === 'inicio' || stage === 'reserva' || stage === 'vuelo' || stage === 'aterrizado'
 
+  // En vuelo, sin tocar nada unos segundos, los controles de arriba se
+  // apartan y queda el mapa con el avión y la tarjeta del vuelo. Cualquier
+  // toque, tecla o foco los devuelve. En pausa no se apartan.
+  const [idle, setIdle] = useState(false)
+  const flyingNow = stage === 'vuelo' && !!active && !active.pausedAt
+  useEffect(() => {
+    if (!flyingNow) {
+      setIdle(false)
+      return
+    }
+    let timer = 0
+    const wake = () => {
+      setIdle(false)
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => setIdle(true), IDLE_MS)
+    }
+    wake()
+    const events = ['pointerdown', 'pointermove', 'keydown', 'focusin', 'wheel'] as const
+    for (const e of events) window.addEventListener(e, wake, { passive: true })
+    return () => {
+      window.clearTimeout(timer)
+      for (const e of events) window.removeEventListener(e, wake)
+    }
+  }, [flyingNow])
+
   return (
     <div
       className="study-root fixed inset-0 z-[35] overflow-hidden text-ink"
@@ -562,6 +590,7 @@ export default function StudyView() {
       data-quiet={prefs.quiet ? 'true' : undefined}
       data-tone={tone}
       data-activity={activity ? 'true' : undefined}
+      data-idle={idle ? 'true' : undefined}
     >
       {/* El envoltorio fija el tamaño: MapLibre pone `position: relative` a
           su contenedor y, sin él, el mapa se quedaba con altura cero. */}

@@ -809,3 +809,28 @@
     backdrop-filter: none;
   }
 }
+
+/* Vuelo en reposo: los controles de arriba se apartan (con el mapa a la
+   vista, como en el modo inmersivo de Mapas) y la tarjeta se aquieta. */
+.study-root .study-chrome {
+  transition: opacity .6s ease, translate .6s cubic-bezier(.2, .8, .2, 1);
+}
+.study-root .study-flight-card {
+  transition: opacity .6s ease;
+}
+.study-root[data-idle='true'] .study-chrome {
+  /* !important: Motion deja la opacidad de entrada escrita en el estilo
+     del propio elemento. */
+  opacity: 0 !important;
+  translate: 0 -8px;
+  pointer-events: none;
+}
+.study-root[data-idle='true'] .study-flight-route { translate: -50% -8px; }
+.study-root[data-idle='true'] .study-flight-card { opacity: .82; }
+@media (max-width: 719px) {
+  .study-root[data-idle='true'] .study-flight-route { translate: 0 -8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .study-root[data-idle='true'] .study-chrome { translate: none; }
+  .study-root[data-idle='true'] .study-flight-route { translate: -50% 0; }
+}
