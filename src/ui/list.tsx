@@ -191,7 +191,7 @@ export function RowInput({
           value={value}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
-          className="w-[11rem] max-w-[48vw] bg-transparent text-right text-[1rem] text-ink-3 focus:text-ink placeholder:text-ink-3/70 outline-none focus-visible:outline-none"
+          className="w-[11rem] max-w-[48vw] bg-transparent text-right text-[1rem] text-ink-3 focus:text-ink placeholder:text-ink-3/70 rounded-[6px] px-1 -mr-1 focus-visible:outline-2 focus-visible:outline-accent"
         />
       }
     />
@@ -227,7 +227,7 @@ export function RowSelect<T extends string>({
             id={id}
             value={value}
             onChange={(e) => onChange(e.target.value as T)}
-            className="appearance-none bg-transparent text-right text-[1rem] text-ink-3 pr-5 cursor-pointer outline-none focus-visible:text-accent max-w-[52vw] truncate font-sans"
+            className="appearance-none bg-transparent text-right text-[1rem] text-ink-3 pr-5 cursor-pointer rounded-[6px] focus-visible:text-accent focus-visible:outline-2 focus-visible:outline-accent max-w-[52vw] truncate font-sans"
           >
             {options.map((o) => (
               <option key={o.value} value={o.value}>
@@ -391,7 +391,7 @@ function BareNumber({
           e.currentTarget.blur()
         }
       }}
-      className="w-14 bg-transparent text-right tabular-nums text-ink-3 focus:text-ink outline-none"
+      className="w-14 bg-transparent text-right tabular-nums text-ink-3 focus:text-ink rounded-[6px] px-1 -mr-1 focus-visible:outline-2 focus-visible:outline-accent"
     />
   )
 }

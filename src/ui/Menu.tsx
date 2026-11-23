@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, m as motion } from 'motion/react'
 import { Check } from 'lucide-react'
@@ -33,6 +33,16 @@ interface MenuProps {
   width?: number
 }
 
+function nextEnabled(items: MenuItem[], start: number, step: 1 | -1): number {
+  const len = items.length
+  if (len === 0) return -1
+  for (let offset = 1; offset <= len; offset++) {
+    const idx = (start + step * offset + len * 2) % len
+    if (!items[idx]?.disabled) return idx
+  }
+  return -1
+}
+
 /**
  * Menú contextual ligero.
  *
@@ -40,6 +50,7 @@ interface MenuProps {
  * recorte el `overflow` de una lista. Navegable con flechas, Inicio/Fin y Esc.
  */
 export function Menu({ trigger, items, label, align = 'end', width = 232 }: MenuProps) {
+  const menuId = useId()
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState<{
     top: number
@@ -67,13 +78,9 @@ export function Menu({ trigger, items, label, align = 'end', width = 232 }: Menu
     const origin = `${originX}px ${up ? '100%' : '0%'}`
 
     setPosition({ top: Math.max(8, top), left, origin })
-    setActiveIndex(
-      Math.max(
-        0,
-        items.findIndex((i) => i.selected),
-      ),
-    )
-  }, [open, items, align])
+    const initial = items.findIndex((i) => i.selected && !i.disabled)
+    setActiveIndex(initial >= 0 ? initial : Math.max(0, items.findIndex((i) => !i.disabled)))
+  }, [open, items, align, width])
 
   useEffect(() => {
     if (!open) return
@@ -128,20 +135,34 @@ export function Menu({ trigger, items, label, align = 'end', width = 232 }: Menu
         break
       case 'ArrowDown':
         event.preventDefault()
-        setActiveIndex((i) => (i + 1) % items.length)
+        setActiveIndex((i) => {
+          const next = nextEnabled(items, i, 1)
+          return next >= 0 ? next : i
+        })
         break
       case 'ArrowUp':
         event.preventDefault()
-        setActiveIndex((i) => (i - 1 + items.length) % items.length)
+        setActiveIndex((i) => {
+          const prev = nextEnabled(items, i, -1)
+          return prev >= 0 ? prev : i
+        })
         break
       case 'Home':
         event.preventDefault()
-        setActiveIndex(0)
+        setActiveIndex(() => Math.max(0, items.findIndex((item) => !item.disabled)))
         break
-      case 'End':
+      case 'End': {
         event.preventDefault()
-        setActiveIndex(items.length - 1)
+        let last = -1
+        for (let idx = items.length - 1; idx >= 0; idx--) {
+          if (!items[idx]?.disabled) {
+            last = idx
+            break
+          }
+        }
+        if (last >= 0) setActiveIndex(last)
         break
+      }
       case 'Enter':
       case ' ':
         event.preventDefault()
@@ -149,6 +170,10 @@ export function Menu({ trigger, items, label, align = 'end', width = 232 }: Menu
         break
     }
   }
+
+  const activeItem = items[activeIndex]
+  const activeDomId =
+    activeItem && !activeItem.disabled ? `${menuId}-item-${activeItem.id}` : undefined
 
   return (
     <>
@@ -165,6 +190,7 @@ export function Menu({ trigger, items, label, align = 'end', width = 232 }: Menu
               ref={menuRef}
               role="menu"
               aria-label={label}
+              aria-activedescendant={activeDomId}
               tabIndex={-1}
               onKeyDown={onKeyDown}
               initial={{ opacity: 0, scale: 0.35, filter: 'blur(8px)' }}
@@ -190,11 +216,12 @@ export function Menu({ trigger, items, label, align = 'end', width = 232 }: Menu
                       <div className="mx-3 my-1.5 h-px bg-[var(--glass-edge)]" aria-hidden />
                     )}
                     <button
+                      id={`${menuId}-item-${item.id}`}
                       type="button"
                       role="menuitem"
                       disabled={item.disabled}
                       onClick={() => choose(item)}
-                      onPointerEnter={() => setActiveIndex(index)}
+                      onPointerEnter={() => !item.disabled && setActiveIndex(index)}
                       className={cx(
                         'w-full flex items-center gap-3 px-3 h-11 rounded-[14px] text-left',
                         'text-[0.9375rem] transition-colors duration-100 disabled:opacity-40',

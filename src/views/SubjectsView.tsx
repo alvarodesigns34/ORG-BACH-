@@ -1,14 +1,15 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Archive, BookOpen, ChevronRight, Plus } from 'lucide-react'
 
 import { courseLine } from '@/data/defaults'
 import { daysUntil, formatShort } from '@/domain/dates'
+import { clockOf, isExamOver } from '@/domain/exams'
 import { formatGrade, numeralTone } from '@/domain/grades'
 import { colorVar, quietVar } from '@/domain/palette'
 import { isDone } from '@/domain/tasks'
 import { hrefFor } from '@/router'
 import { useDispatch, useSettings, useStore, useToday } from '@/state/StoreProvider'
-import { useSubjectResults, useSubjects } from '@/state/selectors'
+import { useMinuteClock, useSubjectMap, useSubjectResults, useSubjects } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
 import { WeekSchedule } from '@/features/schedule/WeekSchedule'
 import { SubjectEditor } from '@/features/subjects/SubjectEditor'
@@ -17,14 +18,18 @@ import { Button, Card, EmptyState, Numeral, cx } from '@/ui/primitives'
 export function SubjectsView() {
   const settings = useSettings()
   const today = useToday()
+  const minute = useMinuteClock()
   const { data } = useStore()
   const subjects = useSubjects()
+  const subjectMap = useSubjectMap()
   const dispatch = useDispatch()
   const archived = data.subjects
     .filter((s) => s.archived)
     .sort((a, b) => a.name.localeCompare(b.name, 'es'))
   const [showArchived, setShowArchived] = useState(false)
   const results = useSubjectResults(settings.activeTerm)
+  const gradeIds = useMemo(() => new Set(data.grades.map((g) => g.id)), [data.grades])
+  const clock = useMemo(() => clockOf(new Date(minute * 60_000)), [minute])
 
   const [creating, setCreating] = useState(false)
 
@@ -71,8 +76,13 @@ export function SubjectsView() {
               (t) => t.subjectId === subject.id && !isDone(t),
             ).length
             const nextExam = data.exams
-              .filter((e) => e.subjectId === subject.id && e.date >= today)
-              .sort((a, b) => a.date.localeCompare(b.date))[0]
+              .filter(
+                (e) =>
+                  e.subjectId === subject.id &&
+                  !(e.gradeEntryId && gradeIds.has(e.gradeEntryId)) &&
+                  !isExamOver({ ...e, gradeEntryId: undefined }, subjectMap, clock),
+              )
+              .sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))[0]
             const examSoon = nextExam && daysUntil(nextExam.date, today) <= 6
             const detail = [
               pendingTasks > 0
@@ -135,7 +145,7 @@ export function SubjectsView() {
             type="button"
             onClick={() => setShowArchived((v) => !v)}
             aria-expanded={showArchived}
-            className="pressable px-4 mb-2 inline-flex items-center gap-2 text-[0.9375rem] font-semibold text-ink-2"
+            className="pressable min-h-[44px] px-4 py-2 mb-1 inline-flex items-center gap-2 rounded-full text-[0.9375rem] font-semibold text-ink-2 hover:bg-fill/60"
           >
             <Archive className="size-4" aria-hidden="true" />
             Archivadas ({archived.length})

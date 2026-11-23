@@ -133,8 +133,12 @@ export function GradeEditor({ open, onClose, grade, defaults }: GradeEditorProps
         (g.categoryId ?? '') === form.categoryId,
     )
     const used = siblings.reduce((sum, g) => sum + (g.weight || 0), 0)
-    return round(100 - used, 2)
-  }, [data.grades, form.subjectId, form.term, form.categoryId, grade?.id])
+    const categoriesUsed =
+      !form.categoryId && categories.length > 0
+        ? categories.reduce((sum, c) => sum + c.weight, 0)
+        : 0
+    return round(Math.max(0, 100 - categoriesUsed) - used, 2)
+  }, [data.grades, form.subjectId, form.term, form.categoryId, grade?.id, categories])
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }))

@@ -77,8 +77,20 @@ export function GoalEditor({ open, onClose, goal }: GoalEditorProps) {
   }, [kind, scope, parsedTarget, subjectId, subjects, touchedTitle])
 
   const submit = () => {
-    if (!Number.isFinite(parsedTarget) || parsedTarget <= 0 || (kind === 'estudio' && !Number.isInteger(parsedTarget))) {
-      setError(kind === 'estudio' ? 'Escribe un número entero de minutos.' : 'Escribe la cifra a la que quieres llegar.')
+    if (!Number.isFinite(parsedTarget) || parsedTarget <= 0) {
+      setError('Escribe la cifra a la que quieres llegar.')
+      return
+    }
+    if (kind === 'estudio' && !Number.isInteger(parsedTarget)) {
+      setError('Escribe un número entero de minutos.')
+      return
+    }
+    if (kind === 'tareas' && !Number.isInteger(parsedTarget)) {
+      setError('Escribe un número entero de tareas.')
+      return
+    }
+    if (kind === 'media' && parsedTarget > settings.gradeScale.max) {
+      setError(`La nota objetivo no puede superar ${settings.gradeScale.max}.`)
       return
     }
     if (!title.trim()) {

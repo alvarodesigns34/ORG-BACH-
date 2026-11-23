@@ -75,7 +75,26 @@ const countsOf = (data: AppData): SnapshotMeta['counts'] => ({
 
 /** Un curso vacío no merece copia: no hay nada que recuperar. */
 const isEmpty = (data: AppData) =>
-  data.subjects.length + data.tasks.length + data.grades.length + data.exams.length + data.sessions.length === 0
+  data.subjects.length +
+    data.tasks.length +
+    data.grades.length +
+    data.exams.length +
+    data.events.length +
+    data.goals.length +
+    data.sessions.length ===
+  0
+
+export async function clearSnapshots(): Promise<void> {
+  lastDaily = null
+  checkingDaily = null
+  try {
+    await run('readwrite', (store) => {
+      store.clear()
+    })
+  } catch {
+    // Si IndexedDB no está disponible no hay copias que borrar.
+  }
+}
 
 export async function listSnapshots(): Promise<SnapshotMeta[]> {
   try {

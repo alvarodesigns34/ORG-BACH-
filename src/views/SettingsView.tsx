@@ -82,10 +82,21 @@ export function SettingsView({ section }: { section?: string | null }) {
   // En iPad abre la hoja de compartir («Guardar en Archivos»); en el resto,
   // descarga el archivo (ver `exportBackup`).
   const calendarDetail = (() => {
-    const sel = icsSelection({ tasks: data.tasks, exams: data.exams, subjects: data.subjects, today: todayISO() })
-    const t = sel.tasks.length
-    const e = sel.exams.length
-    return `${t} ${t === 1 ? 'tarea' : 'tareas'} con fecha y ${e} ${e === 1 ? 'examen' : 'exámenes'}, en un archivo .ics`
+    const sel = icsSelection({
+      tasks: data.tasks,
+      exams: data.exams,
+      events: data.events,
+      subjects: data.subjects,
+      today: todayISO(),
+    })
+    const parts = [
+      `${sel.tasks.length} ${sel.tasks.length === 1 ? 'tarea' : 'tareas'}`,
+      `${sel.exams.length} ${sel.exams.length === 1 ? 'examen' : 'exámenes'}`,
+    ]
+    if (sel.events.length > 0) {
+      parts.push(`${sel.events.length} ${sel.events.length === 1 ? 'evento' : 'eventos'}`)
+    }
+    return `${parts.join(', ')}, en un archivo .ics`
   })()
   const exportData = async () => {
     if (await exportBackup(data)) setNotice({ tone: 'ok', text: 'Copia guardada correctamente.' })

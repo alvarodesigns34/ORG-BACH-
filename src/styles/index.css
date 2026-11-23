@@ -46,6 +46,7 @@
 
   /* --- Estados: solo con significado --- */
   --c-danger: #c40014;
+  --c-danger-fill: #c40014;
   --c-danger-quiet: #ffebed;
   --c-warn: #a64b00;
   --c-warn-quiet: #fff2e2;
@@ -155,6 +156,7 @@
   --c-accent-quiet: #0d2440;
 
   --c-danger: #ff7a72;
+  --c-danger-fill: #d92d20;
   --c-danger-quiet: #3a1513;
   --c-warn: #ffb340;
   --c-warn-quiet: #33240b;
@@ -722,6 +724,7 @@ html {
 @media (prefers-reduced-transparency: reduce) {
   .edge-top,
   .edge-top-blur,
+  .edge-top-lg-blur,
   .edge-bottom {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -731,6 +734,9 @@ html {
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .glass,
   .glass-bar,
+  .glass-btn,
+  .sheet-glass,
+  .segmented,
   .liquid {
     background: var(--c-surface);
   }
@@ -744,6 +750,8 @@ html {
   }
   .glass,
   .glass-bar,
+  .sheet-glass,
+  .segmented,
   .liquid {
     background: var(--c-surface);
     -webkit-backdrop-filter: none;

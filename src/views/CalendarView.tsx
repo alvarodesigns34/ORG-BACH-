@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CalendarPlus, Check, ChevronLeft, ChevronRight, GripVertical, ListPlus, Plus } from 'lucide-react'
 
 import {
@@ -17,6 +17,7 @@ import {
 } from '@/domain/dates'
 import { colorVar } from '@/domain/palette'
 import type { CalendarEvent, Exam, Subject, Task } from '@/domain/types'
+import { useRoute } from '@/router'
 import { useDispatch, useStore, useSettings, useToday } from '@/state/StoreProvider'
 import { DragGhost, useDragToDay, type DragState } from '@/features/tasks/dragToDay'
 import { useToast } from '@/ui/Toast'
@@ -30,6 +31,8 @@ import { Button, EmptyState, IconButton, Segmented, cx } from '@/ui/primitives'
 
 type CalendarMode = 'mes' | 'semana' | 'dia'
 
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/
+
 /** Marca de tipo: forma distinta por tipo, no solo color. */
 const KIND_STYLE: Record<DayItem['kind'], { label: string; shape: string }> = {
   tarea: { label: 'Tarea', shape: 'rounded-full' },
@@ -38,21 +41,32 @@ const KIND_STYLE: Record<DayItem['kind'], { label: string; shape: string }> = {
 }
 
 export function CalendarView() {
+  const { route } = useRoute()
   const settings = useSettings()
   const today = useToday()
   const { data } = useStore()
   const index = useCalendarIndex()
   const subjects = useSubjectMap()
 
+  const dayParam = route.params.get('dia')
+  const initialDay = dayParam && DAY_RE.test(dayParam) ? dayParam : today
+
   const [mode, setMode] = useState<CalendarMode>('mes')
-  const [cursor, setCursor] = useState(today)
-  const [selected, setSelected] = useState(today)
+  const [cursor, setCursor] = useState(initialDay)
+  const [selected, setSelected] = useState(initialDay)
   const [creating, setCreating] = useState<'tarea' | 'examen' | 'evento' | null>(null)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [editingExam, setEditingExam] = useState<Exam | null>(null)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
   const dispatch = useDispatch()
   const toast = useToast()
+
+  useEffect(() => {
+    if (dayParam && DAY_RE.test(dayParam)) {
+      setCursor(dayParam)
+      setSelected(dayParam)
+    }
+  }, [dayParam])
 
   // Arrastrar una tarea (de «Por planificar» o del día) a otro día le pone
   // esa fecha. Se puede deshacer.
@@ -155,18 +169,21 @@ export function CalendarView() {
         }
         toolbar={
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center justify-between gap-3 md:justify-start md:gap-4 min-w-0">
-              <h2 className="text-[1.5rem] font-bold tracking-[-0.015em] first-letter:uppercase truncate">
+            <div className="flex items-center justify-between gap-2 sm:gap-3 md:justify-start md:gap-4 min-w-0">
+              <h2 className="text-[1.25rem] sm:text-[1.5rem] font-bold tracking-[-0.015em] first-letter:uppercase truncate">
                 {heading}
               </h2>
-              <div className="glass-btn flex items-center gap-0.5 shrink-0 rounded-full p-[3px]">
+              <div
+                data-liquid="off"
+                className="glass-btn flex items-center gap-0.5 shrink-0 rounded-full p-[3px]"
+              >
                 <IconButton label="Anterior" size="sm" className="!size-9 hover:!bg-[var(--glass-tint)]" onClick={() => step(-1)}>
                   <ChevronLeft className="size-[18px] text-ink-2" strokeWidth={2.4} />
                 </IconButton>
                 <button
                   type="button"
                   onClick={goToday}
-                  className="pressable h-9 px-3.5 rounded-full text-[0.9375rem] font-semibold text-accent hover:bg-[var(--glass-tint)] transition-colors"
+                  className="pressable h-9 px-3 rounded-full text-[0.875rem] sm:text-[0.9375rem] font-semibold text-accent hover:bg-[var(--glass-tint)] transition-colors"
                 >
                   Hoy
                 </button>
@@ -259,7 +276,7 @@ export function CalendarView() {
             />
           )}
           {unplanned.length > 0 && (
-            <section aria-label="Por planificar">
+            <section aria-label="Por planificar" className="min-w-0">
               <div className="flex items-baseline justify-between px-1 mb-2.5">
                 <h2 className="text-[1.125rem] font-bold tracking-[-0.012em]">Por planificar</h2>
                 <span className="text-[0.75rem] text-ink-3">Arrastra a un día</span>
@@ -666,7 +683,7 @@ function DayPanel({
   const date = parseDay(day)
 
   return (
-    <section className={cx('xl:sticky xl:top-6', expanded && 'xl:static')}>
+    <section className={cx('min-w-0 xl:sticky xl:top-20', expanded && 'xl:static')}>
       <div className="flex items-end justify-between gap-3 px-1 mb-2.5">
         <div className="min-w-0">
           <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.04em] text-ink-3">
@@ -693,6 +710,7 @@ function DayPanel({
               const color = subject ? colorVar(subject.color) : 'var(--c-ink-3)'
               const exam = item.kind === 'examen' ? data.exams.find((e) => e.id === item.id) : null
               const editable = true
+              const draggable = item.kind === 'tarea' && !item.done
 
               const body = (
                 <>
@@ -742,12 +760,12 @@ function DayPanel({
                   key={item.id}
                   className={cx(
                     i > 0 && 'inset-separator',
-                    'relative',
+                    'relative flex items-center',
                     drag?.taskId === item.id && 'opacity-40',
                   )}
                   // Las tareas se pueden llevar a otro día arrastrando.
                   onPointerDown={
-                    item.kind === 'tarea' && !item.done
+                    draggable
                       ? onDragStart({ id: item.id, title: item.title }, colorOf(item.subjectId))
                       : undefined
                   }
@@ -757,12 +775,22 @@ function DayPanel({
                       type="button"
                       onClick={() => onOpen(item)}
                       aria-label={`Editar ${KIND_STYLE[item.kind].label.toLowerCase()}: ${item.title}`}
-                      className="w-full text-left flex items-start gap-2.5 pl-2 pr-4 py-3 active:bg-fill hover:bg-fill/50 transition-colors duration-150"
+                      className="flex-1 min-w-0 text-left flex items-start gap-2.5 pl-2 pr-3 py-3 active:bg-fill hover:bg-fill/50 transition-colors duration-150"
                     >
                       {body}
                     </button>
                   ) : (
-                    <div className="flex items-start gap-3 px-4 py-3">{body}</div>
+                    <div className="flex-1 min-w-0 flex items-start gap-3 px-4 py-3">{body}</div>
+                  )}
+                  {draggable && (
+                    <span
+                      data-drag-handle
+                      aria-hidden
+                      title="Arrastra a otro día"
+                      className="grid place-items-center size-9 mr-1 shrink-0 text-ink-3 touch-none cursor-grab active:cursor-grabbing"
+                    >
+                      <GripVertical className="size-4" strokeWidth={2.2} />
+                    </span>
                   )}
                 </li>
               )

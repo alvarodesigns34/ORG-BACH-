@@ -16,6 +16,7 @@ import {
   NotebookPen,
   PanelLeft,
   Plus,
+  Search,
   Sparkle,
   type LucideIcon,
 } from 'lucide-react'
@@ -40,6 +41,8 @@ interface Chrome {
   openCreate: (kind?: CreateKind) => void
   /** Abre el asistente; con «voice», empieza a dictar directamente. */
   openAssistant: (mode?: 'text' | 'voice') => void
+  /** Abre la búsqueda global y paleta de acciones (⌘K). */
+  openSearch: () => void
   /** Hay asignaturas: exámenes y notas necesitan una. */
   hasSubjects: boolean
 }
@@ -47,6 +50,7 @@ interface Chrome {
 const ChromeContext = createContext<Chrome>({
   openCreate: () => {},
   openAssistant: () => {},
+  openSearch: () => {},
   hasSubjects: false,
 })
 
@@ -160,11 +164,14 @@ export function useScrolledPast(ref: RefObject<HTMLElement | null>): {
   const [state, setState] = useState({ past: false, scrolled: false })
   useEffect(() => {
     let frame = 0
+    let safeTop = 0
+    const readSafeTop = () => {
+      safeTop =
+        parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-top')) || 0
+    }
     const check = () => {
       frame = 0
       const node = ref.current
-      const safeTop =
-        parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-top')) || 0
       const scrolled = window.scrollY > 2
       const past = !!node && scrolled && node.getBoundingClientRect().bottom < safeTop + TOP_BAR
       setState((prev) =>
@@ -174,13 +181,18 @@ export function useScrolledPast(ref: RefObject<HTMLElement | null>): {
     const onScroll = () => {
       if (!frame) frame = requestAnimationFrame(check)
     }
+    const onResize = () => {
+      readSafeTop()
+      onScroll()
+    }
+    readSafeTop()
     check()
     window.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('resize', onScroll)
+    window.addEventListener('resize', onResize)
     return () => {
       cancelAnimationFrame(frame)
       window.removeEventListener('scroll', onScroll)
-      window.removeEventListener('resize', onScroll)
+      window.removeEventListener('resize', onResize)
     }
   }, [ref])
   return state
@@ -203,7 +215,7 @@ export interface BackLink {
  * - A la izquierda, la vuelta atrás cuando la hay.
  * - En el centro, el título pequeño, que aparece cuando el grande sale de la
  *   pantalla.
- * - A la derecha, el asistente y el avatar (Ajustes).
+ * - A la derecha, buscar, el asistente y el avatar (Ajustes).
  *
  * Va en un portal: la entrada animada de cada sección usa `transform`, y un
  * elemento fijo dentro de un ancestro transformado se mueve con él.
@@ -235,7 +247,7 @@ export function TopBar({
       <div aria-hidden className="edge-top-blur lg:hidden" style={{ opacity: scrolled ? 1 : 0 }} />
       <div className="lg:hidden fixed top-0 inset-x-0 z-40 pt-[env(safe-area-inset-top)] pointer-events-none">
         <div
-          className="relative flex items-center justify-between gap-2 px-[max(0.75rem,env(safe-area-inset-left))]"
+          className="relative flex items-center justify-between gap-2 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]"
           style={{ height: TOP_BAR }}
         >
           {back ? (
@@ -258,7 +270,7 @@ export function TopBar({
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 exit={{ opacity: 0, y: 6, filter: 'blur(4px)', transition: exitFast }}
                 transition={spring.snappy}
-                className="absolute inset-x-28 text-center text-[1.0625rem] font-semibold tracking-[-0.012em] truncate"
+                className="absolute inset-x-32 text-center text-[1.0625rem] font-semibold tracking-[-0.012em] truncate"
               >
                 {title}
               </motion.p>
@@ -279,7 +291,8 @@ export function TopBar({
  * con el título pequeño en el centro cuando el grande sale de la pantalla.
  *
  * - A la izquierda, mostrar la barra lateral (si está oculta) y volver.
- * - A la derecha, el asistente (si la barra lateral está oculta) y «+».
+ * - A la derecha, búsqueda rápida (⌘K), el asistente y Ajustes (si la barra
+ *   lateral está oculta) y «+».
  */
 function PadToolbar({
   title,
@@ -295,7 +308,7 @@ function PadToolbar({
   actions?: ReactNode
 }) {
   const { hidden } = useSidebarPrefs()
-  const { openAssistant } = useChrome()
+  const { openAssistant, openSearch } = useChrome()
   return (
     <>
       <div aria-hidden className="edge-top-lg hidden lg:block" style={{ opacity: scrolled ? 1 : 0 }} />
@@ -355,6 +368,18 @@ function PadToolbar({
           </AnimatePresence>
 
           <div className="chrome-controls pointer-events-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                haptic()
+                openSearch()
+              }}
+              aria-label="Buscar en Órbita (⌘K)"
+              title="Buscar en Órbita (⌘K)"
+              className="glass-btn pressable grid place-items-center size-11 rounded-full text-ink-2 hover:text-ink"
+            >
+              <Search className="size-[19px]" strokeWidth={2.1} />
+            </button>
             <AnimatePresence initial={false}>
               {hidden && (
                 <motion.button
@@ -375,6 +400,7 @@ function PadToolbar({
                 </motion.button>
               )}
             </AnimatePresence>
+            {hidden && <AccountAvatar size={44} />}
             {actions}
             {/* Si la pantalla ya tiene su acción principal (tintada), el «+»
                 es de cristal claro: una sola acción tintada por barra. */}
@@ -395,7 +421,7 @@ export function AssistantIcon({ className }: { className?: string }) {
 }
 
 /**
- * Asistente y avatar, arriba a la derecha. Crear va abajo, junto al pulgar.
+ * Búsqueda, asistente y avatar, arriba a la derecha. Crear va abajo, junto al pulgar.
  *
  * El asistente es una cápsula con nombre, no un micrófono suelto: se le
  * escribe o se le habla. Cuando el título pequeño ocupa el centro de la barra,
@@ -409,9 +435,20 @@ export function ChromeActions({
   /** Solo el icono (el título pequeño está a la vista). */
   compact?: boolean
 }) {
-  const { openAssistant } = useChrome()
+  const { openAssistant, openSearch } = useChrome()
   return (
     <div className={cx('flex items-center gap-2', className)}>
+      <button
+        type="button"
+        onClick={() => {
+          haptic()
+          openSearch()
+        }}
+        aria-label="Buscar en Órbita"
+        className="pressable liquid relative grid place-items-center size-10 rounded-full text-ink-2 hover:text-ink"
+      >
+        <Search className="relative z-[2] size-[18px]" strokeWidth={2.2} />
+      </button>
       <button
         type="button"
         onClick={() => {
@@ -483,8 +520,8 @@ export function AccountAvatar({
         width: size,
         height: size,
         fontSize: size * 0.42,
-        // El de los contactos de iOS: degradado gris con luz arriba.
-        background: 'linear-gradient(180deg, #a9a9b2 0%, #7c7c86 100%)',
+        // Degradado neutro con contraste >= 4,5:1 frente a la inicial blanca (WCAG AA).
+        background: 'linear-gradient(180deg, #74747e 0%, #55555f 100%)',
       }}
     >
       {initial}

@@ -1,7 +1,7 @@
 import { ChevronRight } from 'lucide-react'
 
 import { daysUntil, MONTHS_LONG, parseDay, WEEKDAYS_LONG } from '@/domain/dates'
-import { colorVar } from '@/domain/palette'
+import { colorVar, quietVar } from '@/domain/palette'
 import { formatPercent } from '@/domain/grades'
 import type { Exam, Subject } from '@/domain/types'
 import { cx } from '@/ui/primitives'
@@ -46,15 +46,20 @@ export function ExamCard({ exam, subject, today, onOpen, hideSubject }: ExamCard
     >
       <span
         aria-hidden
-        className="grid w-11 shrink-0 overflow-hidden rounded-[10px] bg-fill text-center"
+        className="grid w-11 shrink-0 overflow-hidden rounded-[10px] bg-fill border border-hairline text-center"
       >
         <span
-          className="text-[0.625rem] font-bold uppercase tracking-[0.04em] leading-[1.6] text-white"
-          style={{ background: tint }}
+          className="text-[0.625rem] font-bold uppercase tracking-[0.04em] leading-[1.6]"
+          style={{
+            background: subject ? quietVar(subject.color) : 'var(--c-fill-2)',
+            color: subject ? tint : 'var(--c-ink-2)',
+          }}
         >
           {WEEKDAYS_LONG[date.getDay()].slice(0, 3)}
         </span>
-        <span className="numeral text-[1.25rem] leading-[1.6] text-ink">{date.getDate()}</span>
+        <span className="numeral text-[1.25rem] leading-[1.6] text-ink bg-surface">
+          {date.getDate()}
+        </span>
       </span>
 
       <span className="flex-1 min-w-0">

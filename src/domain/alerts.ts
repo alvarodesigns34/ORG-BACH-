@@ -8,7 +8,7 @@
 
 import { daysUntil, formatDuration, relativeDay } from './dates.ts'
 import { clockOf, isExamOver } from './exams.ts'
-import { formatGrade } from './grades.ts'
+import { formatGrade, round } from './grades.ts'
 import type { SubjectResult } from './grades.ts'
 import { isOverdue } from './tasks.ts'
 import type { DateISO, Exam, GradeScale, Subject, Task } from './types.ts'
@@ -66,14 +66,13 @@ export function detectAlerts(input: AlertInput): Alert[] {
   // cae en el mismo día que `today`.
   const clock = clockOf(new Date(now))
   const archived = new Set(subjects.filter((s) => s.archived).map((s) => s.id))
-  const upcoming = exams
+  const pendingAll = exams
     .filter((e) => !archived.has(e.subjectId) && !e.gradeEntryId)
     .filter((e) => clock.day !== today || !isExamOver(e, subjects, clock))
-    .filter((e) => {
-      const d = daysUntil(e.date, today)
-      return d >= 0 && d <= examAlertDays
-    })
+    .filter((e) => daysUntil(e.date, today) >= 0)
     .sort((a, b) => a.date.localeCompare(b.date))
+
+  const upcoming = pendingAll.filter((e) => daysUntil(e.date, today) <= examAlertDays)
 
   const tomorrow = upcoming.filter((e) => daysUntil(e.date, today) <= 1)
   for (const exam of tomorrow) {
@@ -84,7 +83,7 @@ export function detectAlerts(input: AlertInput): Alert[] {
       level: 'critico',
       title: `Examen ${when}: ${subject?.name ?? 'sin asignatura'}`,
       detail: exam.topics ? `${exam.title} — ${exam.topics}` : exam.title,
-      href: '#/calendario',
+      href: '#/examenes',
     })
   }
 
@@ -101,7 +100,38 @@ export function detectAlerts(input: AlertInput): Alert[] {
           ? `Examen ${relativeDay(next.date, today).toLowerCase()}`
           : `${later.length} exámenes en los próximos ${examAlertDays} días`,
       detail: `El siguiente: ${subject?.name ?? 'sin asignatura'} — ${next.title}, ${relativeDay(next.date, today).toLowerCase()}.`,
-      href: '#/calendario',
+      href: '#/examenes',
+    })
+  }
+
+  // --- Acumulación de exámenes (semana de exámenes) ---
+  // En Bachillerato los exámenes suelen agruparse en bloques de 2–4 días.
+  // Detectar 2+ exámenes en 48 h o 3+ en 7 días permite adelantar repaso.
+  const examsNext7 = pendingAll.filter((e) => daysUntil(e.date, today) <= 7)
+  let tightCluster = false
+  for (let i = 0; i < examsNext7.length - 1; i++) {
+    if (daysUntil(examsNext7[i + 1].date, examsNext7[i].date) <= 1) {
+      tightCluster = true
+      break
+    }
+  }
+  if (examsNext7.length >= 3 || (examsNext7.length >= 2 && tightCluster)) {
+    const names = [
+      ...new Set(
+        examsNext7
+          .slice(0, 3)
+          .map((e) => subjects.find((s) => s.id === e.subjectId)?.shortName ?? e.title),
+      ),
+    ].join(', ')
+    alerts.push({
+      id: 'acumulacion-examenes',
+      level: 'aviso',
+      title:
+        examsNext7.length >= 3
+          ? `Semana intensa: ${examsNext7.length} exámenes en 7 días`
+          : 'Exámenes seguidos esta semana',
+      detail: `${names}${examsNext7.length > 3 ? '…' : ''}. Conviene repartir el repaso con antelación.`,
+      href: '#/examenes',
     })
   }
 
@@ -111,7 +141,9 @@ export function detectAlerts(input: AlertInput): Alert[] {
     .map((s) => ({ subject: s, result: results.get(s.id) }))
     .filter(
       (x): x is { subject: Subject; result: SubjectResult } =>
-        !!x.result && x.result.average !== null && x.result.average < (x.subject.targetGrade ?? 0),
+        !!x.result &&
+        x.result.average !== null &&
+        round(x.result.average, scale.decimals) < round(x.subject.targetGrade ?? 0, scale.decimals),
     )
 
   if (below.length > 0) {

@@ -87,8 +87,7 @@ interface Item {
 function itemLines(item: Item, dtstamp: string): string[] {
   const lines = ['BEGIN:VEVENT', `UID:${item.uid}`, `DTSTAMP:${dtstamp}`]
   if (item.start !== undefined && item.end !== undefined) {
-    // Un final que pasa de medianoche se recorta a las 23:59.
-    const end = Math.min(Math.max(item.end, item.start + 1), 23 * 60 + 59)
+    const end = Math.min(Math.max(item.end, item.start), 23 * 60 + 59)
     lines.push(
       `DTSTART;TZID=${ICS_TIMEZONE}:${compactDay(item.day)}T${hhmm(item.start)}`,
       `DTEND;TZID=${ICS_TIMEZONE}:${compactDay(item.day)}T${hhmm(end)}`,
@@ -110,13 +109,18 @@ function itemLines(item: Item, dtstamp: string): string[] {
 export interface IcsInput {
   tasks: Task[]
   exams: Exam[]
+  events?: import('./types.ts').CalendarEvent[]
   subjects: Subject[]
   today: DateISO
   now?: Date
 }
 
 /** Lo que entraría en el calendario: para decir «12 tareas y 3 exámenes». */
-export function icsSelection({ tasks, exams, subjects, today }: IcsInput): { tasks: Task[]; exams: Exam[] } {
+export function icsSelection({ tasks, exams, events = [], subjects, today }: IcsInput): {
+  tasks: Task[]
+  exams: Exam[]
+  events: import('./types.ts').CalendarEvent[]
+} {
   const archived = new Set(subjects.filter((s) => s.archived).map((s) => s.id))
   const oldest = addDays(today, -PAST_EXAM_DAYS)
   return {
@@ -125,6 +129,7 @@ export function icsSelection({ tasks, exams, subjects, today }: IcsInput): { tas
       (t) => t.dueDate && t.status !== 'completada' && !(t.subjectId && archived.has(t.subjectId)),
     ),
     exams: exams.filter((e) => e.date >= oldest && !archived.has(e.subjectId)),
+    events: events.filter((ev) => ev.date >= oldest && !(ev.subjectId && archived.has(ev.subjectId))),
   }
 }
 
@@ -132,7 +137,7 @@ export function buildIcs(input: IcsInput): string {
   const { subjects } = input
   const map = new Map(subjects.map((s) => [s.id, s]))
   const dtstamp = stamp(input.now ?? new Date())
-  const { tasks, exams } = icsSelection(input)
+  const { tasks, exams, events } = icsSelection(input)
 
   const items: Item[] = []
   for (const exam of exams) {
@@ -159,6 +164,20 @@ export function buildIcs(input: IcsInput): string {
       // Una tarea con hora es una entrega: un hueco corto a esa hora.
       ...(Number.isFinite(start) ? { start, end: start + 30 } : {}),
       categories: 'Tarea',
+    })
+  }
+  for (const ev of events) {
+    const subject = ev.subjectId ? map.get(ev.subjectId) : undefined
+    const start = ev.startTime ? toMinutes(ev.startTime) : Number.NaN
+    const endRaw = ev.endTime ? toMinutes(ev.endTime) : Number.NaN
+    const end = Number.isFinite(endRaw) && endRaw > start ? endRaw : start + 60
+    items.push({
+      uid: `${ev.id}@orbita`,
+      summary: subject ? `${ev.title} (${subject.name})` : ev.title,
+      description: ev.notes,
+      day: ev.date,
+      ...(Number.isFinite(start) ? { start, end } : {}),
+      categories: 'Evento',
     })
   }
   items.sort((a, b) => a.day.localeCompare(b.day) || (a.start ?? -1) - (b.start ?? -1))

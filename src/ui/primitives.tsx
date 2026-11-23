@@ -25,7 +25,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
   secondary: 'glass-btn text-ink',
   ghost: 'liquid-press bg-transparent text-accent hover:bg-fill',
   danger: 'bg-transparent text-danger hover:bg-danger-quiet',
-  dangerFill: 'bg-danger text-white hover:brightness-110',
+  dangerFill: 'bg-[var(--c-danger-fill)] text-white hover:brightness-110',
 }
 
 const SIZES: Record<ButtonSize, string> = {
@@ -436,7 +436,7 @@ export function Segmented<T extends string>({
       }}
     >
       <span ref={lensRef} aria-hidden className="lens liquid-lens absolute left-0 top-[3px] bottom-[3px] rounded-full pointer-events-none" />
-      {options.map((option) => {
+      {options.map((option, index) => {
         const active = option.value === value
         return (
           <button
@@ -444,11 +444,32 @@ export function Segmented<T extends string>({
             role="radio"
             type="button"
             aria-checked={active}
+            tabIndex={active ? 0 : -1}
             data-value={option.value}
             data-liquid="off"
             onClick={() => {
               if (!active) haptic()
               onChange(option.value)
+            }}
+            onKeyDown={(e) => {
+              let nextIndex: number | null = null
+              if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                nextIndex = (index + 1) % options.length
+              } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                nextIndex = (index - 1 + options.length) % options.length
+              } else if (e.key === 'Home') {
+                nextIndex = 0
+              } else if (e.key === 'End') {
+                nextIndex = options.length - 1
+              }
+              if (nextIndex === null) return
+              e.preventDefault()
+              const next = options[nextIndex]
+              if (next && next.value !== value) {
+                haptic()
+                onChange(next.value)
+              }
+              buttons()[nextIndex]?.focus()
             }}
             className={cx(
               'relative shrink-0 inline-flex items-center justify-center gap-1.5 rounded-full whitespace-nowrap',

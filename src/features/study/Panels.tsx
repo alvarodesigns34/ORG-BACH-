@@ -16,9 +16,10 @@ import {
   type Airport,
   type Destination,
 } from '@/domain/flights'
-import { daysUntil, relativeDay } from '@/domain/dates'
+import { daysUntil, parseDay, relativeDay, startOfWeek } from '@/domain/dates'
 import { focusMinutes } from '@/domain/flights'
 import { studyHref } from '@/router'
+import { useSettings } from '@/state/StoreProvider'
 import { usePendingExams, useTaskSummary } from '@/state/selectors'
 import type { FocusSession, Subject } from '@/domain/types'
 import { colorVar } from '@/domain/palette'
@@ -266,10 +267,9 @@ function Summary({
   subjects: Map<string, Subject>
   today: string
 }) {
+  const settings = useSettings()
   const stats = useMemo(() => {
-    const weekStart = new Date()
-    weekStart.setHours(0, 0, 0, 0)
-    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7))
+    const weekStart = parseDay(startOfWeek(today, settings.weekStartsOn))
     let todayMin = 0
     let weekMin = 0
     let flights = 0
@@ -288,7 +288,7 @@ function Summary({
       .map(([id, minutes]) => ({ id, minutes }))
       .sort((a, b) => b.minutes - a.minutes)
     return { todayMin, weekMin, flights, last, bySubject }
-  }, [sessions, today])
+  }, [sessions, today, settings.weekStartsOn])
 
   const hoy = shortTime(stats.todayMin)
   const semana = shortTime(stats.weekMin)

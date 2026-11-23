@@ -234,12 +234,12 @@ function GradeHero({ average, scopeLabel, averages, scale, active, onSelect, mod
                 onClick={() => onSelect(isFinal ? 'todas' : (entry.term as Scope))}
                 title={isFinal ? `Nota final: media ${mode === 'ponderada' ? 'ponderada por horas' : 'de las asignaturas'}` : termName(entry.term as TermId)}
                 className={cx(
-                  'glass-btn inline-flex items-baseline gap-1.5 h-8 px-3 rounded-full text-[0.75rem] font-semibold',
-                  selected ? 'text-ink' : 'text-ink-3',
+                  'glass-btn inline-flex items-baseline gap-1.5 h-8 px-3 rounded-full text-[0.75rem] font-semibold transition-colors',
+                  selected ? 'filter-on text-accent' : 'text-ink-3 hover:text-ink-2',
                 )}
               >
                 {isFinal ? 'Curso' : TERMS.find((t) => t.id === entry.term)?.short}
-                <span className={cx('tabular-nums', selected ? 'text-ink' : 'text-ink-2')}>
+                <span className={cx('tabular-nums', selected ? 'text-accent font-bold' : 'text-ink-2')}>
                   {formatGrade(entry.average, scale)}
                 </span>
               </button>
@@ -248,10 +248,12 @@ function GradeHero({ average, scopeLabel, averages, scale, active, onSelect, mod
         </div>
       </div>
 
-      <div className="grade-ruler" aria-label={`Asignaturas en la escala de ${lo} a ${hi}`}>
+      <div className="grade-ruler px-3 sm:px-4" aria-label={`Asignaturas en la escala de ${lo} a ${hi}`}>
         <div className="relative h-[5.5rem]">
           {points.map((p, i) => {
             const pct = at(p.value)
+            const edgeAlign =
+              pct < 8 ? 'translate-x-0' : pct > 92 ? '-translate-x-full' : '-translate-x-1/2'
             return (
               <a
                 key={p.subject.id}
@@ -260,7 +262,10 @@ function GradeHero({ average, scopeLabel, averages, scale, active, onSelect, mod
                   event.preventDefault()
                   document.getElementById(`nota-${p.subject.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
                 }}
-                className="grade-ruler-label absolute bottom-0 -translate-x-1/2 text-[0.6875rem] font-bold whitespace-nowrap"
+                className={cx(
+                  'grade-ruler-label absolute bottom-0 text-[0.6875rem] font-bold whitespace-nowrap',
+                  edgeAlign,
+                )}
                 style={{ left: `${pct}%`, color: colorVar(p.subject.color), ['--row' as string]: rows[i], animationDelay: `${120 + i * 50}ms` }}
                 aria-label={`${p.subject.name}: ${formatGrade(p.value, scale)}`}
               >

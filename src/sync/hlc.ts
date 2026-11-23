@@ -21,12 +21,18 @@ export interface HlcState {
 }
 
 const MAX_COUNTER = 99_999
+/** Límite del formato de 15 cifras: impide corromper el formato del reloj. */
+const MAX_WALL = 999_999_999_999_999
+/** Desfase futuro máximo aceptable de un reloj remoto (1 año). */
+const MAX_FUTURE_DRIFT_MS = 365 * 24 * 60 * 60 * 1000
 
 /** Marca mínima: pierde frente a cualquier edición real. */
 export const ZERO_CLOCK = '000000000000000:00000:0'
 
 export function formatClock(state: HlcState): string {
-  return `${String(state.wall).padStart(15, '0')}:${String(state.counter).padStart(5, '0')}:${state.node}`
+  const safeWall = Math.min(Math.max(0, Math.floor(state.wall)), MAX_WALL)
+  const safeCounter = Math.min(Math.max(0, Math.floor(state.counter)), MAX_COUNTER)
+  return `${String(safeWall).padStart(15, '0')}:${String(safeCounter).padStart(5, '0')}:${state.node}`
 }
 
 export function parseClock(clock: string): HlcState | null {
@@ -51,11 +57,11 @@ export function newNodeId(): string {
 
 /** Siguiente marca para un cambio local. */
 export function tick(state: HlcState, now: number = Date.now()): HlcState {
-  const wall = Math.max(state.wall, now)
-  let counter = wall === state.wall ? state.counter + 1 : 0
+  const wall = Math.min(MAX_WALL, Math.max(state.wall, now))
+  const counter = wall === state.wall ? state.counter + 1 : 0
   if (counter > MAX_COUNTER) {
     // Más de cien mil cambios en el mismo milisegundo: se avanza el reloj.
-    return { wall: wall + 1, counter: 0, node: state.node }
+    return { wall: Math.min(MAX_WALL, wall + 1), counter: 0, node: state.node }
   }
   return { wall, counter, node: state.node }
 }
@@ -64,13 +70,16 @@ export function tick(state: HlcState, now: number = Date.now()): HlcState {
 export function receive(state: HlcState, remote: string, now: number = Date.now()): HlcState {
   const other = parseClock(remote)
   if (!other) return state
-  const wall = Math.max(state.wall, other.wall, now)
+  // Ignorar marcas con reloj de pared disparatado (>1 año en el futuro) para
+  // evitar envenenar el HLC de todos los dispositivos de la cuenta.
+  if (other.wall > now + MAX_FUTURE_DRIFT_MS) return state
+  const wall = Math.min(MAX_WALL, Math.max(state.wall, other.wall, now))
   let counter: number
   if (wall === state.wall && wall === other.wall)
     counter = Math.max(state.counter, other.counter) + 1
   else if (wall === state.wall) counter = state.counter + 1
   else if (wall === other.wall) counter = other.counter + 1
   else counter = 0
-  if (counter > MAX_COUNTER) return { wall: wall + 1, counter: 0, node: state.node }
+  if (counter > MAX_COUNTER) return { wall: Math.min(MAX_WALL, wall + 1), counter: 0, node: state.node }
   return { wall, counter, node: state.node }
 }

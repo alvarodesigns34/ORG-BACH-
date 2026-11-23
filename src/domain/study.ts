@@ -174,15 +174,30 @@ export interface PrepComparison {
 export function comparePrep(rows: ExamPrep[]): PrepComparison | null {
   if (rows.length < 4) return null
   const sorted = [...rows].sort((a, b) => a.minutes - b.minutes)
+  if (sorted[0].minutes === sorted[sorted.length - 1].minutes) return null
+
   const mid = Math.floor(sorted.length / 2)
-  const less = sorted.slice(0, mid)
-  const more = sorted.slice(mid)
-  if (less[less.length - 1].minutes === more[0].minutes && less[0].minutes === more[more.length - 1].minutes) {
-    return null
+  let less: ExamPrep[]
+  let more: ExamPrep[]
+  let threshold: number
+
+  if (sorted[mid].minutes === 0) {
+    // Si la mitad o más de los exámenes no tienen estudio registrado, partir
+    // por la mediana metería ceros en el grupo de «más estudio». Comparamos
+    // los preparados (> 0 min) frente a los que no tienen vuelos (0 min).
+    less = sorted.filter((r) => r.minutes === 0)
+    more = sorted.filter((r) => r.minutes > 0)
+    if (less.length === 0 || more.length === 0) return null
+    threshold = 0
+  } else {
+    less = sorted.slice(0, mid)
+    more = sorted.slice(mid)
+    threshold = more[0].minutes
   }
+
   const avg = (list: ExamPrep[]) => list.reduce((sum, r) => sum + r.score, 0) / list.length
   return {
-    threshold: more[0].minutes,
+    threshold,
     more: { count: more.length, average: avg(more) },
     less: { count: less.length, average: avg(less) },
   }

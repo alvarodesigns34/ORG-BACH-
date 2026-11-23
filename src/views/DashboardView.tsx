@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, m as motion, useDragControls } from 'motion/react'
 import {
+  ArrowDown,
+  ArrowUp,
   BellRing,
   CalendarRange,
   Check,
@@ -49,6 +51,7 @@ import {
   useCalendarIndex,
   useGlobalAverage,
   useGoalsProgress,
+  useMinuteClock,
   useSubjectMap,
   useSubjects,
   useTaskSummary,
@@ -83,7 +86,7 @@ const WIDGETS: Record<
     icon: NotebookPen,
     tint: '#ff453a',
     size: 'lg',
-    href: hrefFor('calendario'),
+    href: hrefFor('examenes'),
   },
   media: {
     label: 'Media',
@@ -118,19 +121,10 @@ const SPAN = {
   xl: 'col-span-2 md:col-span-4',
 } as const
 
-/** Reloj que avanza solo: la tarjeta «Ahora» no puede quedarse parada. */
+/** Reloj compartido al minuto: evita duplicar temporizadores en Inicio. */
 function useClock(): Date {
-  const [now, setNow] = useState(() => new Date())
-  useEffect(() => {
-    const tick = () => setNow(new Date())
-    const id = window.setInterval(tick, 20_000)
-    document.addEventListener('visibilitychange', tick)
-    return () => {
-      window.clearInterval(id)
-      document.removeEventListener('visibilitychange', tick)
-    }
-  }, [])
-  return now
+  const minute = useMinuteClock()
+  return useMemo(() => new Date(minute * 60_000), [minute])
 }
 
 // ---------------------------------------------------------------------------
@@ -302,12 +296,25 @@ export function DashboardView({ hasSubjects }: { hasSubjects: boolean }) {
               key={id}
               id={id}
               index={index}
+              canMoveUp={index > 0}
+              canMoveDown={index < shown.length - 1}
               editing={editing}
               register={(node) => {
                 if (node) frames.current.set(id, node)
                 else frames.current.delete(id)
               }}
               onDragOver={dragOver}
+              onMove={(dir) => {
+                const targetId = shown[index + dir]
+                if (!targetId) return
+                const next = [...order]
+                const from = next.indexOf(id)
+                const to = next.indexOf(targetId)
+                next.splice(from, 1)
+                next.splice(to, 0, id)
+                haptic()
+                saveHome({ order: next })
+              }}
               onRemove={() => {
                 haptic()
                 saveHome({ hidden: [...hidden, id] })
@@ -367,17 +374,23 @@ function useHomeAlerts() {
 function WidgetFrame({
   id,
   index,
+  canMoveUp,
+  canMoveDown,
   editing,
   register,
   onDragOver,
+  onMove,
   onRemove,
   children,
 }: {
   id: HomeWidgetId
   index: number
+  canMoveUp: boolean
+  canMoveDown: boolean
   editing: boolean
   register: (node: HTMLElement | null) => void
   onDragOver: (id: HomeWidgetId, point: { x: number; y: number }) => void
+  onMove: (dir: -1 | 1) => void
   onRemove: () => void
   children: ReactNode
 }) {
@@ -430,19 +443,41 @@ function WidgetFrame({
             >
               <Minus className="size-4" strokeWidth={3} />
             </motion.button>
-            <motion.button
-              key="mover"
-              type="button"
-              aria-label={`Mover ${meta.label}`}
-              onPointerDown={(event) => controls.start(event)}
+            <motion.div
+              key="controles"
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0 }}
               transition={spring.bouncy}
-              className="liquid absolute top-2 right-2 z-10 grid place-items-center h-9 w-12 rounded-full text-ink-2 touch-none cursor-grab active:cursor-grabbing"
+              className="absolute top-2 right-2 z-10 flex items-center gap-1"
             >
-              <GripHorizontal className="relative z-[2] size-5" strokeWidth={2.2} />
-            </motion.button>
+              <button
+                type="button"
+                aria-label={`Subir ${meta.label}`}
+                disabled={!canMoveUp}
+                onClick={() => onMove(-1)}
+                className="liquid grid place-items-center size-8 rounded-full text-ink-2 disabled:opacity-35"
+              >
+                <ArrowUp className="relative z-[2] size-4" strokeWidth={2.4} />
+              </button>
+              <button
+                type="button"
+                aria-label={`Bajar ${meta.label}`}
+                disabled={!canMoveDown}
+                onClick={() => onMove(1)}
+                className="liquid grid place-items-center size-8 rounded-full text-ink-2 disabled:opacity-35"
+              >
+                <ArrowDown className="relative z-[2] size-4" strokeWidth={2.4} />
+              </button>
+              <button
+                type="button"
+                aria-label={`Arrastrar ${meta.label}`}
+                onPointerDown={(event) => controls.start(event)}
+                className="liquid grid place-items-center h-8 w-10 rounded-full text-ink-2 touch-none cursor-grab active:cursor-grabbing"
+              >
+                <GripHorizontal className="relative z-[2] size-5" strokeWidth={2.2} />
+              </button>
+            </motion.div>
           </>
         )}
       </AnimatePresence>
@@ -1023,13 +1058,18 @@ function WeekWidget() {
 
   return (
     <WidgetCard id="semana">
-      <a href={hrefFor('calendario')} className="grid grid-cols-7 gap-1 pt-1">
+      <div className="grid grid-cols-7 gap-1 pt-1">
         {days.map((day, i) => {
           const date = parseDay(day)
           const items = index.get(day) ?? []
           const exam = items.some((item) => item.kind === 'examen')
           return (
-            <span key={day} className="flex flex-col items-center gap-1.5 min-w-0">
+            <a
+              key={day}
+              href={hrefFor('calendario', { dia: day })}
+              aria-label={`${formatLongDate(day)}: ${items.length} ${items.length === 1 ? 'elemento' : 'elementos'}`}
+              className="pressable flex flex-col items-center gap-1.5 min-w-0 rounded-xl py-1 hover:bg-fill/60 transition-colors"
+            >
               <span className="text-[0.6875rem] font-semibold text-ink-3">
                 {WEEKDAYS_SHORT[date.getDay()]}
               </span>
@@ -1061,15 +1101,10 @@ function WeekWidget() {
                   )
                 })}
               </span>
-            </span>
+            </a>
           )
         })}
-      </a>
-      <p className="sr-only">
-        {days
-          .map((day) => `${formatLongDate(day)}: ${(index.get(day) ?? []).length} cosas`)
-          .join('. ')}
-      </p>
+      </div>
     </WidgetCard>
   )
 }

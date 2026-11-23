@@ -125,18 +125,19 @@ export function SubjectGrades({
                 size="md"
                 tone={numeralTone(result.average, scale)}
               />
-              {subject.targetGrade !== undefined && result.average !== null && (
-                <p
-                  className={cx(
-                    'text-[0.6875rem] mt-1 tabular-nums',
-                    result.average >= subject.targetGrade ? 'text-ok' : 'text-warn',
-                  )}
-                >
-                  {result.average >= subject.targetGrade
-                    ? 'objetivo cumplido'
-                    : `${formatGrade(subject.targetGrade - result.average, scale)} por debajo`}
-                </p>
-              )}
+              {subject.targetGrade !== undefined && result.average !== null && (() => {
+                const factor = 10 ** scale.decimals
+                const roundedAvg = Math.round(result.average * factor) / factor
+                const roundedTarget = Math.round(subject.targetGrade * factor) / factor
+                const met = roundedAvg >= roundedTarget
+                return (
+                  <p className={cx('text-[0.6875rem] mt-1 tabular-nums', met ? 'text-ok' : 'text-warn')}>
+                    {met
+                      ? 'objetivo cumplido'
+                      : `${formatGrade(roundedTarget - roundedAvg, scale)} por debajo`}
+                  </p>
+                )
+              })()}
             </div>
           </div>
         </HeaderTag>

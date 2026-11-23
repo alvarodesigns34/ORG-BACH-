@@ -75,11 +75,24 @@ export function loadPrefs(): PushPrefs {
   }
 }
 
+const PUSH_PREFS_EVENT = 'orbita:push-prefs'
+
 function savePrefs(prefs: PushPrefs) {
   try {
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event(PUSH_PREFS_EVENT))
   } catch {
     // Solo es una caché de la interfaz: la verdad está en el servidor.
+  }
+}
+
+export function subscribePushPrefs(listener: () => void): () => void {
+  if (typeof window === 'undefined') return () => {}
+  window.addEventListener(PUSH_PREFS_EVENT, listener)
+  window.addEventListener('storage', listener)
+  return () => {
+    window.removeEventListener(PUSH_PREFS_EVENT, listener)
+    window.removeEventListener('storage', listener)
   }
 }
 
@@ -223,6 +236,24 @@ export async function disableFlightAlerts(): Promise<void> {
     await apply(prefs)
   } catch {
     // Sin red: se reintenta la próxima vez que se toque el interruptor.
+  }
+}
+
+/** Da de baja todos los avisos push de este dispositivo (p. ej. al cerrar sesión en un ordenador compartido). */
+export async function disableAllPush(): Promise<void> {
+  const prefs: PushPrefs = { enabled: false, hour: DEFAULT_DIGEST_HOUR, flights: false }
+  savePrefs(prefs)
+  try {
+    await apply(prefs)
+  } catch {
+    // Si falla la red, intentamos igualmente revocar la suscripción local del navegador.
+    try {
+      const reg = await registration()
+      const subscription = await reg.pushManager.getSubscription()
+      await subscription?.unsubscribe()
+    } catch {
+      // Sin Service Worker no hay suscripción que retirar.
+    }
   }
 }
 

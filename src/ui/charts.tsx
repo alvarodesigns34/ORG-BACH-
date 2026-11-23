@@ -508,54 +508,56 @@ export function RankedBars({
   }
 
   return (
-    <div role="img" aria-label={title}>
-      <ul className="flex flex-col gap-3.5">
-        {bars.map((bar) => {
-          const percent = Math.max(0, Math.min(100, (bar.value / Math.max(max, 0.0001)) * 100))
-          const markerPercent =
-            bar.marker !== undefined
-              ? Math.max(0, Math.min(100, (bar.marker.value / Math.max(max, 0.0001)) * 100))
-              : null
+    <div>
+      <div role="img" aria-label={title}>
+        <ul className="flex flex-col gap-3.5" aria-hidden="true">
+          {bars.map((bar) => {
+            const percent = Math.max(0, Math.min(100, (bar.value / Math.max(max, 0.0001)) * 100))
+            const markerPercent =
+              bar.marker !== undefined
+                ? Math.max(0, Math.min(100, (bar.marker.value / Math.max(max, 0.0001)) * 100))
+                : null
 
-          return (
-            <li key={bar.id}>
-              <div className="flex items-baseline justify-between gap-3 mb-1.5">
-                <span className="flex items-center gap-1.5 min-w-0">
-                  {bar.dotColor && (
+            return (
+              <li key={bar.id}>
+                <div className="flex items-baseline justify-between gap-3 mb-1.5">
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    {bar.dotColor && (
+                      <span
+                        aria-hidden
+                        className="size-2 rounded-full shrink-0"
+                        style={{ background: bar.dotColor }}
+                      />
+                    )}
+                    <span className="text-[0.8125rem] text-ink truncate">{bar.label}</span>
+                  </span>
+                  <span className="text-[0.8125rem] font-semibold text-ink tabular-nums shrink-0">
+                    {bar.formatted}
+                  </span>
+                </div>
+
+                <div className="relative h-2 rounded-full bg-sunken overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-[width] duration-300 ease-out"
+                    style={{
+                      width: `${percent}%`,
+                      background: BAR_TONE[bar.tone ?? 'accent'],
+                    }}
+                  />
+                  {markerPercent !== null && (
                     <span
                       aria-hidden
-                      className="size-2 rounded-full shrink-0"
-                      style={{ background: bar.dotColor }}
+                      title={bar.marker!.label}
+                      className="absolute top-0 bottom-0 w-px bg-ink-2"
+                      style={{ left: `${markerPercent}%` }}
                     />
                   )}
-                  <span className="text-[0.8125rem] text-ink truncate">{bar.label}</span>
-                </span>
-                <span className="text-[0.8125rem] font-semibold text-ink tabular-nums shrink-0">
-                  {bar.formatted}
-                </span>
-              </div>
-
-              <div className="relative h-2 rounded-full bg-sunken overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-[width] duration-300 ease-out"
-                  style={{
-                    width: `${percent}%`,
-                    background: BAR_TONE[bar.tone ?? 'accent'],
-                  }}
-                />
-                {markerPercent !== null && (
-                  <span
-                    aria-hidden
-                    title={bar.marker!.label}
-                    className="absolute top-0 bottom-0 w-px bg-ink-2"
-                    style={{ left: `${markerPercent}%` }}
-                  />
-                )}
-              </div>
-            </li>
-          )
-        })}
-      </ul>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
 
       <table className="sr-only">
         <caption>{title}</caption>

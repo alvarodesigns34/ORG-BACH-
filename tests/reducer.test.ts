@@ -224,6 +224,31 @@ describe('notas y exámenes', () => {
     const next = reducer(withGrade, { type: 'grade/remove', id: added.id })
     assert.equal(next.exams.find((e) => e.id === 'e1')?.gradeEntryId, undefined)
   })
+
+  it('al mover una nota a otra asignatura se desenlaza del examen original', () => {
+    const withGrade = reducer(baseState(), {
+      type: 'grade/add',
+      grade: {
+        subjectId: 'mat',
+        categoryId: 'c1',
+        term: 'T1',
+        name: 'Derivadas',
+        kind: 'examen',
+        score: 9,
+        maxScore: 10,
+        weight: 50,
+        date: '2026-11-01',
+      },
+      linkExamId: 'e1',
+    })
+    const added = withGrade.grades.find((g) => g.name === 'Derivadas')!
+    const moved = reducer(withGrade, {
+      type: 'grade/update',
+      id: added.id,
+      patch: { subjectId: 'fis', categoryId: null },
+    })
+    assert.equal(moved.exams.find((e) => e.id === 'e1')?.gradeEntryId, undefined)
+  })
 })
 
 describe('el reductor no muta el estado que recibe', () => {

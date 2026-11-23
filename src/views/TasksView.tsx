@@ -1,6 +1,16 @@
 import { AnimatePresence, m as motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowUpDown, ListChecks, Menu as GripLines, Plus, Search, X } from 'lucide-react'
+import {
+  ArrowUpDown,
+  CalendarClock,
+  CornerDownLeft,
+  ListChecks,
+  Menu as GripLines,
+  Plus,
+  Search,
+  Sparkles,
+  X,
+} from 'lucide-react'
 
 import {
   EMPTY_FILTERS,
@@ -12,7 +22,9 @@ import {
   type TaskSort,
   type TaskView,
 } from '@/domain/tasks'
-import { daysUntil, formatDuration } from '@/domain/dates'
+import { parseQuickTask } from '@/domain/quickCapture'
+import { daysUntil, formatDuration, relativeDay } from '@/domain/dates'
+import { colorVar } from '@/domain/palette'
 import { PRIORITIES, type Priority, type Task } from '@/domain/types'
 import { useRoute } from '@/router'
 import { useDispatch, useStore, useToday } from '@/state/StoreProvider'
@@ -24,6 +36,7 @@ import { ReorderableTaskList } from '@/features/tasks/ReorderableTaskList'
 import { spring } from '@/ui/motion'
 import { Menu } from '@/ui/Menu'
 import { Input, Select } from '@/ui/fields'
+import { useToast } from '@/ui/Toast'
 import { Button, Card, EmptyState, PRIORITY_LABEL, Segmented, cx } from '@/ui/primitives'
 
 const VIEW_LABELS: { value: TaskView; label: string }[] = [
@@ -89,6 +102,7 @@ function saveSort(sort: TaskSort) {
 
 export function TasksView() {
   const dispatch = useDispatch()
+  const toast = useToast()
   const { route } = useRoute()
   const { data } = useStore()
   const today = useToday()
@@ -103,6 +117,7 @@ export function TasksView() {
   }
   const [editing, setEditing] = useState<Task | null>(null)
   const [creating, setCreating] = useState(false)
+  const [quickText, setQuickText] = useState('')
 
   // Las alertas enlazan a '#/tareas?vista=atrasadas': la vista se sincroniza
   // con la URL para que ese enlace lleve exactamente a donde dice.
@@ -113,11 +128,77 @@ export function TasksView() {
     }
   }, [viewParam])
 
+  const subjectNames = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const s of data.subjects) map.set(s.id, s.name)
+    return map
+  }, [data.subjects])
+
   const counts = useMemo(() => countByView(data.tasks, today), [data.tasks, today])
   const visible = useMemo(
-    () => sortTasks(filterTasks(data.tasks, filters, today), sort),
-    [data.tasks, filters, sort, today],
+    () => sortTasks(filterTasks(data.tasks, filters, today), sort, subjectNames),
+    [data.tasks, filters, sort, today, subjectNames],
   )
+
+  const parsedQuick = useMemo(
+    () => (quickText.trim() ? parseQuickTask(quickText, data.subjects, today) : null),
+    [quickText, data.subjects, today],
+  )
+  const quickSubject = parsedQuick?.subjectId ? subjectMap.get(parsedQuick.subjectId) : undefined
+
+  const submitQuick = () => {
+    if (!parsedQuick || !parsedQuick.title.trim()) return
+    const fallbackSubject = parsedQuick.subjectId ?? filters.subjectId ?? undefined
+    const fallbackDue =
+      parsedQuick.dueDate ?? (filters.view === 'hoy' ? today : undefined)
+    dispatch({
+      type: 'task/add',
+      task: {
+        title: parsedQuick.title,
+        subjectId: fallbackSubject,
+        dueDate: fallbackDue,
+        dueTime: parsedQuick.dueTime,
+        priority: parsedQuick.priority,
+        status: 'pendiente',
+        estimatedMinutes: parsedQuick.estimatedMinutes,
+        tags: parsedQuick.tags,
+        subtasks: [],
+      },
+    })
+    setQuickText('')
+    toast({ text: `Tarea añadida: ${parsedQuick.title}` })
+  }
+
+  const rescheduleOverdueToToday = () => {
+    const overdue = data.tasks.filter((t) => bucketOf(t, today) === 'atrasada')
+    if (overdue.length === 0) return
+    const snapshot = overdue.map((t) => ({ id: t.id, dueDate: t.dueDate, dueTime: t.dueTime }))
+    for (const task of overdue) {
+      dispatch({
+        type: 'task/update',
+        id: task.id,
+        patch: { dueDate: today, dueTime: undefined },
+      })
+    }
+    toast({
+      text:
+        overdue.length === 1
+          ? '1 tarea atrasada movida a hoy'
+          : `${overdue.length} tareas atrasadas movidas a hoy`,
+      action: {
+        label: 'Deshacer',
+        run: () => {
+          for (const prev of snapshot) {
+            dispatch({
+              type: 'task/update',
+              id: prev.id,
+              patch: { dueDate: prev.dueDate, dueTime: prev.dueTime },
+            })
+          }
+        },
+      },
+    })
+  }
 
   const grouped = useMemo(
     () => (sort === 'manual' ? groupForManual(visible) : groupByDay(visible, today)),
@@ -140,16 +221,113 @@ export function TasksView() {
               }`
         }
         actions={
-          // En el móvil ya está el «+» de la barra inferior.
-          <Button variant="primary" onClick={() => setCreating(true)} className="max-lg:hidden">
-            <Plus className="size-4" strokeWidth={2.5} />
-            Nueva tarea
-          </Button>
+          <div className="flex items-center gap-2">
+            {counts.atrasadas > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={rescheduleOverdueToToday}
+                title="Reprogramar todas las atrasadas para hoy"
+              >
+                <CalendarClock className="size-4" />
+                <span className="hidden sm:inline">Mover atrasadas a hoy</span>
+                <span className="sm:hidden">A hoy ({counts.atrasadas})</span>
+              </Button>
+            )}
+            {/* En el móvil ya está el «+» de la barra inferior. */}
+            <Button variant="primary" onClick={() => setCreating(true)} className="max-lg:hidden">
+              <Plus className="size-4" strokeWidth={2.5} />
+              Nueva tarea
+            </Button>
+          </div>
         }
         toolbar={
           <div className="flex flex-col gap-3">
+            {/* Captura rápida en lenguaje natural: apunta una tarea en una línea */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                submitQuick()
+              }}
+              className="flex flex-col gap-1.5"
+            >
+              <div className="relative flex items-center gap-2">
+                <Sparkles
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-accent pointer-events-none"
+                  aria-hidden
+                />
+                <Input
+                  value={quickText}
+                  aria-label="Captura rápida de tarea"
+                  placeholder="Añadir rápido… ej.: Derivadas #MAT mañana 18:00 45m !alta"
+                  className="pl-10 pr-12 sm:pr-24 h-11 rounded-full bg-surface shadow-[var(--shadow-sm)]"
+                  onChange={(e) => setQuickText(e.target.value)}
+                />
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={!parsedQuick?.title.trim()}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 px-3 rounded-full"
+                >
+                  <CornerDownLeft className="size-3.5" />
+                  <span className="hidden sm:inline">Añadir</span>
+                </Button>
+              </div>
+              {parsedQuick && parsedQuick.title && (
+                <div
+                  className="flex flex-wrap items-center gap-1.5 px-2 text-[0.75rem] text-ink-2"
+                  aria-live="polite"
+                >
+                  <span className="font-medium text-ink truncate max-w-[260px]">
+                    {parsedQuick.title}
+                  </span>
+                  {quickSubject && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-fill px-2 py-0.5 font-medium text-ink">
+                      <span
+                        className="size-1.5 rounded-full"
+                        style={{ background: colorVar(quickSubject.color) }}
+                      />
+                      {quickSubject.shortName || quickSubject.name}
+                    </span>
+                  )}
+                  {parsedQuick.dueDate && (
+                    <span className="rounded-full bg-accent-soft text-accent px-2 py-0.5 font-medium">
+                      {relativeDay(parsedQuick.dueDate, today)}
+                      {parsedQuick.dueTime ? ` · ${parsedQuick.dueTime}` : ''}
+                    </span>
+                  )}
+                  {parsedQuick.estimatedMinutes && (
+                    <span className="rounded-full bg-fill px-2 py-0.5 tabular-nums">
+                      {formatDuration(parsedQuick.estimatedMinutes)}
+                    </span>
+                  )}
+                  {parsedQuick.priority !== 'media' && (
+                    <span
+                      className={cx(
+                        'rounded-full px-2 py-0.5 font-medium',
+                        parsedQuick.priority === 'urgente'
+                          ? 'bg-danger-soft text-danger'
+                          : parsedQuick.priority === 'alta'
+                            ? 'bg-warn-soft text-warn'
+                            : 'bg-fill text-ink-2',
+                      )}
+                    >
+                      {PRIORITY_LABEL[parsedQuick.priority]}
+                    </span>
+                  )}
+                  {parsedQuick.tags.map((tag) => (
+                    <span key={tag} className="rounded-full bg-fill px-2 py-0.5 text-ink-3">
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </form>
+
             <Segmented
               label="Vista de tareas"
+              className="self-start max-w-full"
               value={filters.view}
               onChange={(view) => setFilters((prev) => ({ ...prev, view }))}
               options={VIEW_LABELS.map((v) => ({ ...v, count: counts[v.value] }))}
@@ -165,7 +343,7 @@ export function TasksView() {
                 value={filters.query}
                 aria-label="Buscar tareas"
                 placeholder="Buscar…"
-                className="search-field pl-10 pr-9 h-10 rounded-full"
+                className="search-field pl-10 pr-10 h-10 rounded-full"
                 onChange={(e) => setFilters((prev) => ({ ...prev, query: e.target.value }))}
               />
               {filters.query && (
@@ -173,16 +351,18 @@ export function TasksView() {
                   type="button"
                   aria-label="Borrar búsqueda"
                   onClick={() => setFilters((prev) => ({ ...prev, query: '' }))}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 size-6 grid place-items-center rounded-full bg-ink-3/25 text-surface hover:bg-ink-3/40"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 size-8 grid place-items-center rounded-full text-ink-2 hover:text-ink"
                 >
-                  <X className="size-3.5" strokeWidth={3} />
+                  <span className="size-5 grid place-items-center rounded-full bg-ink-3/25 text-surface">
+                    <X className="size-3" strokeWidth={3} />
+                  </span>
                 </button>
               )}
             </div>
 
             {/* Filtros como píldoras en una fila que se desliza: apilados,
                 ocupaban media pantalla del móvil antes de la primera tarea. */}
-            <div className="flex-1 min-w-0 flex items-center gap-2 overflow-x-auto no-scrollbar -mx-[1.125rem] px-[1.125rem] sm:mx-0 sm:px-0 py-1">
+            <div className="flex-1 min-w-0 flex items-center gap-2 overflow-x-auto no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 py-1">
               <Select
                 aria-label="Filtrar por asignatura"
                 value={filters.subjectId ?? ''}

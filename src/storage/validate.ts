@@ -104,8 +104,8 @@ function parseSlot(raw: unknown): ScheduleSlot | null {
   if (!isRow(raw) || !isId(raw.id) || !isTime(raw.start) || !isTime(raw.end)) return null
   const day = raw.day
   if (!isNum(day) || day < 0 || day > 6) return null
-  // Una franja que termina antes de empezar dibuja una duración negativa.
-  if (raw.end < raw.start) return null
+  // Una franja que termina antes o al mismo tiempo que empieza no tiene duración.
+  if (raw.end <= raw.start) return null
   return {
     id: raw.id,
     day: day as ScheduleSlot['day'],
@@ -157,6 +157,7 @@ export function parseTask(raw: unknown): Task | null {
   const dueDate = optDay(raw.dueDate)
   const status = oneOf('pendiente', 'en_progreso', 'completada')(raw.status) ? raw.status : 'pendiente'
   const stamp = isStamp(raw.completedAt) ? raw.completedAt : undefined
+  const rawMinutes = optNum(raw.estimatedMinutes)
   return {
     id: raw.id,
     title: raw.title,
@@ -167,7 +168,10 @@ export function parseTask(raw: unknown): Task | null {
     dueTime: dueDate ? optTime(raw.dueTime) : undefined,
     priority: oneOf('baja', 'media', 'alta', 'urgente')(raw.priority) ? raw.priority : 'media',
     status,
-    estimatedMinutes: optNum(raw.estimatedMinutes),
+    estimatedMinutes:
+      rawMinutes !== undefined && rawMinutes > 0
+        ? Math.min(1440, Math.round(rawMinutes))
+        : undefined,
     tags: Array.isArray(raw.tags) ? raw.tags.filter(isText) : [],
     subtasks: uniqueById(
       Array.isArray(raw.subtasks)
@@ -219,6 +223,7 @@ export function parseGrade(raw: unknown): GradeEntry | null {
 
 export function parseExam(raw: unknown): Exam | null {
   if (!isRow(raw) || !isId(raw.id) || !isId(raw.subjectId) || !isDay(raw.date)) return null
+  const rawWeight = optNum(raw.weight)
   return {
     id: raw.id,
     subjectId: raw.subjectId,
@@ -226,7 +231,8 @@ export function parseExam(raw: unknown): Exam | null {
     date: raw.date,
     time: optTime(raw.time),
     topics: optText(raw.topics),
-    weight: optNum(raw.weight),
+    weight:
+      rawWeight !== undefined && rawWeight > 0 ? Math.min(100, rawWeight) : undefined,
     term: isTerm(raw.term) ? raw.term : 'T1',
     gradeEntryId: optId(raw.gradeEntryId),
     createdAt: isStamp(raw.createdAt) ? raw.createdAt : new Date().toISOString(),

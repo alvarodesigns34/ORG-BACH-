@@ -187,7 +187,7 @@ export function Page({ children, className }: PageProps) {
       className={cx(
         'page-enter mx-auto w-full max-w-[1180px]',
         // En móvil, el hueco de arriba es el de la barra superior flotante.
-        'px-[max(1.25rem,env(safe-area-inset-left))] sm:px-8 pt-[3.75rem] lg:pt-[4.75rem] pb-6',
+        'pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] sm:px-8 pt-[3.75rem] lg:pt-[4.75rem] pb-6',
         className,
       )}
     >

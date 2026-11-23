@@ -25,7 +25,7 @@ self.addEventListener('push', (event) => {
     tag,
     // Un resumen nuevo sustituye al de ayer en lugar de apilarse; un aviso de
     // vuelo (aterrizaje, escala) sí vuelve a sonar aunque sustituya a otro.
-    renotify: tag === 'vuelo',
+    renotify: String(tag).startsWith('vuelo'),
     icon: new URL('pwa-192x192.png', self.registration.scope).href,
     badge: new URL('pwa-192x192.png', self.registration.scope).href,
     lang: 'es',
@@ -41,10 +41,12 @@ self.addEventListener('notificationclick', (event) => {
   if (hash) target.hash = hash
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windows) => {
       for (const client of windows) {
         if (client.url.startsWith(self.registration.scope) && 'focus' in client) {
-          if (hash && 'navigate' in client) client.navigate(target.href).catch(() => {})
+          if (hash && 'navigate' in client && client.url !== target.href) {
+            await client.navigate(target.href).catch(() => {})
+          }
           return client.focus()
         }
       }

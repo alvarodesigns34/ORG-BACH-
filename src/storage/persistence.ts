@@ -191,6 +191,20 @@ export function migrateWithReport(raw: unknown): MigrateReport {
   data.activity = data.activity.map((a) =>
     a.subjectId && !subjectIds.has(a.subjectId) ? { ...a, subjectId: undefined } : a,
   )
+  const taskIds = new Set(data.tasks.map((t) => t.id))
+  const examIds = new Set(data.exams.map((e) => e.id))
+  data.sessions = data.sessions.map((s) => {
+    const badSubject = s.subjectId && !subjectIds.has(s.subjectId)
+    const badTask = s.taskId && !taskIds.has(s.taskId)
+    const badExam = s.examId && !examIds.has(s.examId)
+    if (!badSubject && !badTask && !badExam) return s
+    return {
+      ...s,
+      ...(badSubject ? { subjectId: undefined } : {}),
+      ...(badTask ? { taskId: undefined } : {}),
+      ...(badExam ? { examId: undefined } : {}),
+    }
+  })
 
   // Un archivo (o un JSON a medias) con asignaturas no puede dejar la app en
   // el alta: terminarla añadiría otro juego de materias encima.
@@ -209,6 +223,7 @@ const COLLECTION_NAMES: Record<string, string> = {
   events: 'eventos',
   goals: 'objetivos',
   activity: 'entradas de actividad',
+  sessions: 'sesiones de estudio',
 }
 
 /** «2 asignaturas, 1 nota» — el detalle de lo descartado, en cristiano. */

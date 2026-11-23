@@ -135,5 +135,13 @@ describe('estudio antes de cada examen', () => {
     assert.equal(c.threshold, 180)
     assert.equal(c.more.average, 8.5)
     assert.equal(c.less.average, 5.5)
+
+    // Si la mitad o más tienen 0 min, se compara preparados (>0) frente a sin vuelos (0)
+    const z = comparePrep([row(0, 5), row(0, 6), row(0, 5.5), row(120, 9)])
+    assert.ok(z)
+    assert.equal(z.threshold, 0)
+    assert.equal(z.more.count, 1)
+    assert.equal(z.more.average, 9)
+    assert.equal(z.less.count, 3)
   })
 })

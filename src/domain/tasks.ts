@@ -115,6 +115,7 @@ export type TaskSort = 'manual' | 'fecha' | 'prioridad' | 'asignatura' | 'creaci
 function compareByDate(a: Task, b: Task): number {
   if (a.dueDate && b.dueDate) {
     if (a.dueDate !== b.dueDate) return a.dueDate < b.dueDate ? -1 : 1
+    if (a.dueTime !== b.dueTime) return (a.dueTime ?? '99:99').localeCompare(b.dueTime ?? '99:99')
     return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]
   }
   if (a.dueDate) return -1
@@ -157,7 +158,11 @@ export function applyManualOrder(tasks: Task[], ids: string[]): Task[] {
   return ordered
 }
 
-export function sortTasks(tasks: Task[], sort: TaskSort = 'fecha'): Task[] {
+export function sortTasks(
+  tasks: Task[],
+  sort: TaskSort = 'fecha',
+  subjectNames?: Map<string, string>,
+): Task[] {
   const copy = [...tasks]
   switch (sort) {
     case 'manual':
@@ -167,11 +172,13 @@ export function sortTasks(tasks: Task[], sort: TaskSort = 'fecha'): Task[] {
         (a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || compareByDate(a, b),
       )
     case 'asignatura':
-      return copy.sort(
-        (a, b) => (a.subjectId ?? 'zzz').localeCompare(b.subjectId ?? 'zzz') || compareByDate(a, b),
-      )
+      return copy.sort((a, b) => {
+        const nameA = a.subjectId ? (subjectNames?.get(a.subjectId) ?? a.subjectId) : '\uffff'
+        const nameB = b.subjectId ? (subjectNames?.get(b.subjectId) ?? b.subjectId) : '\uffff'
+        return nameA.localeCompare(nameB, 'es') || compareByDate(a, b)
+      })
     case 'creacion':
-      return copy.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+      return copy.sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id))
     case 'alfabetico':
       return copy.sort((a, b) => a.title.localeCompare(b.title, 'es'))
     case 'fecha':
@@ -258,12 +265,29 @@ export function countByView(
   today: DateISO = todayISO(),
   now: number = Date.now(),
 ): Record<TaskView, number> {
-  return {
-    todas: tasks.filter((t) => matchesView(t, 'todas', today, now)).length,
-    hoy: tasks.filter((t) => matchesView(t, 'hoy', today, now)).length,
-    proximas: tasks.filter((t) => matchesView(t, 'proximas', today, now)).length,
-    atrasadas: tasks.filter((t) => matchesView(t, 'atrasadas', today, now)).length,
-    completadas: tasks.filter((t) => matchesView(t, 'completadas', today, now)).length,
+  const counts: Record<TaskView, number> = {
+    todas: 0,
+    hoy: 0,
+    proximas: 0,
+    atrasadas: 0,
+    completadas: 0,
   }
+  for (const task of tasks) {
+    const bucket = bucketOf(task, today, now)
+    if (bucket === 'completada') {
+      counts.completadas++
+      continue
+    }
+    counts.todas++
+    if (bucket === 'atrasada') {
+      counts.atrasadas++
+      counts.hoy++
+    } else if (bucket === 'hoy') {
+      counts.hoy++
+    } else if (bucket === 'manana' || bucket === 'proxima') {
+      counts.proximas++
+    }
+  }
+  return counts
 }
 

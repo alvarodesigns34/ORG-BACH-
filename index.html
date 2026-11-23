@@ -2,9 +2,9 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="Tareas, exámenes y notas en un solo sitio, con un asistente de IA que te organiza la semana. Gratis, sin cuenta y sin conexión." />
-    <meta name="theme-color" content="#F2F2F7" />
+    <meta name="theme-color" content="#eef0f4" />
     <title>Órbita · La app para organizar tus estudios</title>
 
     <!-- Compartir (Open Graph). %SITE_URL% lo pone vite.config.ts. -->
@@ -33,7 +33,7 @@
     <style>
       /* El CSS llega con el JS. Sin esto, el script de tema pinta data-theme
          sobre un documento blanco hasta que carga el bundle. */
-      html, body { background: #f2f2f7; color: #1d1d1f; }
+      html, body { background: #eef0f4; color: #1d1d1f; }
       html[data-theme='dark'], html[data-theme='dark'] body { background: #000; color: #f5f5f7; }
     </style>
 
@@ -49,7 +49,7 @@
               window.matchMedia('(prefers-color-scheme: dark)').matches)
           document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
           var meta = document.querySelector('meta[name="theme-color"]')
-          if (meta) meta.setAttribute('content', dark ? '#000000' : '#F2F2F7')
+          if (meta) meta.setAttribute('content', dark ? '#000000' : '#eef0f4')
           // iOS (Añadir a pantalla de inicio) no siempre dispara el media
           // query display-mode; navigator.standalone sí. La clase marca el
           // modo app por si algún estilo lo necesita.

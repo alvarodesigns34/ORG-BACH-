@@ -204,7 +204,10 @@ export function reducer(state: AppData, action: Action): AppData {
       return { ...state, subjects, grades }
     }
 
-    case 'subject/remove':
+    case 'subject/remove': {
+      const removedExams = new Set(
+        state.exams.filter((e) => e.subjectId === action.id).map((e) => e.id),
+      )
       // Al borrar una asignatura se borra su rastro académico (notas y
       // exámenes carecen de sentido sin ella), pero las tareas y los eventos
       // sobreviven sueltos: son trabajo real que el alumno puede reasignar.
@@ -214,9 +217,16 @@ export function reducer(state: AppData, action: Action): AppData {
         grades: state.grades.filter((g) => g.subjectId !== action.id),
         exams: state.exams.filter((e) => e.subjectId !== action.id),
         // Los vuelos son tiempo estudiado de verdad: se quedan, sin asignatura.
-        sessions: state.sessions.map((s) =>
-          s.subjectId === action.id ? { ...s, subjectId: undefined } : s,
-        ),
+        sessions: state.sessions.map((s) => {
+          const dropSub = s.subjectId === action.id
+          const dropExam = s.examId !== undefined && removedExams.has(s.examId)
+          if (!dropSub && !dropExam) return s
+          return {
+            ...s,
+            ...(dropSub ? { subjectId: undefined } : {}),
+            ...(dropExam ? { examId: undefined } : {}),
+          }
+        }),
         tasks: state.tasks.map((t) =>
           t.subjectId === action.id ? { ...t, subjectId: undefined } : t,
         ),
@@ -234,6 +244,7 @@ export function reducer(state: AppData, action: Action): AppData {
           a.subjectId === action.id ? { ...a, subjectId: undefined } : a,
         ),
       }
+    }
 
     // --- Tareas ---
 
@@ -500,8 +511,27 @@ export function reducer(state: AppData, action: Action): AppData {
       }
     }
 
-    case 'grade/update':
-      return { ...state, grades: patchById(state.grades, action.id, action.patch) }
+    case 'grade/update': {
+      const grades = patchById(state.grades, action.id, action.patch)
+      const updated = grades.find((g) => g.id === action.id)
+      if (!updated) return { ...state, grades }
+      // Si se cambia la asignatura de una nota enlazada a un examen, se rompe
+      // el enlace para mantener la integridad referencial (igual que exam/update).
+      const hasStaleLink = state.exams.some(
+        (e) => e.gradeEntryId === action.id && e.subjectId !== updated.subjectId,
+      )
+      return {
+        ...state,
+        grades,
+        exams: hasStaleLink
+          ? state.exams.map((e) =>
+              e.gradeEntryId === action.id && e.subjectId !== updated.subjectId
+                ? { ...e, gradeEntryId: undefined }
+                : e,
+            )
+          : state.exams,
+      }
+    }
 
     case 'grade/remove':
       return {
@@ -546,7 +576,13 @@ export function reducer(state: AppData, action: Action): AppData {
     }
 
     case 'exam/remove':
-      return { ...state, exams: state.exams.filter((e) => e.id !== action.id) }
+      return {
+        ...state,
+        exams: state.exams.filter((e) => e.id !== action.id),
+        sessions: state.sessions.map((s) =>
+          s.examId === action.id ? { ...s, examId: undefined } : s,
+        ),
+      }
 
     // --- Eventos ---
 

@@ -186,6 +186,30 @@ describe('la nota del curso es la media de las evaluaciones', () => {
     ]
     assert.equal(subjectResult(subject, grades, DEFAULT_SCALE, 'todas').entryCount, 2)
   })
+
+  it('no dispara falso aviso de >100 % al ver todo el curso con 100 % en cada evaluación', () => {
+    const subject = makeSubject({
+      categories: [{ id: 'ex', name: 'Exámenes', weight: 100 }],
+    })
+    const grades = [
+      makeGrade(subject.id, 8, 100, { term: 'T1', categoryId: 'ex' }),
+      makeGrade(subject.id, 9, 100, { term: 'T2', categoryId: 'ex' }),
+    ]
+    const result = subjectResult(subject, grades, DEFAULT_SCALE, 'todas')
+    assert.equal(round(result.average!, 2), 8.5)
+    assert.equal(result.warnings.length, 0)
+  })
+
+  it('avisa cuando una nota sin peso queda excluida porque las demás ya suman 100 %', () => {
+    const subject = makeSubject()
+    const grades = [
+      makeGrade(subject.id, 8, 100, { term: 'T1' }),
+      makeGrade(subject.id, 5, 0, { term: 'T1' }),
+    ]
+    const result = subjectResult(subject, grades, DEFAULT_SCALE, 'T1')
+    assert.equal(round(result.average!, 2), 8)
+    assert.ok(result.warnings.some((w) => /sin peso|100/.test(w.message)))
+  })
 })
 
 describe('notas sin categoría en una asignatura que sí tiene categorías', () => {

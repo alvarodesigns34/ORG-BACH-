@@ -6,16 +6,58 @@
  * no puedan discrepar nunca — salen de la misma función.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useSyncExternalStore } from 'react'
 
 import { detectAlerts, type Alert } from '../domain/alerts.ts'
-import { clockOf, examsAwaitingGrade, pendingExams } from '../domain/exams.ts'
+import { clockOf, examsAwaitingGrade, isExamOver, pendingExams } from '../domain/exams.ts'
 import { goalProgress, type GoalContext, type GoalProgress } from '../domain/goals.ts'
 import { daysUntil, startOfWeek, toDay } from '../domain/dates.ts'
 import { globalAverage, subjectResult, type SubjectResult } from '../domain/grades.ts'
 import { bucketOf, isOverdue, sortTasks } from '../domain/tasks.ts'
 import type { DateISO, Exam, Goal, ID, Subject, Task, TermId } from '../domain/types.ts'
 import { useStore } from './StoreProvider'
+
+// ---------------------------------------------------------------------------
+// Reloj compartido de minutos (un único temporizador para toda la app)
+// ---------------------------------------------------------------------------
+
+let currentMinute = Math.floor(Date.now() / 60_000)
+const minuteListeners = new Set<() => void>()
+let clockTimer: number | null = null
+
+function tickMinuteClock() {
+  const next = Math.floor(Date.now() / 60_000)
+  if (next === currentMinute) return
+  currentMinute = next
+  for (const listener of minuteListeners) listener()
+}
+
+function subscribeMinuteClock(listener: () => void): () => void {
+  minuteListeners.add(listener)
+  if (minuteListeners.size === 1 && typeof window !== 'undefined') {
+    clockTimer = window.setInterval(tickMinuteClock, 30_000)
+    document.addEventListener('visibilitychange', tickMinuteClock)
+  }
+  return () => {
+    minuteListeners.delete(listener)
+    if (minuteListeners.size === 0 && typeof window !== 'undefined') {
+      if (clockTimer !== null) {
+        window.clearInterval(clockTimer)
+        clockTimer = null
+      }
+      document.removeEventListener('visibilitychange', tickMinuteClock)
+    }
+  }
+}
+
+/** Minuto actual (hora local), compartido por todos los componentes que lo usan. */
+export function useMinuteClock(): number {
+  return useSyncExternalStore(
+    subscribeMinuteClock,
+    () => currentMinute,
+    () => currentMinute,
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Asignaturas
@@ -136,33 +178,25 @@ export function useTaskSummary(): TaskSummary {
 // Exámenes
 // ---------------------------------------------------------------------------
 
-/** Exámenes de hoy en adelante, más los pasados que siguen sin nota. */
+/** Exámenes pendientes de hacer, más los pasados recientes (<= 14 días) sin nota. */
 export function useUpcomingExams(limit?: number): Exam[] {
   const { data, today } = useStore()
+  const minute = useMinuteClock()
   return useMemo(() => {
-    const archived = new Set(data.subjects.filter((s) => s.archived).map((s) => s.id))
+    const subjectMap = new Map(data.subjects.map((s) => [s.id, s]))
+    const gradeIds = new Set(data.grades.map((g) => g.id))
+    const clock = clockOf(new Date(minute * 60_000))
     const list = data.exams
-      .filter((e) => !archived.has(e.subjectId))
-      .filter((e) => e.date >= today || !e.gradeEntryId)
+      .filter((e) => !subjectMap.get(e.subjectId)?.archived)
+      .filter((e) => {
+        const hasGrade = !!(e.gradeEntryId && gradeIds.has(e.gradeEntryId))
+        if (hasGrade) return false
+        if (!isExamOver(e, subjectMap, clock)) return true
+        return daysUntil(e.date, today) >= -14
+      })
       .sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? ''))
     return limit ? list.slice(0, limit) : list
-  }, [data.exams, data.subjects, today, limit])
-}
-
-/** Minuto actual (hora local), que avanza solo cada minuto. */
-export function useMinuteClock(): number {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const tick = () => setNow(Date.now())
-    const id = window.setInterval(tick, 60_000)
-    // Al volver a la app (iPad en reposo) el intervalo pudo quedarse dormido.
-    document.addEventListener('visibilitychange', tick)
-    return () => {
-      window.clearInterval(id)
-      document.removeEventListener('visibilitychange', tick)
-    }
-  }, [])
-  return Math.floor(now / 60_000)
+  }, [data.exams, data.subjects, data.grades, today, minute, limit])
 }
 
 /**
@@ -247,6 +281,8 @@ export interface DayItem {
 export function useCalendarIndex(): Map<DateISO, DayItem[]> {
   const { data } = useStore()
   return useMemo(() => {
+    const archived = new Set(data.subjects.filter((s) => s.archived).map((s) => s.id))
+    const gradeIds = new Set(data.grades.map((g) => g.id))
     const index = new Map<DateISO, DayItem[]>()
     const push = (day: DateISO, item: DayItem) => {
       const list = index.get(day)
@@ -256,6 +292,7 @@ export function useCalendarIndex(): Map<DateISO, DayItem[]> {
 
     for (const task of data.tasks) {
       if (!task.dueDate) continue
+      if (task.subjectId && archived.has(task.subjectId)) continue
       push(task.dueDate, {
         id: task.id,
         kind: 'tarea',
@@ -266,15 +303,18 @@ export function useCalendarIndex(): Map<DateISO, DayItem[]> {
       })
     }
     for (const exam of data.exams) {
+      if (archived.has(exam.subjectId)) continue
       push(exam.date, {
         id: exam.id,
         kind: 'examen',
         title: exam.title,
         subjectId: exam.subjectId,
         time: exam.time,
+        done: !!(exam.gradeEntryId && gradeIds.has(exam.gradeEntryId)),
       })
     }
     for (const event of data.events) {
+      if (event.subjectId && archived.has(event.subjectId)) continue
       push(event.date, {
         id: event.id,
         kind: 'evento',
@@ -288,7 +328,7 @@ export function useCalendarIndex(): Map<DateISO, DayItem[]> {
       list.sort((a, b) => (a.time ?? '99:99').localeCompare(b.time ?? '99:99'))
     }
     return index
-  }, [data.tasks, data.exams, data.events])
+  }, [data.tasks, data.exams, data.events, data.subjects, data.grades])
 }
 
 // ---------------------------------------------------------------------------
@@ -298,39 +338,37 @@ export function useCalendarIndex(): Map<DateISO, DayItem[]> {
 /**
  * Objetivos activos con su progreso ya calculado.
  *
- * Las tres evaluaciones se calculan siempre —los hooks no pueden ir tras un
- * `if`— y salen de la misma función que el resto de medias, así que no pueden
- * discrepar de lo que enseña Notas.
+ * Calcula cada evaluación una sola vez (T1, T2, T3 y curso completo) y
+ * reutiliza el resultado correspondiente para la evaluación activa, evitando
+ * duplicar el cálculo de `subjectResult`.
  */
 export function useGoalsProgress(): { goal: Goal; progress: GoalProgress }[] {
   const { data, today } = useStore()
   const settings = data.settings
-  const results = useSubjectResults(settings.activeTerm)
-  const average = useGlobalAverage(settings.activeTerm)
-  const courseResults = useSubjectResults('todas')
-  const courseAverage = useGlobalAverage('todas')
   const t1 = useSubjectResults('T1')
   const t2 = useSubjectResults('T2')
   const t3 = useSubjectResults('T3')
-  const avg1 = useGlobalAverage('T1')
-  const avg2 = useGlobalAverage('T2')
-  const avg3 = useGlobalAverage('T3')
+  const courseResults = useSubjectResults('todas')
 
   return useMemo(() => {
+    const mode = settings.averageMode
+    const byTerm: Record<TermId, { results: Map<ID, SubjectResult>; average: number | null }> = {
+      T1: { results: t1, average: globalAverage(data.subjects, t1, mode) },
+      T2: { results: t2, average: globalAverage(data.subjects, t2, mode) },
+      T3: { results: t3, average: globalAverage(data.subjects, t3, mode) },
+    }
+    const active = byTerm[settings.activeTerm]
+    const courseAverage = globalAverage(data.subjects, courseResults, mode)
+
     const context: GoalContext = {
       tasks: data.tasks,
       sessions: data.sessions,
       subjects: data.subjects,
-      results,
-      globalAverage: average,
+      results: active.results,
+      globalAverage: active.average,
       courseResults,
       courseAverage,
-      termResults: (term: TermId) =>
-        term === 'T1'
-          ? { results: t1, average: avg1 }
-          : term === 'T2'
-            ? { results: t2, average: avg2 }
-            : { results: t3, average: avg3 },
+      termResults: (term: TermId) => byTerm[term],
       scale: settings.gradeScale,
       today,
       weekStartsOn: settings.weekStartsOn,
@@ -343,16 +381,12 @@ export function useGoalsProgress(): { goal: Goal; progress: GoalProgress }[] {
     data.sessions,
     data.subjects,
     data.goals,
-    results,
-    average,
-    courseResults,
-    courseAverage,
     t1,
     t2,
     t3,
-    avg1,
-    avg2,
-    avg3,
+    courseResults,
+    settings.activeTerm,
+    settings.averageMode,
     settings.gradeScale,
     settings.weekStartsOn,
     today,

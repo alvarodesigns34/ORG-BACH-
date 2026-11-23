@@ -414,7 +414,7 @@
   box-shadow: 0 8px 20px color-mix(in srgb, var(--seat) 35%, transparent);
 }
 [data-theme='dark'] .fs-seat.is-selected svg {
-  color: #111114;
+  color: #ffffff;
 }
 [data-theme='dark'] .fs-seat.is-taken {
   background: #2c2c30;
@@ -799,7 +799,7 @@
 
 @media (prefers-reduced-transparency: reduce) {
   .study-root .liquid,
-  .study-root [data-theme='dark'] .liquid {
+  [data-theme='dark'] .study-root .liquid {
     background: var(--c-surface);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;

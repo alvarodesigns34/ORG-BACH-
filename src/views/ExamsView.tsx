@@ -2,12 +2,13 @@ import { useMemo, useState } from 'react'
 import { CalendarPlus, ClipboardList, PlaneTakeoff } from 'lucide-react'
 
 import { MONTHS_LONG, daysUntil, parseDay, WEEKDAYS_LONG } from '@/domain/dates'
+import { clockOf, isExamOver } from '@/domain/exams'
 import { formatFlightTime } from '@/domain/flights'
 import { studyHref } from '@/router'
 import { colorVar, quietVar } from '@/domain/palette'
 import { TERMS, termName, type Exam, type GradeEntry, type Subject, type TermId } from '@/domain/types'
 import { useSettings, useStore, useToday } from '@/state/StoreProvider'
-import { useSubjectMap } from '@/state/selectors'
+import { useMinuteClock, useSubjectMap } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
 import { ExamEditor } from '@/features/exams/ExamEditor'
 import { Button, Card, EmptyState, GroupTitle, Segmented, cx } from '@/ui/primitives'
@@ -39,9 +40,8 @@ function countdown(days: number): string {
 
 /**
  * Arriba, los próximos (con su cuenta atrás); debajo, los ya hechos, por
- * evaluación, y dentro de cada una por fecha o por
- * asignatura. «Hecho» = su fecha ya llegó o ya tiene la nota apuntada; los
- * que están por venir se ven en Inicio y en Calendario.
+ * evaluación, y dentro de cada una por fecha o por asignatura. «Hecho» = su
+ * hora ya pasó (según `isExamOver`) o ya tiene la nota apuntada.
  */
 export function ExamsView() {
   const settings = useSettings()
@@ -56,6 +56,7 @@ export function ExamsView() {
     return byExam
   }, [data.sessions])
   const today = useToday()
+  const minute = useMinuteClock()
   const subjects = useSubjectMap()
 
   const [scope, setScope] = useState<Scope>(settings.activeTerm)
@@ -65,18 +66,25 @@ export function ExamsView() {
 
   const grades = useMemo(() => new Map(data.grades.map((g) => [g.id, g])), [data.grades])
 
-  const done = useMemo(
-    () => data.exams.filter((e) => e.date <= today || (e.gradeEntryId && grades.has(e.gradeEntryId))),
-    [data.exams, grades, today],
-  )
-
-  const upcoming = useMemo(
-    () =>
-      data.exams
-        .filter((e) => e.date > today && !(e.gradeEntryId && grades.has(e.gradeEntryId)))
-        .sort(byDate),
-    [data.exams, grades, today],
-  )
+  const { upcoming, done } = useMemo(() => {
+    const clock = clockOf(new Date(minute * 60_000))
+    const up: Exam[] = []
+    const finished: Exam[] = []
+    for (const exam of data.exams) {
+      if (subjects.get(exam.subjectId)?.archived) continue
+      const hasGrade = !!(exam.gradeEntryId && grades.has(exam.gradeEntryId))
+      const examForClock = hasGrade ? exam : { ...exam, gradeEntryId: undefined }
+      if (hasGrade || isExamOver(examForClock, subjects, clock)) {
+        finished.push(exam)
+      } else {
+        up.push(exam)
+      }
+    }
+    up.sort(byDate)
+    return { upcoming: up, done: finished }
+    // `today` asegura recálculo al cruzar medianoche.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.exams, subjects, grades, minute, today])
 
   const terms = scope === 'todas' ? TERMS.map((t) => t.id) : [scope]
   const blocks = terms
@@ -89,11 +97,11 @@ export function ExamsView() {
     const subject = subjects.get(exam.subjectId)
     const grade = exam.gradeEntryId ? grades.get(exam.gradeEntryId) : undefined
     return (
-      <li key={exam.id} className={cx(index > 0 && 'inset-separator-wide')}>
+      <li key={exam.id} className={cx('flex', index > 0 && 'inset-separator-wide')}>
         <button
           type="button"
           onClick={() => setEditing(exam)}
-          className="flex-1 min-w-0 text-left flex items-center gap-2.5 sm:gap-3.5 pl-3 sm:pl-4 pr-2 py-3 rounded-xl transition-colors duration-150 active:bg-fill hover:bg-fill/50"
+          className="w-full min-w-0 text-left flex items-center gap-2.5 sm:gap-3.5 pl-3 sm:pl-4 pr-3 sm:pr-4 py-3 transition-colors duration-150 active:bg-fill hover:bg-fill/50"
         >
           <DateLeaf date={exam.date} subject={subject} />
           <span className="flex-1 min-w-0">
@@ -177,7 +185,7 @@ export function ExamsView() {
                   <button
                     type="button"
                     onClick={() => setEditing(exam)}
-                    className="w-full text-left flex items-center gap-3.5 pl-4 pr-4 py-3 transition-colors duration-150 active:bg-fill hover:bg-fill/50"
+                    className="flex-1 min-w-0 text-left flex items-center gap-3 sm:gap-3.5 pl-3.5 sm:pl-4 pr-2 py-3 transition-colors duration-150 active:bg-fill hover:bg-fill/50"
                   >
                     <DateLeaf date={exam.date} subject={subject} />
                     <span className="flex-1 min-w-0">
@@ -186,6 +194,7 @@ export function ExamsView() {
                         style={{ color: subject ? colorVar(subject.color) : undefined }}
                       >
                         {subject?.name ?? 'Sin asignatura'}
+                        {exam.time ? ` · ${exam.time}` : ''}
                       </span>
                       <span className="block text-[0.9375rem] font-medium text-ink leading-snug truncate">
                         {exam.title}
@@ -200,7 +209,11 @@ export function ExamsView() {
                     <span
                       className={cx(
                         'shrink-0 rounded-full px-2.5 h-7 inline-flex items-center text-[0.8125rem] font-semibold tabular-nums',
-                        near ? 'bg-warn-quiet text-warn' : 'bg-fill text-ink-2',
+                        days <= 0
+                          ? 'bg-danger-quiet text-danger'
+                          : near
+                            ? 'bg-warn-quiet text-warn'
+                            : 'bg-fill text-ink-2',
                       )}
                     >
                       {countdown(days)}
@@ -293,17 +306,20 @@ function groupBySubject(exams: Exam[], subjects: Map<string, Subject>) {
 function DateLeaf({ date, subject }: { date: string; subject?: Subject }) {
   const day = parseDay(date)
   return (
-    <span aria-hidden className="grid w-11 shrink-0 overflow-hidden rounded-[10px] text-center bg-fill">
+    <span
+      aria-hidden
+      className="grid w-11 shrink-0 overflow-hidden rounded-[10px] text-center bg-fill border border-hairline"
+    >
       <span
-        className="text-[0.625rem] font-bold uppercase tracking-[0.04em] leading-[1.6] text-white"
-        style={{ background: subject ? colorVar(subject.color) : 'var(--c-ink-3)' }}
+        className="text-[0.625rem] font-bold uppercase tracking-[0.04em] leading-[1.6] text-ink"
+        style={{
+          background: subject ? quietVar(subject.color) : 'var(--c-fill-2)',
+          color: subject ? colorVar(subject.color) : 'var(--c-ink-2)',
+        }}
       >
         {WEEKDAYS_LONG[day.getDay()].slice(0, 3)}
       </span>
-      <span
-        className="numeral text-[1.25rem] leading-[1.6] text-ink"
-        style={subject ? { background: quietVar(subject.color) } : undefined}
-      >
+      <span className="numeral text-[1.25rem] leading-[1.6] text-ink bg-surface">
         {day.getDate()}
       </span>
     </span>

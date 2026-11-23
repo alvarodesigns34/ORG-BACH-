@@ -289,7 +289,7 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
                         aria-label="Día"
                         value={slot.day}
                         onChange={(e) => patch({ day: Number(e.target.value) as ScheduleSlot['day'] })}
-                        className="flex-1 min-w-0 h-9 bg-transparent text-[1rem] text-ink font-sans outline-none cursor-pointer"
+                        className="flex-1 min-w-0 h-9 bg-transparent text-[1rem] text-ink font-sans rounded-[6px] focus-visible:outline-2 focus-visible:outline-accent cursor-pointer"
                       >
                         {SCHEDULE_DAYS.map((day) => (
                           <option key={day.value} value={day.value}>

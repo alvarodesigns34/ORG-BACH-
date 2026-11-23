@@ -456,8 +456,11 @@ export class FlightMap {
     if (this.ready) this.source('range')?.setData(this.rangeData())
   }
 
+  private onPinPick: ((iata: string) => void) | null = null
+
   /** Destinos posibles como cápsulas con el código del aeropuerto. */
   setPins(all: Destination[], selected: string | null, onPick: (iata: string) => void): void {
+    this.onPinPick = onPick
     // Los 14 mejores (y el elegido): más cápsulas se pisan unas a otras.
     const list = all.filter((d, i) => i < 14 || d.airport.iata === selected)
     const keep = new Set(list.map((d) => d.airport.iata))
@@ -482,7 +485,7 @@ export class FlightMap {
         el.appendChild(pin)
         pin.addEventListener('click', (event) => {
           event.stopPropagation()
-          onPick(d.airport.iata)
+          this.onPinPick?.(d.airport.iata)
         })
         marker = new Marker({ element: el }).setLngLat(ll(d.airport)).addTo(this.map)
         this.pins.set(d.airport.iata, marker)

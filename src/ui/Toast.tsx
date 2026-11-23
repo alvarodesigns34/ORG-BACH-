@@ -67,7 +67,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           className={cx(
             'fixed z-40 inset-x-0 flex justify-center pointer-events-none px-4',
             // Encima de la barra flotante en móvil; abajo a la izquierda en escritorio.
-            'bottom-[calc(5.75rem+env(safe-area-inset-bottom))] lg:bottom-6 lg:justify-start lg:left-[304px]',
+            'bottom-[calc(5.75rem+env(safe-area-inset-bottom))] lg:bottom-6 lg:justify-start lg:left-[calc(var(--content-left)+1rem)]',
           )}
         >
           <AnimatePresence mode="popLayout">

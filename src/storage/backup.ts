@@ -134,8 +134,8 @@ function isIos(): boolean {
  * compartir del sistema, que ofrece «Guardar en Archivos», AirDrop o Mail.
  * Devuelve false si el alumno la cerró sin guardar.
  */
-export async function exportBackup(data: AppData): Promise<boolean> {
-  const name = `orbita-${todayISO()}.json`
+export async function exportBackup(data: AppData, filename?: string): Promise<boolean> {
+  const name = filename ?? `orbita-${todayISO()}.json`
   const text = exportJSON(data)
   const file = new File([text], name, { type: 'application/json' })
 

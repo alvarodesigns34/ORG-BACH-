@@ -281,10 +281,14 @@ class SyncEngine {
       return
     }
 
-    downloadBackup(
-      exportJSON(store.getData()),
-      `orbita-antes-de-sincronizar-${today()}.json`,
-    )
+    // En iPad/iPhone usa la hoja de compartir del sistema en lugar de `<a download>`.
+    void import('../storage/backup.ts')
+      .then(({ exportBackup }) =>
+        exportBackup(store.getData(), `orbita-antes-de-sincronizar-${today()}.json`),
+      )
+      .catch(() =>
+        downloadBackup(exportJSON(store.getData()), `orbita-antes-de-sincronizar-${today()}.json`),
+      )
     this.set({ phase: 'syncing' })
     try {
       await this.pull({ replaceLocal: true, linkMeta: createMeta(userId, nodeId()) })
@@ -328,9 +332,15 @@ class SyncEngine {
     }
     this.set({ phase: 'syncing' })
     try {
+      const hiding = typeof document !== 'undefined' && document.visibilityState === 'hidden'
       await withLock(async () => {
-        await this.pull()
-        await this.push()
+        if (hiding) {
+          // Al pasar a segundo plano (iOS), priorizar subir lo pendiente antes de que el sistema congele la app.
+          await this.push()
+        } else {
+          await this.pull()
+          await this.push()
+        }
       })
       this.retryDelay = 15_000
       clearTimeout(this.timers.retry)
@@ -387,7 +397,13 @@ class SyncEngine {
     const applied = store.applyRemote((current) => {
       const latest = options.linkMeta ?? loadMeta()
       if (!latest || latest.userId !== userId) return null
-      const base = options.replaceLocal ? createEmptyData() : current
+      // El tema es local del dispositivo: conservarlo incluso al sustituir el curso.
+      const base = options.replaceLocal
+        ? {
+            ...createEmptyData(),
+            settings: { ...createEmptyData().settings, theme: current.settings.theme },
+          }
+        : current
       const result = mergeRemote(base, latest, rows)
       return { data: result.changed || options.replaceLocal ? result.data : null, meta: result.meta }
     })
@@ -399,9 +415,11 @@ class SyncEngine {
     if (!userId) return
     const client = await getClient()
     const store = await storeBridge()
-    if (!store.applyRemote(() => null)) throw new Error('Guarda los cambios locales antes de sincronizar.')
 
     for (let round = 0; round < 25; round++) {
+      // Volcar cualquier cambio en debounce antes de leer `meta` y `getData()`
+      // en cada ronda: evita emparejar valores nuevos con relojes antiguos.
+      if (!store.applyRemote(() => null)) throw new Error('Guarda los cambios locales antes de sincronizar.')
       const meta = loadMeta()
       if (this.userId !== userId || !meta || meta.userId !== userId || meta.dirty.length === 0) break
       const keys = meta.dirty.slice(0, PUSH_BATCH)
@@ -506,6 +524,16 @@ class SyncEngine {
         // Si no se puede, queda en la cola para la próxima vez.
       }
     }
+    if (wipeLocal) {
+      // Dar de baja push ANTES de cerrar sesión para que el servidor retire
+      // este navegador y no siga recibiendo avisos privados en un equipo compartido.
+      try {
+        const { disableAllPush } = await import('../push/push.ts')
+        await disableAllPush()
+      } catch {
+        // Mejor esfuerzo: no bloquea el cierre de sesión.
+      }
+    }
     this.teardownRealtime()
     await client.auth.signOut({ scope: 'local' })
     if (wipeLocal) {
@@ -513,6 +541,7 @@ class SyncEngine {
       if (!store.applyRemote(() => ({ data: createEmptyData(), meta: null }))) {
         throw new Error('La sesión se cerró, pero no se pudo retirar la copia local.')
       }
+      await wipeSharedDeviceArtifacts()
     }
     this.userId = null
     this.set({ phase: 'signed-out', email: null, pending: loadMeta()?.dirty.length ?? 0 })
@@ -535,6 +564,35 @@ class SyncEngine {
     const client = await getClient()
     const { data } = await client.auth.getSession()
     return data.session?.access_token ?? null
+  }
+}
+
+/** Retira copias automáticas, historial del asistente y preferencias de un equipo compartido. */
+async function wipeSharedDeviceArtifacts(): Promise<void> {
+  try {
+    const { clearSnapshots } = await import('../storage/snapshots.ts')
+    await clearSnapshots()
+  } catch {
+    // IndexedDB opcional.
+  }
+  try {
+    const prefixes = [
+      'bachillerato-os:assistant',
+      'bachillerato-os:v1.bak',
+      'bachillerato-os:push',
+      'bachillerato-os:node',
+      'bachillerato-os:sync',
+      'orbita:copias',
+      'org-bach:',
+    ]
+    const keysToRemove: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k && prefixes.some((p) => k.startsWith(p))) keysToRemove.push(k)
+    }
+    for (const k of keysToRemove) localStorage.removeItem(k)
+  } catch {
+    // Almacenamiento restringido.
   }
 }
 

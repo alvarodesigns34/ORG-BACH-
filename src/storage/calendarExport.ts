@@ -15,6 +15,7 @@ export function exportCalendar(data: AppData): void {
   const text = buildIcs({
     tasks: data.tasks,
     exams: data.exams,
+    events: data.events,
     subjects: data.subjects,
     today: todayISO(),
   })

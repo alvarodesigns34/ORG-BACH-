@@ -11,7 +11,6 @@ import { TaskEditor } from '@/features/tasks/TaskEditor'
 import { ExamEditor } from '@/features/exams/ExamEditor'
 import { GradeEditor } from '@/features/grades/GradeEditor'
 import { EventEditor } from '@/features/events/EventEditor'
-import { Onboarding } from '@/features/onboarding/Onboarding'
 import { prewarmStudyMap, scheduleStudyMapPrewarm } from '@/features/study/prewarm'
 import { DashboardView } from '@/views/DashboardView'
 import { SubjectsView } from '@/views/SubjectsView'
@@ -23,6 +22,13 @@ import { ToastProvider } from '@/ui/Toast'
 import { ChromeProvider, type CreateKind } from '@/layout/chrome'
 import { FlightController } from '@/features/study/FlightController'
 import { ShortcutsSheet, useKeyboardShortcuts } from '@/layout/shortcuts'
+
+const Onboarding = lazy(() =>
+  import('@/features/onboarding/Onboarding').then((m) => ({ default: m.Onboarding })),
+)
+const CommandPalette = lazyView(() =>
+  import('@/features/search/CommandPalette').then((m) => m.CommandPalette),
+)
 
 // Vistas en bloques aparte. Se descargan en reposo tras el arranque (ver
 // `preloadViews`) y, si aún no estaban, al tocar su pestaña: el router espera
@@ -58,7 +64,7 @@ setRoutePreloader((route) => {
 })
 
 /** En orden de uso probable. El globo de Estudio se precalienta aparte (ver `prewarm`). */
-const IDLE_ORDER = [TasksView, CalendarView, StudyView, GradesView, ExamsView, SubjectDetailView, StatsView, GoalsView, SettingsView]
+const IDLE_ORDER = [CommandPalette, TasksView, CalendarView, StudyView, GradesView, ExamsView, SubjectDetailView, StatsView, GoalsView, SettingsView]
 
 function preloadViews(): () => void {
   let cancel = () => {}
@@ -94,6 +100,8 @@ function Shell() {
     useStore()
   const summary = useTaskSummary()
   const [creating, setCreating] = useState<CreateKind | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchLoaded, setSearchLoaded] = useState(false)
 
   // `summary.today` ya incluye lo atrasado (es la lista real del día), así que
   // sumarle `overdue` contaba dos veces cada tarea pasada de fecha: una sola
@@ -104,6 +112,10 @@ function Shell() {
   )
 
   const openCreate = useCallback((kind: CreateKind = 'tarea') => setCreating(kind), [])
+  const openSearch = useCallback(() => {
+    setSearchLoaded(true)
+    setSearchOpen(true)
+  }, [])
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [assistantLoaded, setAssistantLoaded] = useState(false)
   const [assistantStart, setAssistantStart] = useState<{ mode: 'text' | 'voice'; at: number }>()
@@ -113,10 +125,10 @@ function Shell() {
     setAssistantLoaded(true)
     setAssistantOpen(true)
   }, [])
-  const hasSubjects = data.subjects.length > 0
+  const hasSubjects = data.subjects.some((s) => !s.archived)
   const chrome = useMemo(
-    () => ({ openCreate, openAssistant, hasSubjects }),
-    [openCreate, openAssistant, hasSubjects],
+    () => ({ openCreate, openAssistant, openSearch, hasSubjects }),
+    [openCreate, openAssistant, openSearch, hasSubjects],
   )
   const closeCreate = useCallback(() => setCreating(null), [])
 
@@ -144,7 +156,13 @@ function Shell() {
 
   // Atajos de teclado (iPad con teclado y ordenador) y su hoja de ayuda.
   const flightActive = data.sessions.some((s) => s.status === 'en_vuelo')
-  const shortcuts = useKeyboardShortcuts({ openCreate, openAssistant, flightActive })
+  const shortcuts = useKeyboardShortcuts({
+    openCreate,
+    openAssistant,
+    openSearch,
+    hasSubjects,
+    flightActive,
+  })
 
   // `?crear=tarea|examen|nota|evento` en cualquier ruta abre el editor: lo
   // usan los accesos directos de la app instalada.
@@ -193,24 +211,28 @@ function Shell() {
     return (
       <>
         <StorageBanner />
-        <Onboarding />
+        <Suspense fallback={<RouteLoading study={false} />}>
+          <Onboarding />
+        </Suspense>
         <LinkChoiceDialog />
         <RecoveryDialog />
       </>
     )
   }
 
+  const routeKey = `${route.id}:${route.params.get('id') ?? ''}`
+
   return (
     <>
       <ChromeProvider value={chrome}>
         <AppShell
           current={route.id}
-          screenKey={`${route.id}:${route.params.get('id') ?? ''}`}
+          screenKey={routeKey}
           restoreScroll={![...route.params.keys()].some((k) => k !== 'id')}
           badges={badges}
           backHref={route.id === 'asignaturas' && route.params.get('id') ? hrefFor('asignaturas') : undefined}
         >
-          <ErrorBoundary fallback={<RouteFailure study={route.id === 'estudio'} />}>
+          <ErrorBoundary key={routeKey} fallback={<RouteFailure study={route.id === 'estudio'} />}>
             <Suspense fallback={<RouteLoading study={route.id === 'estudio'} />}>
               {renderRoute(route, data.subjects.length)}
             </Suspense>
@@ -222,6 +244,16 @@ function Shell() {
       <ExamEditor open={creating === 'examen'} onClose={closeCreate} />
       <GradeEditor open={creating === 'nota'} onClose={closeCreate} />
       <EventEditor open={creating === 'evento'} onClose={closeCreate} />
+      {searchLoaded && (
+        <Suspense fallback={null}>
+          <CommandPalette
+            open={searchOpen}
+            onClose={() => setSearchOpen(false)}
+            onCreate={openCreate}
+            onOpenAssistant={openAssistant}
+          />
+        </Suspense>
+      )}
       {assistantLoaded && (
         <ErrorBoundary fallback={assistantOpen && (
           <div className="fixed inset-x-4 bottom-24 z-[70] mx-auto max-w-sm rounded-3xl bg-surface p-5 shadow-xl" role="alert">

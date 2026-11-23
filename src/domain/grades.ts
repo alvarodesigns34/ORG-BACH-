@@ -211,8 +211,8 @@ function courseResult(
   allGrades: GradeEntry[],
   scale: GradeScale,
 ): SubjectResult {
-  const perTerm = ALL_TERMS.map((t) => termResult(subject, allGrades, scale, t))
-  const scored = perTerm.filter((r) => r.average !== null)
+  const perTerm = ALL_TERMS.map((t) => ({ term: t, result: termResult(subject, allGrades, scale, t) }))
+  const scored = perTerm.filter((x) => x.result.average !== null)
 
   // El desglose por categorías sigue saliendo del conjunto de notas: es lo
   // que la interfaz enseña para explicar de dónde vienen. La media, en
@@ -222,17 +222,31 @@ function courseResult(
   const average =
     scored.length === 0
       ? null
-      : round(scored.reduce((sum, r) => sum + (r.average as number), 0) / scored.length, 4)
+      : round(scored.reduce((sum, x) => sum + (x.result.average as number), 0) / scored.length, 4)
 
   // Cuánto del CURSO se ha evaluado: cada evaluación aporta un tercio, y las
   // que aún no han empezado cuentan como cero. Un curso con la primera
   // evaluación cerrada y nada más lleva un 33 %, no un 100 %.
   const evaluatedPercent = round(
-    perTerm.reduce((sum, r) => sum + r.evaluatedPercent, 0) / ALL_TERMS.length,
+    perTerm.reduce((sum, x) => sum + x.result.evaluatedPercent, 0) / ALL_TERMS.length,
     2,
   )
 
-  return { ...pooled, average, evaluatedPercent }
+  // Los avisos de peso dentro de una categoría se evalúan POR EVALUACIÓN, no
+  // sumando T1+T2+T3 en el mismo saco (dos exámenes del 60 % en trimestres
+  // distintos no suman 120 % de un mismo trimestre).
+  const subjectWarnings = pooled.warnings.filter((w) => w.scope === 'asignatura')
+  const termWarnings: WeightWarning[] = perTerm.flatMap(({ term, result }) =>
+    result.warnings
+      .filter((w) => w.scope !== 'asignatura')
+      .map((w) => ({
+        ...w,
+        label: `${term} · ${w.label}`,
+        message: `${term}: ${w.message}`,
+      })),
+  )
+
+  return { ...pooled, average, evaluatedPercent, warnings: [...subjectWarnings, ...termWarnings] }
 }
 
 function termResult(
@@ -328,6 +342,20 @@ function termResult(
         sum: round(breakdown.declaredWeight, 2),
         message: `Las notas de ${breakdown.name} suman ${formatPercent(breakdown.declaredWeight)}, más del 100 %.`,
       })
+    } else if (breakdown.declaredWeight >= 99.99) {
+      const zeroWeightCount = breakdown.entries.filter((e) => !e.weight).length
+      if (zeroWeightCount > 0) {
+        warnings.push({
+          scope: 'categoria',
+          categoryId: breakdown.categoryId ?? undefined,
+          label: breakdown.name,
+          sum: round(breakdown.declaredWeight, 2),
+          message:
+            zeroWeightCount === 1
+              ? `Hay 1 nota sin peso en ${breakdown.name} que no cuenta porque el resto ya suma el 100 %.`
+              : `Hay ${zeroWeightCount} notas sin peso en ${breakdown.name} que no cuentan porque el resto ya suma el 100 %.`,
+        })
+      }
     }
   }
 
@@ -341,9 +369,10 @@ function termResult(
       : scoring.reduce((sum, b) => sum + (b.average as number) * b.weight, 0) / activeWeight
 
   // --- Porcentaje evaluado: peso de cada categoría por su cobertura ---
-  const totalWeight = hasCategories
-    ? breakdowns.reduce((sum, b) => sum + b.weight, 0) || 100
-    : 100
+  // Si las categorías declaradas suman menos del 100 % (p. ej. solo «Exámenes 70 %»),
+  // el total sigue siendo 100 % para no dar por «100 % evaluado» lo que aún tiene hueco libre.
+  const declaredTotal = breakdowns.reduce((sum, b) => sum + b.weight, 0)
+  const totalWeight = hasCategories ? Math.max(100, declaredTotal) : 100
   const evaluatedPercent = clamp(
     breakdowns.reduce((sum, b) => sum + (b.weight / totalWeight) * b.coverage, 0) * 100,
     0,

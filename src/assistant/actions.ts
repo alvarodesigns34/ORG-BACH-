@@ -14,7 +14,7 @@
 
 import { normalize } from '../domain/tasks.ts'
 import { addDays, formatDayMonth } from '../domain/dates.ts'
-import { requiredGrade, round, subjectResult } from '../domain/grades.ts'
+import { globalAverage, requiredGrade, round, subjectResult } from '../domain/grades.ts'
 import { activeSession, layoverPoints, layoversTaken, remainingMs } from '../domain/flights.ts'
 import { minutesBetween, studyBeforeExams, studyStreak } from '../domain/study.ts'
 import { newId } from '../domain/id.ts'
@@ -139,6 +139,7 @@ export const FLIGHT_SOUNDS: Record<string, string> = {
   viento: 'Viento',
   chimenea: 'Chimenea',
   marron: 'Ruido marrón',
+  rosa: 'Ruido rosa',
   ninguno: 'Silencio',
 }
 
@@ -165,7 +166,7 @@ export const es = (n: number) => n.toLocaleString('es-ES', { maximumFractionDigi
 const isDay = (v: unknown): v is string => {
   if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false
   const [y, m, d] = v.split('-').map(Number)
-  return m >= 1 && m <= 12 && d >= 1 && d <= new Date(y, m, 0).getDate()
+  return m >= 1 && m <= 12 && d >= 1 && d <= new Date(Date.UTC(y, m, 0)).getUTCDate()
 }
 const isTime = (v: unknown): v is string =>
   typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v)
@@ -174,7 +175,7 @@ const num = (v: unknown): number | undefined =>
 const text = (v: unknown, max = 200): string | undefined =>
   typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined
 const has = (a: AssistantAction, key: keyof AssistantAction) =>
-  Object.prototype.hasOwnProperty.call(a, key) && a[key] !== undefined
+  Object.prototype.hasOwnProperty.call(a, key) && a[key] !== undefined && a[key] !== null
 const pct = (v: unknown): number | undefined => {
   const n = num(v)
   return n !== undefined && n > 0 && n <= 100 ? n : undefined
@@ -252,8 +253,9 @@ export function applyAssistantActions(
           skipped.push('Una asignatura sin nombre.')
           break
         }
-        // Ya existe: no se duplica, y lo que venga detrás la encontrará.
-        if (resolveSubject(data.subjects, undefined, name)) break
+        // Ya existe (comparación exacta normalizada, sin confundir «Física» con «Física y Química»).
+        const normName = normalize(name)
+        if (data.subjects.some((s) => normalize(s.name) === normName)) break
         data = reducer(data, {
           type: 'subject/add',
           subject: {
@@ -1080,10 +1082,7 @@ export function buildContext(data: AppData, today: string, now: Date = new Date(
   const results = new Map(
     data.subjects.map((s) => [s.id, subjectResult(s, data.grades, scale, active)]),
   )
-  const scored = data.subjects.filter((s) => !s.archived && results.get(s.id)?.average !== null)
-  const termAverage = scored.length
-    ? r2(scored.reduce((sum, s) => sum + results.get(s.id)!.average!, 0) / scored.length)
-    : null
+  const termAverage = r2(globalAverage(data.subjects, results, data.settings.averageMode))
 
   const task = (t: Task) => ({
     id: t.id,

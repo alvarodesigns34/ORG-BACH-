@@ -93,12 +93,21 @@ const hm = (v: unknown): number => {
  * de su clase o una hora después; sin hora, el fin de la última clase de la
  * asignatura ese día; sin nada, las 20:00.
  */
-function examEnd(exam: Record<string, unknown>, subject: Record<string, unknown> | undefined, weekday: number): number {
-  const slots = (Array.isArray(subject?.schedule) ? subject.schedule : [])
+function slotsFor(subject: Record<string, unknown> | undefined, weekday: number): { start: number; end: number }[] {
+  return (Array.isArray(subject?.schedule) ? subject.schedule : [])
     .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object' && x.day === weekday)
     .map((x) => ({ start: hm(x.start), end: hm(x.end) }))
     .filter((x) => Number.isFinite(x.start) && Number.isFinite(x.end) && x.end > x.start)
     .sort((a, b) => a.start - b.start)
+}
+
+function examEnd(
+  exam: Record<string, unknown>,
+  subject: Record<string, unknown> | undefined,
+  allSubjects: Map<string, Record<string, unknown>>,
+  weekday: number,
+): number {
+  const slots = slotsFor(subject, weekday)
   const blocks: { start: number; end: number }[] = []
   for (const slot of slots) {
     const last = blocks[blocks.length - 1]
@@ -107,9 +116,19 @@ function examEnd(exam: Record<string, unknown>, subject: Record<string, unknown>
   }
   const start = hm(exam.time)
   if (Number.isFinite(start)) {
-    return blocks.find((b) => start >= b.start && start < b.end)?.end ?? start + 60
+    return blocks.find((b) => start >= b.start && start < b.end)?.end ?? Math.min(start + 60, 24 * 60)
   }
-  return blocks.length ? blocks[blocks.length - 1].end : 20 * 60
+  if (blocks.length) return blocks[blocks.length - 1].end
+  // Igual que `src/domain/exams.ts`: si la asignatura no tiene clase hoy,
+  // usar el fin de la última clase de la jornada (o 20:00 si no hay horario).
+  let dayEnd = Number.NaN
+  for (const s of allSubjects.values()) {
+    if (s.archived === true) continue
+    for (const slot of slotsFor(s, weekday)) {
+      if (!(slot.end <= dayEnd)) dayEnd = slot.end
+    }
+  }
+  return Number.isFinite(dayEnd) ? dayEnd : 20 * 60
 }
 
 /**
@@ -121,7 +140,11 @@ export function buildDigest(rows: SyncRow[], today: string, nowMinutes?: number)
   const live = rows.filter((r) => !isDeleted(r))
   const subjectRows = new Map(live.filter((r) => r.collection === 'subjects').map((r) => [r.id, r.data]))
   const subjects = new Map([...subjectRows].map(([id, data]) => [id, String(data.name ?? '')]))
-  const settings = live.find((r) => r.collection === 'settings')?.data ?? {}
+  const liveGradeIds = new Set(live.filter((r) => r.collection === 'grades').map((r) => r.id))
+  const hasGradeRows = live.some((r) => r.collection === 'grades')
+  const settings = live.find((r) => r.collection === 'settings' && r.id === 'settings')?.data
+    ?? live.find((r) => r.collection === 'settings')?.data
+    ?? {}
   const examDays = Math.min(30, Math.max(1, Number(settings.examAlertDays) || 7))
 
   // «Mostrar avisos» apagado silencia también el resumen: es lo que se espera
@@ -135,7 +158,11 @@ export function buildDigest(rows: SyncRow[], today: string, nowMinutes?: number)
   const pending = live
     .filter((r) => r.collection === 'tasks')
     .map((r) => r.data)
-    .filter((t) => t.status !== 'completada' && typeof t.dueDate === 'string' && t.dueDate <= today)
+    .filter((t) => {
+      if (t.status === 'completada' || typeof t.dueDate !== 'string' || t.dueDate > today) return false
+      if (typeof t.subjectId === 'string' && subjectRows.get(t.subjectId)?.archived === true) return false
+      return true
+    })
     .sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)))
   const overdue = pending.filter((t) => (t.dueDate as string) < today).length
 
@@ -144,12 +171,14 @@ export function buildDigest(rows: SyncRow[], today: string, nowMinutes?: number)
     .map((r) => r.data)
     .filter((e) => {
       if (typeof e.date !== 'string') return false
-      // Ya con nota, o de una asignatura archivada: no se anuncia.
-      if (typeof e.gradeEntryId === 'string' && e.gradeEntryId) return false
+      // Ya con nota (y si tenemos filas de notas, comprobar que siga viva), o de asignatura archivada.
+      if (typeof e.gradeEntryId === 'string' && e.gradeEntryId && (!hasGradeRows || liveGradeIds.has(e.gradeEntryId))) {
+        return false
+      }
       const subject = subjectRows.get(String(e.subjectId))
       if (subject?.archived === true) return false
       const diff = daysBetween(today, e.date)
-      if (diff === 0 && nowMinutes !== undefined && nowMinutes >= examEnd(e, subject, weekday)) return false
+      if (diff === 0 && nowMinutes !== undefined && nowMinutes >= examEnd(e, subject, subjectRows, weekday)) return false
       return diff >= 0 && diff <= examDays
     })
     .sort((a, b) => String(a.date).localeCompare(String(b.date)))

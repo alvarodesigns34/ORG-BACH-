@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, m as motion, useDragControls, useReducedMotion } from 'motion/react'
 import { X } from 'lucide-react'
@@ -9,6 +9,9 @@ import { lockScroll } from './scrollLock'
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/** Pila de diálogos abiertos: Esc cierra solo el que está encima. */
+const modalStack: symbol[] = []
 
 interface ModalProps {
   open: boolean
@@ -50,6 +53,8 @@ export function Modal({
   const content = useRef<HTMLDivElement>(null)
   const actions = useRef<HTMLElement>(null)
   const restoreFocus = useRef<HTMLElement | null>(null)
+  const modalToken = useRef(Symbol('modal'))
+  const [keyboardInset, setKeyboardInset] = useState(0)
   const titleId = useId()
   const descId = useId()
   const sheet = !useMediaQuery('(min-width: 640px)')
@@ -92,12 +97,38 @@ export function Modal({
   // es compartido entre diálogos: ver scrollLock.ts.
   useEffect(() => (open ? lockScroll() : undefined), [open])
 
+  // En iOS Safari/PWA el teclado virtual reduce `visualViewport.height` sin
+  // cambiar `100dvh` de inmediato: levantamos la hoja para que el footer no quede tapado.
+  useEffect(() => {
+    if (!open || !sheet || typeof window === 'undefined' || !window.visualViewport) {
+      setKeyboardInset(0)
+      return
+    }
+    const vv = window.visualViewport
+    const update = () => {
+      const occluded = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop))
+      setKeyboardInset(occluded > 80 ? occluded : 0)
+    }
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+      setKeyboardInset(0)
+    }
+  }, [open, sheet])
+
   // Esc y el tabulador tienen que funcionar aunque el foco haya salido al
-  // fondo. El listener va en `document`, no en el overlay.
+  // fondo. Con diálogos anidados (p. ej. ConfirmDialog sobre un editor),
+  // solo el diálogo superior de `modalStack` responde a Esc y Tab.
   useEffect(() => {
     if (!open) return
+    const token = modalToken.current
+    modalStack.push(token)
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (modalStack[modalStack.length - 1] !== token) return
       if (event.key === 'Escape') {
         event.stopPropagation()
         onClose()
@@ -115,7 +146,10 @@ export function Modal({
 
       const first = items[0]
       const last = items[items.length - 1]
-      if (event.shiftKey && document.activeElement === first) {
+      if (
+        event.shiftKey &&
+        (document.activeElement === first || document.activeElement === node)
+      ) {
         event.preventDefault()
         last.focus()
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -125,7 +159,11 @@ export function Modal({
     }
 
     document.addEventListener('keydown', onKeyDown, true)
-    return () => document.removeEventListener('keydown', onKeyDown, true)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown, true)
+      const idx = modalStack.lastIndexOf(token)
+      if (idx !== -1) modalStack.splice(idx, 1)
+    }
   }, [open, onClose])
 
   const widths = { sm: 'sm:max-w-md', md: 'sm:max-w-xl', lg: 'sm:max-w-3xl' }
@@ -143,6 +181,7 @@ export function Modal({
         <motion.div
           key="modal"
           className="fixed inset-0 z-50 flex sm:items-center justify-center items-end"
+          style={keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
           // Mientras baja ya no intercepta toques: se puede seguir usando la
           // página sin esperar a que termine la animación.
           exit={{ pointerEvents: 'none' }}

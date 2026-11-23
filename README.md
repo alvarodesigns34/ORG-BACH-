@@ -42,7 +42,7 @@ con los objetivos de una asignatura borrada, se arregló la entrada de decimales
 en Ajustes, se hizo consistente la confirmación al borrar y se ajustó el
 contraste de los textos secundarios en ambos temas.
 
-Hay **256 pruebas** sobre el dominio, el reductor, la persistencia, la fusión
+Hay **416 pruebas** sobre el dominio, el reductor, la persistencia, la fusión
 de la sincronización y el resumen diario. Recorren
 los casos que rompen este tipo de aplicaciones: pesos que no suman 100, notas
 sin peso junto a notas con peso, escalas distintas del 10, la nota del curso
@@ -379,7 +379,7 @@ iPadOS (sí en Chrome/Edge y Safari de macOS).
 Proyección `globe` de MapLibre con atmósfera y espacio estrellado. El despegue
 arranca con la cámara baja e inclinada y sube hasta ver la curvatura; en vuelo
 la cámara va inclinada y orientada con la ruta; al aterrizar baja girando
-sobre el destino. Minimalista, Relieve y Satélite funcionan en claro y oscuro.
+sobre el destino. Minimalista y Relieve funcionan en claro y oscuro.
 Hay un conmutador **3D/2D** en el panel del mapa por si algún iPad va justo.
 
 ## Estadísticas del estudio

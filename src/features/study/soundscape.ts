@@ -704,15 +704,27 @@ function playStreaming(c: AudioContext, id: Recorded, out: AudioNode): () => voi
   // La descarga completa espera a que el streaming ya suene: si no, las dos
   // se reparten la conexión y el primer sonido tarda más.
   let upgrading = false
+  let playingTimer: number | null = null
+  let fallbackTimer: number | null = null
   function upgrade() {
-    if (upgrading) return
+    if (done || upgrading) return
     upgrading = true
+    if (playingTimer !== null) window.clearTimeout(playingTimer)
+    if (fallbackTimer !== null) window.clearTimeout(fallbackTimer)
+    playingTimer = null
+    fallbackTimer = null
     void load(c, id).then(swap)
   }
   if (!srcNode) upgrade()
   else {
-    el.addEventListener('playing', () => window.setTimeout(upgrade, 400), { once: true })
-    window.setTimeout(upgrade, 4000)
+    el.addEventListener(
+      'playing',
+      () => {
+        if (!done) playingTimer = window.setTimeout(upgrade, 400)
+      },
+      { once: true },
+    )
+    fallbackTimer = window.setTimeout(upgrade, 4000)
   }
   function swap(b: AudioBuffer | null) {
     if (done || !b) return
@@ -731,6 +743,8 @@ function playStreaming(c: AudioContext, id: Recorded, out: AudioNode): () => voi
   }
   return () => {
     done = true
+    if (playingTimer !== null) window.clearTimeout(playingTimer)
+    if (fallbackTimer !== null) window.clearTimeout(fallbackTimer)
     stopBuffer?.()
     release()
   }

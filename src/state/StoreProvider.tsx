@@ -50,6 +50,8 @@ interface StoreValue {
 }
 
 const StoreContext = createContext<StoreValue | null>(null)
+const DispatchContext = createContext<((action: Action) => void) | null>(null)
+const TodayContext = createContext<DateISO | null>(null)
 
 /** Espera antes de escribir en disco: agrupa ráfagas de tecleo en un guardado. */
 const SAVE_DEBOUNCE_MS = 350
@@ -336,7 +338,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     ],
   )
 
-  return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
+  return (
+    <DispatchContext.Provider value={dispatch}>
+      <TodayContext.Provider value={today}>
+        <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
+      </TodayContext.Provider>
+    </DispatchContext.Provider>
+  )
 }
 
 let lastPreference: ThemePreference = 'system'
@@ -364,7 +372,7 @@ function applyTheme(preference: ThemePreference) {
   lastPreference = preference
   const dark = override ? override === 'dark' : appIsDark(preference)
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
-  const color = dark ? '#000000' : '#F2F2F7'
+  const color = dark ? '#000000' : '#eef0f4'
   for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
     meta.setAttribute('content', color)
     meta.removeAttribute('media')
@@ -378,7 +386,9 @@ export function useStore(): StoreValue {
 }
 
 export function useDispatch(): (action: Action) => void {
-  return useStore().dispatch
+  const dispatch = useContext(DispatchContext)
+  if (!dispatch) throw new Error('useDispatch debe usarse dentro de <StoreProvider>')
+  return dispatch
 }
 
 export function useSettings() {
@@ -386,5 +396,7 @@ export function useSettings() {
 }
 
 export function useToday(): DateISO {
-  return useStore().today
+  const today = useContext(TodayContext)
+  if (!today) throw new Error('useToday debe usarse dentro de <StoreProvider>')
+  return today
 }

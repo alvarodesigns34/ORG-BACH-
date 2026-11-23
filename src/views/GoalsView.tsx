@@ -3,7 +3,7 @@ import { Check, Plus, Target } from 'lucide-react'
 
 import { KIND_LABEL, SCOPE_LABEL } from '@/domain/goals'
 import { colorVar } from '@/domain/palette'
-import type { Goal } from '@/domain/types'
+import { termName, type Goal } from '@/domain/types'
 import { useGoalsProgress, useSubjectMap } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
 import { GoalEditor } from '@/features/goals/GoalEditor'
@@ -54,9 +54,13 @@ export function GoalsView() {
           />
         </Card>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3.5">
           {withProgress.map(({ goal, progress }, i) => {
             const subject = goal.subjectId ? subjects.get(goal.subjectId) : undefined
+            const scopeLabel =
+              goal.kind === 'media' && goal.scope === 'trimestral' && goal.term
+                ? termName(goal.term)
+                : SCOPE_LABEL[goal.scope]
 
             return (
               <button
@@ -65,16 +69,14 @@ export function GoalsView() {
                 onClick={() => setEditing(goal)}
                 style={{ '--i': i } as React.CSSProperties}
                 className={cx(
-                  'animate-rise stagger w-full text-left rounded-lg border p-5',
-                  'transition-[border-color,background-color] duration-200',
-                  progress.done
-                    ? 'bg-ok-quiet border-ok/25 hover:border-ok/45'
-                    : 'bg-surface border-hairline hover:border-hairline-strong',
+                  'card animate-rise stagger w-full text-left p-5 block',
+                  'transition-[background-color,transform] duration-200 active:scale-[0.99] hover:bg-raised',
+                  progress.done && 'ring-1 ring-inset ring-ok/35 bg-ok-quiet/60',
                 )}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="flex items-center gap-2 min-w-0">
+                <span className="flex items-start justify-between gap-4">
+                  <span className="min-w-0 block">
+                    <span className="flex items-center gap-2 min-w-0">
                       {subject && (
                         <span
                           aria-hidden
@@ -85,15 +87,15 @@ export function GoalsView() {
                       <span className="text-[0.9375rem] font-semibold text-ink truncate">
                         {goal.title}
                       </span>
-                    </p>
-                    <p className="text-[0.75rem] text-ink-3 mt-1">
-                      {KIND_LABEL[goal.kind]} · {SCOPE_LABEL[goal.scope]}
+                    </span>
+                    <span className="block text-[0.75rem] text-ink-3 mt-1">
+                      {KIND_LABEL[goal.kind]} · {scopeLabel}
                       {subject && ` · ${subject.name}`}
-                    </p>
-                  </div>
+                    </span>
+                  </span>
 
                   {progress.done ? (
-                    <span className="inline-flex items-center gap-1 text-[0.75rem] font-semibold text-ok shrink-0">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-ok-quiet px-2.5 py-1 text-[0.75rem] font-semibold text-ok shrink-0">
                       <Check className="size-3.5" strokeWidth={3} />
                       Conseguido
                     </span>
@@ -107,12 +109,12 @@ export function GoalsView() {
                       {progress.headline}
                     </span>
                   )}
-                </div>
+                </span>
 
                 {/* Barra con marcas cada 25 %: da una referencia sin cargar de
                     números una barra que ya lleva su porcentaje al lado. */}
-                <div
-                  className="relative h-2.5 rounded-full bg-sunken overflow-hidden mt-4"
+                <span
+                  className="block relative h-2.5 rounded-full bg-sunken overflow-hidden mt-4"
                   role="progressbar"
                   aria-valuemin={0}
                   aria-valuemax={100}
@@ -120,9 +122,9 @@ export function GoalsView() {
                   aria-valuetext={progress.label}
                   aria-label={goal.title}
                 >
-                  <div
+                  <span
                     className={cx(
-                      'h-full rounded-full transition-[width] duration-500 ease-out',
+                      'block h-full rounded-full transition-[width] duration-500 ease-out',
                       progress.done ? 'bg-ok' : 'bg-accent',
                     )}
                     style={{ width: `${progress.percent}%` }}
@@ -135,16 +137,16 @@ export function GoalsView() {
                       style={{ left: `${mark}%` }}
                     />
                   ))}
-                </div>
+                </span>
 
-                <p
+                <span
                   className={cx(
-                    'text-[0.8125rem] mt-2 tabular-nums',
+                    'block text-[0.8125rem] mt-2 tabular-nums',
                     progress.measurable ? 'text-ink-2' : 'text-ink-3',
                   )}
                 >
                   {progress.label}
-                </p>
+                </span>
               </button>
             )
           })}

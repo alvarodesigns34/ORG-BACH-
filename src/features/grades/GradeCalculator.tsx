@@ -74,8 +74,9 @@ export function GradeCalculator({ open, onClose, subjectId, term }: GradeCalcula
     setAssumedOver('')
   }
 
-  /** La asignatura elegida no dice cuánto pesa cada nota. */
-  const weightsUnknown = selected ? results.get(selected)?.weightsDeclared === false : false
+  /** La asignatura elegida tiene notas pero no dice cuánto pesa cada una. */
+  const selectedResult = selected ? results.get(selected) : undefined
+  const weightsUnknown = !!selectedResult && selectedResult.entryCount > 0 && !selectedResult.weightsDeclared
 
   useEffect(() => {
     if (!open) return
@@ -89,7 +90,7 @@ export function GradeCalculator({ open, onClose, subjectId, term }: GradeCalcula
     }
     setAssumed('')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, subjectId])
+  }, [open, subjectId, term])
 
   const inputs = {
     current: parseDecimal(current),

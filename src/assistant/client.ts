@@ -69,6 +69,7 @@ export async function startRecording(): Promise<Recording> {
       window.AudioContext ??
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
     context = new Ctx()
+    if (context.state === 'suspended') void context.resume().catch(() => {})
     analyser = context.createAnalyser()
     analyser.fftSize = 512
     context.createMediaStreamSource(stream).connect(analyser)
@@ -80,6 +81,24 @@ export async function startRecording(): Promise<Recording> {
   const release = () => {
     stream.getTracks().forEach((t) => t.stop())
     void context?.close().catch(() => {})
+  }
+
+  const encodeCollected = async () => {
+    release()
+    const type = recorder.mimeType || format.recorder || 'audio/mp4'
+    const blob = new Blob(chunks, { type })
+    const ms = Date.now() - startedAt
+    // Mistral recomienda WAV: se convierte aquí, venga el audio del
+    // iPhone (MP4/AAC) o de Chrome (WebM/Opus). Si el navegador no
+    // sabe decodificar su propia grabación, se manda tal cual.
+    const wav = await toWav16k(blob).catch(() => null)
+    return wav
+      ? { data: await toBase64(wav), mimeType: 'audio/wav', ms }
+      : {
+          data: await toBase64(blob),
+          mimeType: format.fallbackMime,
+          ms,
+        }
   }
 
   return {
@@ -95,35 +114,42 @@ export async function startRecording(): Promise<Recording> {
     },
     cancel() {
       recorder.onstop = null
-      if (recorder.state !== 'inactive') recorder.stop()
+      recorder.onerror = null
+      if (recorder.state !== 'inactive') {
+        try {
+          recorder.stop()
+        } catch {
+          // Ya detenido por interrupción del sistema (llamada, Siri, bloqueo).
+        }
+      }
       release()
     },
     stop() {
       return new Promise((resolve, reject) => {
-        recorder.onstop = async () => {
-          release()
-          try {
-            const type = recorder.mimeType || format.recorder || 'audio/mp4'
-            const blob = new Blob(chunks, { type })
-            const ms = Date.now() - startedAt
-            // Mistral recomienda WAV: se convierte aquí, venga el audio del
-            // iPhone (MP4/AAC) o de Chrome (WebM/Opus). Si el navegador no
-            // sabe decodificar su propia grabación, se manda tal cual.
-            const wav = await toWav16k(blob).catch(() => null)
-            resolve(
-              wav
-                ? { data: await toBase64(wav), mimeType: 'audio/wav', ms }
-                : {
-                    data: await toBase64(blob),
-                    mimeType: format.fallbackMime,
-                    ms,
-                  },
-            )
-          } catch (error) {
-            reject(error)
-          }
+        let settled = false
+        const done = () => {
+          if (settled) return
+          settled = true
+          void encodeCollected().then(resolve, reject)
         }
-        if (recorder.state !== 'inactive') recorder.stop()
+        // En iOS, una interrupción (llamada, bloqueo, Siri) puede haber parado
+        // el grabador antes de pulsar «Enviar»: no esperar a un `onstop` que no llegará.
+        if (recorder.state === 'inactive') {
+          done()
+          return
+        }
+        recorder.onstop = done
+        recorder.onerror = () => {
+          if (settled) return
+          settled = true
+          release()
+          reject(new Error('La grabación se interrumpió. Inténtalo de nuevo.'))
+        }
+        try {
+          recorder.stop()
+        } catch {
+          done()
+        }
       })
     },
   }

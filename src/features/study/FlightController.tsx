@@ -24,6 +24,8 @@ import { endNativeFlight, isNativeApp, useNativeFlight } from '@/native/liveActi
 import { useNow } from './hooks'
 import { clearFlightCard, flightArtwork, setFlightActions, showFlightCard } from './mediaSession'
 import { useStudyPrefs } from './prefs'
+import { useSyncExternalStore } from 'react'
+import { flightAlertsOn, subscribePushPrefs } from '@/push/push'
 import {
   audioRunning,
   carrierPlaying,
@@ -31,6 +33,7 @@ import {
   duck,
   onCarrierPlaying,
   playingSound,
+  playingWaves,
 } from './soundscape'
 
 type Airports = { byIata: Map<string, Airport>; all: Airport[] }
@@ -191,8 +194,9 @@ export function FlightController() {
   useEffect(() => {
     if (!activeId) return
     const ambientReady = prefs.sound === 'ninguno' || playingSound() === prefs.sound
+    const wavesReady = prefs.waves === 'ninguna' || playingWaves() === prefs.waves
     const carrierReady = !wantsLockCard(prefs) || carrierPlaying()
-    if (ambientReady && carrierReady) return
+    if (ambientReady && wavesReady && carrierReady) return
     const kick = () => beginFlightAudio(prefs)
     window.addEventListener('pointerdown', kick, { once: true })
     window.addEventListener('keydown', kick, { once: true })
@@ -232,10 +236,15 @@ export function FlightController() {
   }, [active, showCard, from, to, subject, airports, now])
 
   // --- Avisos ------------------------------------------------------------
-  // En la web, programados en el servidor (Web Push); dentro de la app
-  // nativa, como notificaciones locales, junto con la Live Activity.
+  // En la web, programados en el servidor (Web Push) solo si el alumno activó
+  // «Avisos de vuelo» en Ajustes → Notificaciones; en la app nativa, como
+  // notificaciones locales junto con la Live Activity.
   const native = isNativeApp()
-  useFlightAlerts(native ? undefined : active, { city: to?.city, enabled: prefs.alerts && !native })
+  const webPushFlightAlerts = useSyncExternalStore(subscribePushPrefs, flightAlertsOn, () => false)
+  useFlightAlerts(native ? undefined : active, {
+    city: to?.city,
+    enabled: !native && prefs.alerts && webPushFlightAlerts,
+  })
   useNativeFlight(active, {
     city: to?.city,
     subject: subject?.name,

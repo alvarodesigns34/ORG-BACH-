@@ -83,6 +83,35 @@ describe('icsSelection', () => {
     const sel = icsSelection({ tasks: [], exams: [exam('viejo', { date: '2026-09-01' })], subjects, today: '2026-11-18' })
     assert.equal(sel.exams.length, 0)
   })
+
+  it('exporta eventos personales con hora y de día completo', () => {
+    const out = buildIcs({
+      tasks: [],
+      exams: [],
+      events: [
+        {
+          id: 'ev1',
+          title: 'Tutoría',
+          date: '2026-11-22',
+          startTime: '17:00',
+          endTime: '17:30',
+          kind: 'otro',
+          createdAt: '2026-11-01T00:00:00Z',
+        },
+        {
+          id: 'ev2',
+          title: 'Excursión',
+          date: '2026-11-23',
+          kind: 'personal',
+          createdAt: '2026-11-01T00:00:00Z',
+        },
+      ],
+      subjects,
+      today: '2026-11-18',
+    })
+    assert.match(out, /UID:ev1@orbita[\s\S]*?DTSTART;TZID=Europe\/Madrid:20261122T170000\r\nDTEND;TZID=Europe\/Madrid:20261122T173000/)
+    assert.match(out, /UID:ev2@orbita[\s\S]*?DTSTART;VALUE=DATE:20261123\r\nDTEND;VALUE=DATE:20261124/)
+  })
 })
 
 describe('formato', () => {

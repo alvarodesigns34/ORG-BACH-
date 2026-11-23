@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Archive, CalendarPlus, ListChecks, Pencil, PlaneTakeoff, Plus } from 'lucide-react'
+import { Archive, CalendarPlus, Clock, ListChecks, Pencil, PlaneTakeoff, Plus } from 'lucide-react'
 
+import { WEEKDAYS_LONG } from '@/domain/dates'
+import { formatFlightTime } from '@/domain/flights'
 import { formatGrade, formatPercent, numeralTone } from '@/domain/grades'
 import { colorVar } from '@/domain/palette'
 import { isDone, sortTasks } from '@/domain/tasks'
-import { termName, type Exam, type GradeEntry, type Task } from '@/domain/types'
+import { TERMS, termName, type Exam, type GradeEntry, type Task, type TermId } from '@/domain/types'
 import { hrefFor, studyHref } from '@/router'
 import { useDispatch, useSettings, useStore, useToday } from '@/state/StoreProvider'
 import { useSubjectResults } from '@/state/selectors'
@@ -18,14 +20,17 @@ import { SubjectGrades } from '@/features/grades/SubjectGrades'
 import { SubjectEditor } from '@/features/subjects/SubjectEditor'
 import { TaskEditor } from '@/features/tasks/TaskEditor'
 import { TaskList } from '@/features/tasks/TaskRow'
-import { Button, Card, EmptyState, Numeral, SectionHeader } from '@/ui/primitives'
+import { Button, Card, EmptyState, Numeral, SectionHeader, Segmented } from '@/ui/primitives'
+
+type Scope = TermId | 'todas'
 
 export function SubjectDetailView({ subjectId }: { subjectId: string }) {
   const settings = useSettings()
   const today = useToday()
   const { data } = useStore()
   const dispatch = useDispatch()
-  const results = useSubjectResults(settings.activeTerm)
+  const [scope, setScope] = useState<Scope>(settings.activeTerm)
+  const results = useSubjectResults(scope)
 
   const subject = data.subjects.find((s) => s.id === subjectId)
   const result = results.get(subjectId)
@@ -54,6 +59,26 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
     [data.exams, subjectId, today],
   )
 
+  const studyMinutes = useMemo(
+    () =>
+      data.sessions.reduce(
+        (sum, s) =>
+          s.subjectId === subjectId && s.status !== 'en_vuelo'
+            ? sum + (s.focusedMinutes ?? 0)
+            : sum,
+        0,
+      ),
+    [data.sessions, subjectId],
+  )
+
+  const sortedSchedule = useMemo(() => {
+    if (!subject) return []
+    const order = (d: number) => (d === 0 ? 7 : d)
+    return [...subject.schedule].sort(
+      (a, b) => order(a.day) - order(b.day) || a.start.localeCompare(b.start),
+    )
+  }, [subject])
+
   if (!subject || !result) {
     return (
       <Page className="max-w-[720px]">
@@ -76,7 +101,7 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
 
   const metrics = [
     {
-      label: 'Media actual',
+      label: scope === 'todas' ? 'Media curso' : `Media · ${TERMS.find((t) => t.id === scope)?.short}`,
       value: formatGrade(result.average, settings.gradeScale),
       tone: numeralTone(result.average, settings.gradeScale),
     },
@@ -91,7 +116,10 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
       label: 'Evaluado',
       value: result.weightsDeclared ? formatPercent(result.evaluatedPercent) : '—',
     },
-    { label: 'Tareas pendientes', value: String(tasks.length) },
+    {
+      label: 'Estudiado',
+      value: studyMinutes > 0 ? formatFlightTime(studyMinutes) : '—',
+    },
   ]
 
   return (
@@ -114,7 +142,10 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
           .join(' · ')}
         actions={
           <>
-            <a href={studyHref({ subjectId, taskId: tasks[0]?.id, minutes: tasks[0]?.estimatedMinutes })} className="study-action-link">
+            <a
+              href={studyHref({ subjectId, taskId: tasks[0]?.id, minutes: tasks[0]?.estimatedMinutes })}
+              className="study-action-link min-h-[44px]"
+            >
               <PlaneTakeoff className="size-4" aria-hidden="true" />
               Estudiar
             </a>
@@ -123,6 +154,18 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
               Editar
             </Button>
           </>
+        }
+        toolbar={
+          <Segmented
+            label="Evaluación de la asignatura"
+            className="self-start"
+            value={scope}
+            onChange={setScope}
+            options={[
+              ...TERMS.map((t) => ({ value: t.id as Scope, label: t.short })),
+              { value: 'todas' as Scope, label: 'Curso' },
+            ]}
+          />
         }
       />
 
@@ -145,9 +188,19 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
 
       {/* --- Cifras --- */}
       <div className="card overflow-hidden">
-        <dl className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-hairline">
-          {metrics.map((metric) => (
-            <div key={metric.label} className="px-4 sm:px-5 py-4">
+        <dl className="grid grid-cols-2 sm:grid-cols-4">
+          {metrics.map((metric, idx) => (
+            <div
+              key={metric.label}
+              className={[
+                'px-4 sm:px-5 py-4 border-hairline',
+                idx % 2 === 1 && 'border-l',
+                idx >= 2 && 'border-t sm:border-t-0',
+                idx > 0 && 'sm:border-l',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
               <dt className="eyebrow whitespace-nowrap">{metric.label}</dt>
               <dd className="mt-2">
                 <Numeral value={metric.value} size="sm" tone={metric.tone} />
@@ -155,6 +208,22 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
             </div>
           ))}
         </dl>
+        {sortedSchedule.length > 0 && (
+          <div className="border-t border-hairline px-4 sm:px-5 py-2.5 flex flex-wrap items-center gap-2 text-[0.75rem] text-ink-2">
+            <Clock className="size-3.5 text-ink-3 shrink-0" aria-hidden />
+            {sortedSchedule.map((slot, i) => (
+              <span
+                key={`${slot.day}-${slot.start}-${i}`}
+                className="rounded-full bg-fill px-2.5 py-0.5 tabular-nums"
+              >
+                <span className="capitalize font-medium text-ink">
+                  {WEEKDAYS_LONG[slot.day].slice(0, 3)}
+                </span>{' '}
+                {slot.start}–{slot.end}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 mt-5">
@@ -166,7 +235,7 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
               hint={
                 result.entryCount === 0
                   ? 'Sin notas todavía'
-                  : `${result.entryCount} ${result.entryCount === 1 ? 'nota' : 'notas'} en ${termName(settings.activeTerm).toLowerCase()}`
+                  : `${result.entryCount} ${result.entryCount === 1 ? 'nota' : 'notas'} en ${termName(scope).toLowerCase()}`
               }
               className="px-5 sm:px-6 pt-5 pb-4"
             />
@@ -261,7 +330,7 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
         defaults={{
           subjectId: subject.id,
           categoryId: creatingGrade?.categoryId ?? undefined,
-          term: settings.activeTerm,
+          term: scope === 'todas' ? settings.activeTerm : scope,
         }}
       />
       <GradeEditor
@@ -284,7 +353,7 @@ export function SubjectDetailView({ subjectId }: { subjectId: string }) {
       <GradeCalculator
         open={calculatorOpen}
         subjectId={subject.id}
-        term={settings.activeTerm}
+        term={scope}
         onClose={() => setCalculatorOpen(false)}
       />
     </Page>

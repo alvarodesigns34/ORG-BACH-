@@ -64,8 +64,8 @@ export default defineConfig({
         scope: base,
         // El mismo gris agrupado que el fondo de la interfaz: la barra del
         // sistema y el splash de arranque se funden con la aplicación.
-        theme_color: '#f2f2f7',
-        background_color: '#f2f2f7',
+        theme_color: '#eef0f4',
+        background_color: '#eef0f4',
         display: 'standalone',
         orientation: 'any',
         // Accesos directos del icono (clic derecho / pulsación larga). Los
@@ -175,6 +175,24 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('/react-dom/') || id.includes('/react/') || id.includes('/scheduler/')) {
+            return 'vendor-react'
+          }
+          if (id.includes('/motion/') || id.includes('/framer-motion/')) {
+            return 'vendor-motion'
+          }
+          if (id.includes('/@supabase/')) {
+            return 'vendor-supabase'
+          }
+        },
+      },
     },
   },
   server: {

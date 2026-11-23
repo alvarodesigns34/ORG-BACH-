@@ -112,11 +112,25 @@ export function PrepCard() {
         <>
           {comparison && (
             <p className="mx-5 sm:mx-6 mb-3 rounded-[14px] bg-sunken px-4 py-3 text-[0.8125rem] text-ink-2 leading-relaxed">
-              Con {formatFlightTime(comparison.threshold)} o más de estudio sacaste de media{' '}
-              <strong className="text-ink">{formatGrade(comparison.more.average, scale)}</strong> (
-              {comparison.more.count} exámenes); con menos,{' '}
-              <strong className="text-ink">{formatGrade(comparison.less.average, scale)}</strong> (
-              {comparison.less.count}).
+              {comparison.threshold === 0 ? (
+                <>
+                  Cuando preparaste el examen en el modo estudio sacaste de media{' '}
+                  <strong className="text-ink">{formatGrade(comparison.more.average, scale)}</strong> (
+                  {comparison.more.count} {comparison.more.count === 1 ? 'examen' : 'exámenes'}); sin
+                  vuelos registrados,{' '}
+                  <strong className="text-ink">{formatGrade(comparison.less.average, scale)}</strong> (
+                  {comparison.less.count}).
+                </>
+              ) : (
+                <>
+                  Con {formatFlightTime(comparison.threshold)} o más de estudio sacaste de media{' '}
+                  <strong className="text-ink">{formatGrade(comparison.more.average, scale)}</strong> (
+                  {comparison.more.count} {comparison.more.count === 1 ? 'examen' : 'exámenes'}); con
+                  menos,{' '}
+                  <strong className="text-ink">{formatGrade(comparison.less.average, scale)}</strong> (
+                  {comparison.less.count}).
+                </>
+              )}
             </p>
           )}
           {!anyStudy && (

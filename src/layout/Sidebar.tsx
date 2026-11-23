@@ -39,7 +39,7 @@ export function Sidebar({ current, badges }: SidebarProps) {
     <aside
       inert={hidden}
       aria-hidden={hidden || undefined}
-      className="app-sidebar hidden lg:flex flex-col fixed z-30 w-[var(--sidebar-w)] rounded-[30px] liquid top-[max(0.75rem,env(safe-area-inset-top))] bottom-3 left-[max(0.75rem,env(safe-area-inset-left))]"
+      className="app-sidebar hidden lg:flex flex-col fixed z-30 w-[var(--sidebar-w)] rounded-[30px] liquid top-[max(0.75rem,env(safe-area-inset-top))] bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))]"
     >
       <div className="relative z-[2] flex flex-col min-h-0 flex-1">
         {/* --- Cabecera: la app y ocultar la barra --- */}

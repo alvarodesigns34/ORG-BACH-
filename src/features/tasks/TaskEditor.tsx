@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
 
+import { addDays, parseDay } from '@/domain/dates'
 import { newId } from '@/domain/id'
 import { parseDecimalOr } from '@/domain/number'
 import {
@@ -11,7 +12,7 @@ import {
   type Task,
   type TaskStatus,
 } from '@/domain/types'
-import { useDispatch } from '@/state/StoreProvider'
+import { useDispatch, useToday } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
 import { Checkbox, Field, Input, Select, Textarea } from '@/ui/fields'
 import { Modal } from '@/ui/Modal'
@@ -57,6 +58,7 @@ function toForm(task: Task | null | undefined, defaults?: TaskEditorProps['defau
 
 export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
   const dispatch = useDispatch()
+  const today = useToday()
   const subjects = useSubjects()
   const [form, setForm] = useState<FormState>(() => toForm(task, defaults))
   const [error, setError] = useState<string | null>(null)
@@ -90,6 +92,12 @@ export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
     return { done, total, percent: Math.round((done / total) * 100) }
   }, [form.subtasks])
 
+  const nextMonday = useMemo(() => {
+    const dow = parseDay(today).getDay()
+    const delta = (8 - dow) % 7 || 7
+    return addDays(today, delta)
+  }, [today])
+
   const addSubtask = () => {
     const title = newSubtask.trim()
     if (!title) return
@@ -113,7 +121,7 @@ export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
       dueTime: form.dueDate && form.dueTime ? form.dueTime : undefined,
       priority: form.priority,
       status: form.status,
-      estimatedMinutes: Number.isFinite(minutes) && minutes > 0 ? minutes : undefined,
+      estimatedMinutes: Number.isFinite(minutes) && minutes > 0 ? Math.min(1440, minutes) : undefined,
       tags: form.tags
         .split(',')
         .map((t) => t.trim())
@@ -228,30 +236,101 @@ export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
             </Field>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Field label="Fecha límite" className="sm:col-span-1">
-              {({ id }) => (
-                <Input
-                  id={id}
-                  type="date"
-                  value={form.dueDate}
-                  onChange={(e) => set('dueDate', e.target.value)}
-                />
-              )}
-            </Field>
+          <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Field label="Fecha límite">
+                {({ id }) => (
+                  <Input
+                    id={id}
+                    type="date"
+                    value={form.dueDate}
+                    onChange={(e) => set('dueDate', e.target.value)}
+                  />
+                )}
+              </Field>
 
-            <Field label="Hora" hint={form.dueDate ? undefined : 'Necesita una fecha.'}>
-              {({ id, describedBy }) => (
-                <Input
-                  id={id}
-                  type="time"
-                  aria-describedby={describedBy}
-                  value={form.dueTime}
-                  disabled={!form.dueDate}
-                  onChange={(e) => set('dueTime', e.target.value)}
-                />
-              )}
-            </Field>
+              <Field label="Hora" hint={form.dueDate ? undefined : 'Necesita una fecha.'}>
+                {({ id, describedBy }) => (
+                  <Input
+                    id={id}
+                    type="time"
+                    aria-describedby={describedBy}
+                    value={form.dueTime}
+                    disabled={!form.dueDate}
+                    onChange={(e) => set('dueTime', e.target.value)}
+                  />
+                )}
+              </Field>
+
+              <Field label="Duración (min)">
+                {({ id }) => (
+                  <Input
+                    id={id}
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={1440}
+                    step={5}
+                    placeholder="Ej.: 45"
+                    value={form.estimatedMinutes}
+                    onChange={(e) => set('estimatedMinutes', e.target.value)}
+                  />
+                )}
+              </Field>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(
+                  [
+                    { label: 'Hoy', value: today },
+                    { label: 'Mañana', value: addDays(today, 1) },
+                    { label: 'Próx. lunes', value: nextMonday },
+                  ] as const
+                ).map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => set('dueDate', preset.value)}
+                    className={cx(
+                      'px-2.5 py-1 rounded-full text-[0.75rem] font-medium transition-colors',
+                      form.dueDate === preset.value
+                        ? 'bg-accent-soft text-accent'
+                        : 'bg-fill text-ink-2 hover:text-ink',
+                    )}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+                {form.dueDate && (
+                  <button
+                    type="button"
+                    onClick={() => setForm((p) => ({ ...p, dueDate: '', dueTime: '' }))}
+                    className="px-2 py-1 rounded-full text-[0.75rem] text-ink-3 hover:text-ink"
+                  >
+                    Sin fecha
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1">
+                {[15, 30, 45, 60].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => set('estimatedMinutes', String(m))}
+                    className={cx(
+                      'px-2 py-1 rounded-full text-[0.75rem] tabular-nums font-medium transition-colors',
+                      form.estimatedMinutes === String(m)
+                        ? 'bg-accent-soft text-accent'
+                        : 'bg-fill text-ink-2 hover:text-ink',
+                    )}
+                  >
+                    {m === 60 ? '1 h' : `${m}m`}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {task && (
@@ -316,8 +395,8 @@ export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
                         )
                       }
                       className={cx(
-                        'flex-1 min-w-0 bg-transparent text-[1rem] outline-none',
-                        'focus:underline decoration-accent underline-offset-4',
+                        'flex-1 min-w-0 bg-transparent text-[1rem] rounded-[4px] px-1 -mx-1',
+                        'focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2',
                         subtask.done && 'line-through text-ink-3',
                       )}
                     />

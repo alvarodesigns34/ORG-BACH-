@@ -12,7 +12,7 @@ import {
   subscribeBackup,
 } from '@/storage/backup'
 import { listSnapshots, readSnapshot, saveSnapshot, type SnapshotMeta } from '@/storage/snapshots'
-import { exportJSON, migrateWithReport } from '@/storage/persistence'
+import { migrateWithReport } from '@/storage/persistence'
 import { ConfirmDialog, Modal } from '@/ui/Modal'
 import { Button, IconButton, cx } from '@/ui/primitives'
 import { useToast } from '@/ui/Toast'
@@ -115,13 +115,10 @@ export function SnapshotsSheet({ open, onClose }: { open: boolean; onClose: () =
   const download = async (meta: SnapshotMeta) => {
     const snap = await readSnapshot(meta.id)
     if (!snap) return
-    const blob = new Blob([exportJSON(snap)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `orbita-copia-${new Date(meta.at).toISOString().slice(0, 10)}.json`
-    a.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    const day = new Date(meta.at).toISOString().slice(0, 10)
+    if (await exportBackup(snap, `orbita-copia-${day}.json`)) {
+      toast({ text: 'Copia guardada' })
+    }
   }
 
   const restore = async () => {
@@ -136,12 +133,18 @@ export function SnapshotsSheet({ open, onClose }: { open: boolean; onClose: () =
     // Lo de ahora también se guarda, por si la restauración era un error.
     await saveSnapshot(data, 'antes-restaurar')
     // Pasa por el mismo validador que una importación.
-    if (!replaceAndSave(migrateWithReport(snap).data)) {
+    const report = migrateWithReport(snap)
+    if (!replaceAndSave(report.data)) {
       toast({ text: 'La copia no se pudo guardar. Tu curso actual sigue abierto.' })
       return
     }
     onClose()
-    toast({ text: `Restaurada la copia del ${when(meta.at)}` })
+    toast({
+      text:
+        report.totalDropped > 0
+          ? `Copia restaurada (${report.totalDropped} registros dañados omitidos)`
+          : `Restaurada la copia del ${when(meta.at)}`,
+    })
   }
 
   const describe = (c: SnapshotMeta['counts']) =>

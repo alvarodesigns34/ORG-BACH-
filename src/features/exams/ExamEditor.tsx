@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
-import { CircleCheck, ClipboardPen, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { CircleCheck, ClipboardPen, Link2Off, Trash2 } from 'lucide-react'
 
 import { today as todayISO } from '@/domain/dates'
+import { formatGrade } from '@/domain/grades'
 import { parseDecimal, toDecimalInput } from '@/domain/number'
 import { TERMS, type Exam, type TermId } from '@/domain/types'
-import { useDispatch, useSettings } from '@/state/StoreProvider'
+import { useDispatch, useSettings, useStore } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
 import { GradeEditor } from '@/features/grades/GradeEditor'
 import { Field, Input, NumberInput, Select, Textarea } from '@/ui/fields'
@@ -30,6 +31,7 @@ interface FormState {
 
 export function ExamEditor({ open, onClose, exam, defaults }: ExamEditorProps) {
   const dispatch = useDispatch()
+  const { data } = useStore()
   const subjects = useSubjects()
   const settings = useSettings()
 
@@ -53,6 +55,21 @@ export function ExamEditor({ open, onClose, exam, defaults }: ExamEditorProps) {
     kind: 'examen'
     weight?: number
   } | null>(null)
+
+  const linkedGrade = useMemo(
+    () => (exam?.gradeEntryId ? data.grades.find((g) => g.id === exam.gradeEntryId) : undefined),
+    [data.grades, exam?.gradeEntryId],
+  )
+
+  const candidateGrades = useMemo(() => {
+    if (!exam || linkedGrade) return []
+    const claimed = new Set(
+      data.exams.filter((e) => e.id !== exam.id && e.gradeEntryId).map((e) => e.gradeEntryId!),
+    )
+    return data.grades
+      .filter((g) => g.subjectId === (form.subjectId || exam.subjectId) && !claimed.has(g.id))
+      .sort((a, b) => b.date.localeCompare(a.date))
+  }, [data.grades, data.exams, exam, linkedGrade, form.subjectId])
 
   // `defaults` llega casi siempre como objeto literal en la llamada
   // (`defaults={{ date: … }}`), así que cambia de identidad en CADA render del
@@ -87,6 +104,19 @@ export function ExamEditor({ open, onClose, exam, defaults }: ExamEditorProps) {
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }))
 
+  const buildPayload = () => {
+    const weight = parseDecimal(form.weight)
+    return {
+      subjectId: form.subjectId,
+      title: form.title.trim(),
+      date: form.date,
+      time: form.time || undefined,
+      topics: form.topics.trim() || undefined,
+      weight: Number.isFinite(weight) && weight > 0 ? Math.min(100, weight) : undefined,
+      term: form.term,
+    }
+  }
+
   const submit = () => {
     const next: typeof errors = {}
     if (!form.subjectId) next.subjectId = 'Elige la asignatura del examen.'
@@ -97,17 +127,7 @@ export function ExamEditor({ open, onClose, exam, defaults }: ExamEditorProps) {
       return
     }
 
-    const weight = parseDecimal(form.weight)
-    const payload = {
-      subjectId: form.subjectId,
-      title: form.title.trim(),
-      date: form.date,
-      time: form.time || undefined,
-      topics: form.topics.trim() || undefined,
-      weight: Number.isFinite(weight) && weight > 0 ? weight : undefined,
-      term: form.term,
-    }
-
+    const payload = buildPayload()
     if (exam) dispatch({ type: 'exam/update', id: exam.id, patch: payload })
     else dispatch({ type: 'exam/add', exam: payload })
     onClose()
@@ -274,38 +294,82 @@ export function ExamEditor({ open, onClose, exam, defaults }: ExamEditorProps) {
               un número con pinta de contar que no contaba en ninguna media:
               al pasar por aquí, ese peso viaja a la nota, que sí pondera. */}
           {exam && (
-            <div className="pt-4 border-t border-hairline">
-              {exam.gradeEntryId ? (
-                <p className="flex items-start gap-2 text-[0.8125rem] text-ok bg-ok-quiet rounded-sm px-3 py-2">
-                  <CircleCheck className="size-4 shrink-0 mt-px" />
-                  <span>Este examen ya tiene su nota apuntada.</span>
-                </p>
+            <div className="pt-4 border-t border-hairline flex flex-col gap-3">
+              {linkedGrade ? (
+                <div className="flex items-center justify-between gap-3 text-[0.8125rem] text-ok bg-ok-quiet rounded-sm px-3 py-2.5">
+                  <span className="flex items-center gap-2 min-w-0">
+                    <CircleCheck className="size-4 shrink-0" />
+                    <span className="truncate">
+                      Enlazado con «{linkedGrade.name}» ({formatGrade(linkedGrade.score, settings.gradeScale)}).
+                    </span>
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      dispatch({ type: 'exam/update', id: exam.id, patch: { gradeEntryId: undefined } })
+                    }
+                    className="shrink-0 text-ink-2"
+                  >
+                    <Link2Off className="size-3.5" />
+                    Desenlazar
+                  </Button>
+                </div>
               ) : (
                 <>
-                  <Button
-                    onClick={() => {
-                      setGradeFrom({
-                        subjectId: form.subjectId,
-                        examId: exam.id,
-                        name: form.title.trim() || exam.title,
-                        date: form.date,
-                        term: form.term,
-                        kind: 'examen',
-                        weight: (() => {
-                          const w = parseDecimal(form.weight)
-                          return Number.isFinite(w) && w > 0 ? w : undefined
-                        })(),
-                      })
-                      onClose()
-                    }}
-                  >
-                    <ClipboardPen className="size-4" />
-                    Apuntar la nota de este examen
-                  </Button>
-                  <p className="text-[0.75rem] text-ink-3 mt-2 leading-relaxed">
-                    Crea la nota con el nombre, la fecha, la evaluación y el peso de este examen ya
-                    puestos, y los deja enlazados.
-                  </p>
+                  <div>
+                    <Button
+                      onClick={() => {
+                        const payload = buildPayload()
+                        if (payload.subjectId && payload.title && payload.date) {
+                          dispatch({ type: 'exam/update', id: exam.id, patch: payload })
+                        }
+                        setGradeFrom({
+                          subjectId: payload.subjectId || exam.subjectId,
+                          examId: exam.id,
+                          name: payload.title || exam.title,
+                          date: payload.date || exam.date,
+                          term: payload.term,
+                          kind: 'examen',
+                          weight: payload.weight,
+                        })
+                        onClose()
+                      }}
+                    >
+                      <ClipboardPen className="size-4" />
+                      Apuntar la nota de este examen
+                    </Button>
+                    <p className="text-[0.75rem] text-ink-3 mt-2 leading-relaxed">
+                      Guarda los cambios del examen, crea la nota con su nombre, fecha, evaluación y
+                      peso, y los deja enlazados.
+                    </p>
+                  </div>
+
+                  {candidateGrades.length > 0 && (
+                    <Field label="O enlazar con una nota ya apuntada">
+                      {({ id }) => (
+                        <Select
+                          id={id}
+                          value=""
+                          onChange={(e) => {
+                            if (!e.target.value) return
+                            dispatch({
+                              type: 'exam/update',
+                              id: exam.id,
+                              patch: { gradeEntryId: e.target.value },
+                            })
+                          }}
+                        >
+                          <option value="">Elegir nota existente…</option>
+                          {candidateGrades.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.name} — {formatGrade(g.score, settings.gradeScale)} ({g.date})
+                            </option>
+                          ))}
+                        </Select>
+                      )}
+                    </Field>
+                  )}
                 </>
               )}
             </div>

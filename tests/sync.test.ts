@@ -394,6 +394,16 @@ describe('robustez de la fusión', () => {
     assert.ok(!meta.dirty.includes('settings/settings'), 'lo demás queda confirmado')
   })
 
+  it('una subida confirmada NO descarta un campo opcional añadido mientras estaba en vuelo', () => {
+    const device = new Device('d', onboarded())
+    device.edit(withTasks(device.data, [task({ dueDate: undefined })]))
+    const batch = buildPush(device.data, device.meta, device.meta.dirty)
+    // Mientras la subida está en vuelo, el usuario añade `dueDate` (campo nuevo en `clocks`)
+    device.edit(withTasks(device.data, [task({ dueDate: '2026-12-01' })]))
+    const meta = acknowledge(device.meta, batch)
+    assert.ok(meta.dirty.includes(keyOf('tasks', 'task_1')), 'el nuevo campo opcional sigue pendiente')
+  })
+
   it('al vincular, los ajustes de la cuenta ganan a los del dispositivo nuevo', () => {
     const server = new FakeServer()
     const first = new Device('a', onboarded())

@@ -260,6 +260,7 @@ export function AssistantSheet({
   }, [open, messages.length, phase])
 
   // Onda y cronómetro mientras se graba; corte automático al llegar al tope.
+  const stopAndSendRef = useRef<() => Promise<void>>(async () => {})
   useEffect(() => {
     if (phase !== 'recording') return
     const started = Date.now()
@@ -269,14 +270,13 @@ export function AssistantSheet({
       setElapsed(ms)
       setLevel(recording.current?.level() ?? 0)
       if (ms >= MAX_RECORDING_MS) {
-        void stopAndSend()
+        void stopAndSendRef.current()
         return
       }
       frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase])
 
   // El campo de texto crece con lo escrito, hasta unas cinco líneas.
@@ -398,12 +398,24 @@ export function AssistantSheet({
     }
   }
 
+  const startingVoice = useRef(false)
+  const openRef = useRef(open)
+  openRef.current = open
+
   const startVoice = async () => {
+    if (startingVoice.current || recording.current) return
+    startingVoice.current = true
     try {
-      recording.current = await startRecording()
+      const rec = await startRecording()
+      if (!openRef.current) {
+        rec.cancel()
+        return
+      }
+      recording.current = rec
       setElapsed(0)
       setPhase('recording')
     } catch {
+      lastInput.current = null
       setMessages((list) => [
         ...list,
         {
@@ -414,6 +426,8 @@ export function AssistantSheet({
           at: Date.now(),
         },
       ])
+    } finally {
+      startingVoice.current = false
     }
   }
 
@@ -439,12 +453,19 @@ export function AssistantSheet({
     const rec = recording.current
     recording.current = null
     if (!rec) return
-    setPhase('idle')
+    // Pasar a «thinking» desde ya evita doble pulsación mientras se codifica el WAV.
+    setPhase('thinking')
     try {
       const audio = await rec.stop()
-      if (audio.ms < 600) return // Un toque sin querer: no se manda nada.
+      if (!openRef.current) return
+      if (audio.ms < 600) {
+        setPhase('idle')
+        return // Un toque sin querer: no se manda nada.
+      }
       await send({ audio: { data: audio.data, mimeType: audio.mimeType } })
     } catch {
+      lastInput.current = null
+      setPhase('idle')
       setMessages((list) => [
         ...list,
         {
@@ -457,6 +478,7 @@ export function AssistantSheet({
       ])
     }
   }
+  stopAndSendRef.current = stopAndSend
 
   const undo = (message: ChatMessage) => {
     if (!message.undo || message.undone) return
@@ -591,7 +613,10 @@ export function AssistantSheet({
       footer={
         <div className="w-full">
           {phase === 'recording' ? (
-            <div className="glass-btn flex items-center gap-2 h-12 rounded-full pl-1.5 pr-1.5">
+            <div
+              data-liquid="off"
+              className="glass-btn flex items-center gap-2 h-12 rounded-full pl-1.5 pr-1.5"
+            >
               <IconButton label="Cancelar" size="sm" variant="ghost" onClick={cancelVoice}>
                 <X className="size-5 text-ink-2" strokeWidth={2.4} />
               </IconButton>
@@ -615,13 +640,14 @@ export function AssistantSheet({
                 <textarea
                   ref={field}
                   data-autofocus
+                  data-liquid="off"
                   rows={1}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   onKeyDown={onKeyDown}
                   placeholder={messages.length ? 'Responde o pide otra cosa…' : 'Escribe o dicta…'}
                   aria-label="Mensaje para el asistente"
-                  className="glass-btn block w-full resize-none rounded-[24px] pl-4 pr-12 py-[0.75rem] text-[1rem] leading-[1.4] text-ink placeholder:text-ink-3 outline-none"
+                  className="glass-btn block w-full resize-none rounded-[24px] pl-4 pr-12 py-[0.75rem] text-[1rem] leading-[1.4] text-ink placeholder:text-ink-3 focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-1"
                 />
                 <button
                   type="button"

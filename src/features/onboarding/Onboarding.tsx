@@ -331,7 +331,13 @@ export function Onboarding() {
                     disabled={!customDraft.trim()}
                     onClick={() => {
                       const value = customDraft.trim()
-                      if (value && !custom.includes(value)) setCustom((prev) => [...prev, value])
+                      const norm = (s: string) =>
+                        s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                      const needle = norm(value)
+                      const exists =
+                        [...picked].some((p) => norm(p) === needle) ||
+                        custom.some((c) => norm(c) === needle)
+                      if (value && !exists) setCustom((prev) => [...prev, value])
                       setCustomDraft('')
                     }}
                   >
@@ -351,7 +357,17 @@ export function Onboarding() {
                     size="sm"
                     className="mt-0.5"
                   />
-                  <p className="text-[0.875rem] leading-snug text-ink-2">
+                  <p
+                    className="text-[0.875rem] leading-snug text-ink-2 cursor-pointer select-none"
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest('a')) return
+                      setAccepted((v) => {
+                        const next = !v
+                        if (next) setConsentError(false)
+                        return next
+                      })
+                    }}
+                  >
                     Tengo al menos 14 años y acepto las{' '}
                     <a href={`${import.meta.env.BASE_URL}legal/condiciones.html`} target="_blank" rel="noopener" className="text-accent underline-offset-2 hover:underline">
                       condiciones de uso

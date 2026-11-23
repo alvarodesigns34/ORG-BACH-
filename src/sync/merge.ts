@@ -334,7 +334,11 @@ export function mergeRemote(
       const remoteClock = row.clocks[field] ?? ''
       const localClock = localMeta.c[field] ?? ''
       if (remoteClock) hlc = receive(hlc, remoteClock, now)
-      const takeLocal = localClock > remoteClock
+      // Si el registro estaba borrado localmente (no existe `localValue`), no
+      // podemos adoptar un reloj local de un campo cuyo valor ya no tenemos:
+      // tomarlo estamparía un reloj nuevo sobre el valor remoto antiguo.
+      const canTakeLocal = field === '_deleted' || localValue !== undefined
+      const takeLocal = canTakeLocal && localClock > remoteClock
       if (takeLocal) localNewer = true
       mergedClocks[field] = takeLocal ? localClock : remoteClock
 
@@ -448,7 +452,13 @@ export function acknowledge(meta: SyncMeta, pushed: PushRecord[]): SyncMeta {
     const key = keyOf(record.collection, record.id)
     const current = meta.records[key]
     if (!current) continue
-    const unchanged = Object.entries(record.clocks).every(([f, c]) => current.c[f] === c)
+    const pushedEntries = Object.entries(record.clocks)
+    // Si es un borrado confirmado, basta con que siga borrado con el mismo reloj.
+    // Si es un registro vivo, deben coincidir TODOS los campos actuales (si el
+    // usuario añadió un campo opcional nuevo mientras viajaba la subida, sigue dirty).
+    const sameDeletion = current.d === true && record.data._deleted === true
+    const sameFieldCount = sameDeletion || Object.keys(current.c).length === pushedEntries.length
+    const unchanged = sameFieldCount && pushedEntries.every(([f, c]) => current.c[f] === c)
     if (unchanged) done.add(key)
   }
   if (done.size === 0) return meta

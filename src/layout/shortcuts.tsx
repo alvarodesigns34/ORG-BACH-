@@ -45,7 +45,7 @@ export const SHORTCUT_GROUPS: { title: string; items: { keys: string[]; label: s
     title: 'Ir a',
     items: [
       ...SECTIONS.map((s) => ({ keys: [s.key === ',' ? '⌘ ,' : s.key], label: s.label })),
-      { keys: ['/', '⌘ K'], label: 'Buscar tareas' },
+      { keys: ['/', '⌘ K'], label: 'Búsqueda global y acciones' },
     ],
   },
   {
@@ -78,32 +78,22 @@ export function typing(target: EventTarget | null): boolean {
 
 const modalOpen = () => !!document.querySelector('[aria-modal="true"]')
 
-/** Lleva a Tareas y pone el foco en su buscador. */
-function focusSearch() {
-  if (!window.location.hash.startsWith('#/tareas')) window.location.hash = '/tareas'
-  let tries = 0
-  const attempt = () => {
-    const input = document.querySelector<HTMLInputElement>('input[aria-label="Buscar tareas"]')
-    if (input) {
-      input.focus()
-      input.select()
-    } else if (++tries < 30) requestAnimationFrame(attempt)
-  }
-  requestAnimationFrame(attempt)
-}
-
 export function useKeyboardShortcuts({
   openCreate,
   openAssistant,
+  openSearch,
+  hasSubjects,
   flightActive,
 }: {
   openCreate: (kind: CreateKind) => void
   openAssistant: () => void
+  openSearch: () => void
+  hasSubjects: boolean
   flightActive: boolean
 }): { helpOpen: boolean; setHelpOpen: (open: boolean) => void } {
   const [helpOpen, setHelpOpen] = useState(false)
-  const live = useRef({ openCreate, openAssistant, flightActive, helpOpen })
-  live.current = { openCreate, openAssistant, flightActive, helpOpen }
+  const live = useRef({ openCreate, openAssistant, openSearch, hasSubjects, flightActive, helpOpen })
+  live.current = { openCreate, openAssistant, openSearch, hasSubjects, flightActive, helpOpen }
 
   useEffect(() => {
     /** La lista abierta manteniendo ⌘: se cierra al soltar. */
@@ -117,7 +107,7 @@ export function useKeyboardShortcuts({
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.isComposing) return
-      const { openCreate, openAssistant, flightActive } = live.current
+      const { openCreate, openAssistant, openSearch, hasSubjects, flightActive } = live.current
 
       if (event.key === 'Meta' && !event.repeat) {
         cancelHold()
@@ -137,7 +127,7 @@ export function useKeyboardShortcuts({
         const key = event.key.toLowerCase()
         if (key === 'k' && !modalOpen()) {
           event.preventDefault()
-          focusSearch()
+          openSearch()
         } else if (key === ',' && !modalOpen()) {
           event.preventDefault()
           window.location.hash = '/ajustes'
@@ -156,7 +146,7 @@ export function useKeyboardShortcuts({
       }
       if (key === '/') {
         event.preventDefault()
-        focusSearch()
+        openSearch()
         return
       }
       const section = SECTIONS.find((s) => s.key === key && s.key !== ',')
@@ -166,8 +156,10 @@ export function useKeyboardShortcuts({
         return
       }
       if (CREATE[key]) {
+        const kind = CREATE[key]
+        if ((kind === 'examen' || kind === 'nota') && !hasSubjects) return
         event.preventDefault()
-        openCreate(CREATE[key])
+        openCreate(kind)
         return
       }
       if (key === 'a') {

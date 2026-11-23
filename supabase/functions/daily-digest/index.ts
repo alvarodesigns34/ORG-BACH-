@@ -209,6 +209,31 @@ const digestMessage = (digest: Digest): PushMessage => ({
 
 /** Margen para recuperar una ejecución del cron perdida o retrasada. */
 const CATCH_UP_HOURS = 2
+const PUSH_CONCURRENCY = 8
+
+function inDigestWindow(localHour: number, targetHour: number): boolean {
+  const diff = (localHour - targetHour + 24) % 24
+  return diff >= 0 && diff <= CATCH_UP_HOURS
+}
+
+function safeLocalParts(date: Date, timeZone: string) {
+  try {
+    return localParts(date, timeZone)
+  } catch {
+    return localParts(date, 'Europe/Madrid')
+  }
+}
+
+async function runPool<T>(items: T[], concurrency: number, worker: (item: T) => Promise<void>) {
+  let next = 0
+  const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (next < items.length) {
+      const idx = next++
+      await worker(items[idx])
+    }
+  })
+  await Promise.all(runners)
+}
 
 async function runCron(): Promise<Response> {
   const keys = await vapid()
@@ -217,37 +242,45 @@ async function runCron(): Promise<Response> {
     select id, user_id, endpoint, p256dh, auth, timezone, hour, last_sent_on::text
     from public.push_subscriptions where enabled`
 
-  const digests = new Map<string, Digest>()
+  const digests = new Map<string, Promise<Digest>>()
   let sent = 0
-  for (const sub of subs) {
-    let local
-    try {
-      local = localParts(now, sub.timezone)
-    } catch {
-      local = localParts(now, 'Europe/Madrid')
-    }
-    if (local.hour < sub.hour || local.hour > sub.hour + CATCH_UP_HOURS) continue
-    if (sub.last_sent_on === local.day) continue
+
+  await runPool(subs, PUSH_CONCURRENCY, async (sub) => {
+    const local = safeLocalParts(now, sub.timezone)
+    if (!inDigestWindow(local.hour, sub.hour)) return
+    if (sub.last_sent_on === local.day) return
 
     // Se reclama el envío antes de hacerlo: dos ejecuciones solapadas no
     // pueden mandar el mismo resumen dos veces.
+    const previousSentOn = sub.last_sent_on
     const claimed = await sql`
       update public.push_subscriptions set last_sent_on = ${local.day}
       where id = ${sub.id} and last_sent_on is distinct from ${local.day}::date
       returning id`
-    if (claimed.length === 0) continue
+    if (claimed.length === 0) return
 
-    const cacheKey = `${sub.user_id}|${local.day}`
-    let digest = digests.get(cacheKey)
-    if (!digest) {
-      digest = await digestFor(sub.user_id, local.day, local.hour * 60 + local.minute)
-      digests.set(cacheKey, digest)
+    const cacheKey = `${sub.user_id}|${local.day}|${local.hour}`
+    let digestPromise = digests.get(cacheKey)
+    if (!digestPromise) {
+      digestPromise = digestFor(sub.user_id, local.day, local.hour * 60 + local.minute)
+      digests.set(cacheKey, digestPromise)
     }
+    const digest = await digestPromise
     // Sin nada que contar no se molesta: una notificación vacía diaria acaba
     // enseñando a ignorarlas todas.
-    if (digest.empty) continue
-    if ((await send(sub, digestMessage(digest), keys)) === 'ok') sent++
-  }
+    if (digest.empty) return
+    const outcome = await send(sub, digestMessage(digest), keys)
+    if (outcome === 'ok') {
+      sent++
+    } else if (outcome === 'error') {
+      // Fallo transitorio de red/APNs/FCM: devolver `last_sent_on` a su valor
+      // previo para que la ventana de recuperación (CATCH_UP_HOURS) pueda reintentar.
+      await sql`
+        update public.push_subscriptions set last_sent_on = ${previousSentOn}::date
+        where id = ${sub.id} and last_sent_on = ${local.day}::date`
+    }
+  })
+
   return json({ ok: true, checked: subs.length, sent })
 }
 
@@ -265,7 +298,7 @@ interface FlightAlert {
 }
 
 /** Lo que se recoge en cada pasada: lo de este minuto y un poco más. */
-const FLIGHT_WINDOW_SECONDS = 65
+const FLIGHT_WINDOW_SECONDS = 70
 
 async function runFlights(): Promise<Response> {
   // Se reclaman antes de esperar: otra ejecución solapada no los ve.
@@ -277,15 +310,15 @@ async function runFlights(): Promise<Response> {
   if (alerts.length === 0) return json({ ok: true, sent: 0 })
 
   const keys = await vapid()
-  alerts.sort((a, b) => a.fire_at.getTime() - b.fire_at.getTime())
   let sent = 0
-  for (const alert of alerts) {
+
+  await runPool(alerts, PUSH_CONCURRENCY, async (alert) => {
     const wait = alert.fire_at.getTime() - Date.now()
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
     // Si la app lo canceló mientras tanto (pausa, abandono, o el vuelo se
     // está viendo en pantalla), la fila ya no existe: no se envía.
     const still = await sql`delete from public.flight_alerts where id = ${alert.id} returning id`
-    if (still.length === 0) continue
+    if (still.length === 0) return
     const subs = await sql<Pick<Subscription, 'id' | 'endpoint' | 'p256dh' | 'auth'>[]>`
       select id, endpoint, p256dh, auth
       from public.push_subscriptions where user_id = ${alert.user_id} and flights`
@@ -293,7 +326,9 @@ async function runFlights(): Promise<Response> {
       subs.map((sub) =>
         send(
           sub,
-          { title: alert.title, body: alert.body, tag: 'vuelo', url: '#/estudio' },
+          // Etiqueta distinta por tipo de aviso para que Safari 18.4+ (Web Push declarativo)
+          // no reemplace silenciosamente un aviso de escala o aterrizaje por el anterior.
+          { title: alert.title, body: alert.body, tag: `vuelo-${alert.kind}`, url: '#/estudio' },
           keys,
           // Un aviso de aterrizaje que llega media hora tarde ya no sirve.
           { ttl: 15 * 60, urgency: 'high' },
@@ -301,20 +336,28 @@ async function runFlights(): Promise<Response> {
       ),
     )
     if (results.includes('ok')) sent++
-  }
+  })
+
   return json({ ok: true, claimed: alerts.length, sent })
 }
 
 async function userFromRequest(req: Request): Promise<string | null> {
   const auth = req.headers.get('Authorization')
   if (!auth?.startsWith('Bearer ')) return null
-  const apikey = req.headers.get('apikey') ?? Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: { Authorization: auth, apikey },
-  })
-  if (!res.ok) return null
-  const user = (await res.json()) as { id?: string }
-  return user.id ?? null
+  const apikey = Deno.env.get('SUPABASE_ANON_KEY') ?? req.headers.get('apikey') ?? ''
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 8000)
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { Authorization: auth, apikey },
+      signal: controller.signal,
+    })
+    if (!res.ok) return null
+    const user = (await res.json()) as { id?: string }
+    return user.id ?? null
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 async function runTest(req: Request, body: Record<string, unknown>): Promise<Response> {
@@ -322,14 +365,17 @@ async function runTest(req: Request, body: Record<string, unknown>): Promise<Res
   if (!userId) return json({ error: 'No autenticado' }, 401)
   const keys = await vapid()
 
-  const endpoint = typeof body.endpoint === 'string' ? body.endpoint : null
+  const endpoint = typeof body.endpoint === 'string' && body.endpoint.trim() ? body.endpoint.trim() : null
+  if (!endpoint) {
+    return json({ error: 'Indica el dispositivo al que enviar la prueba.' }, 400)
+  }
   const subs = await sql<Subscription[]>`
     select id, user_id, endpoint, p256dh, auth, timezone, hour, last_sent_on::text
     from public.push_subscriptions
-    where user_id = ${userId} ${endpoint ? sql`and endpoint = ${endpoint}` : sql``}`
+    where user_id = ${userId} and endpoint = ${endpoint}`
   if (subs.length === 0) return json({ error: 'Este dispositivo no tiene avisos activados' }, 404)
 
-  const local = localParts(new Date(), subs[0].timezone)
+  const local = safeLocalParts(new Date(), subs[0].timezone)
   // La prueba se envía siempre (aunque no haya nada o esté silenciado): así se
   // ve que llega y, si está silenciado, el aviso lo dice.
   const digest = await digestFor(userId, local.day, local.hour * 60 + local.minute)

@@ -29,7 +29,7 @@ import {
   X,
 } from 'lucide-react'
 
-import { formatFlightTime } from '@/domain/flights'
+import { formatFlightTime, landingAt } from '@/domain/flights'
 import { colorVar, quietVar } from '@/domain/palette'
 import type { Exam, FocusSession, Subject, Task } from '@/domain/types'
 import { ConfirmDialog } from '@/ui/Modal'
@@ -193,7 +193,7 @@ function MapStylePanel({
           ))}
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5">
         {MAP_OPTIONS.map((o) => {
           const active = map === o.id
           return (
@@ -811,7 +811,7 @@ export function FlightHud({
             to={session.to}
             progress={progress}
             layoverMarks={layoverMarks}
-            remainingMs={remainingMs}
+            etaMs={landingAt(session, Date.now()) ?? Date.now() + remainingMs}
             paused={paused}
             distanceKm={session.distanceKm}
             speedKmh={session.plannedMinutes > 0 ? (session.distanceKm / session.plannedMinutes) * 60 : 0}
@@ -916,7 +916,7 @@ function FlightTrack({
   to,
   progress,
   layoverMarks,
-  remainingMs,
+  etaMs,
   paused,
   speedKmh,
   distanceKm,
@@ -926,12 +926,12 @@ function FlightTrack({
   to: string
   progress: number
   layoverMarks: number[]
-  remainingMs: number
+  etaMs: number
   paused: boolean
   speedKmh: number
 }) {
   const p = Math.min(1, Math.max(0, progress))
-  const arrival = new Date(Date.now() + remainingMs).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
+  const arrival = new Date(etaMs).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
   const phase = flightPhase(p)
   const altitude = flightAltitude(p, distanceKm)
   return (
