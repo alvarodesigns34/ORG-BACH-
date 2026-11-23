@@ -83,42 +83,42 @@
   --shadow-lg: 0 6px 16px rgb(0 0 0 / 0.06), 0 28px 64px rgb(0 0 0 / 0.16);
 
   /* --- Material de cristal (barra inferior, cabeceras, menús) --- */
-  --glass-bg: rgb(255 255 255 / 0.4);
-  --glass-bg-strong: rgb(249 249 252 / 0.8);
+  --glass-bg: rgb(255 255 255 / 0.44);
+  --glass-bg-strong: rgb(252 252 255 / 0.84);
   /* Brillo interior y refracción del canto (Liquid Glass). */
-  --glass-glow: rgb(255 255 255 / 0.75);
-  --glass-rim-low: rgb(255 255 255 / 0.5);
-  --glass-refract-a: rgb(255 70 140 / 0.16);
-  --glass-refract-b: rgb(30 160 255 / 0.2);
+  --glass-glow: rgb(255 255 255 / 0.82);
+  --glass-rim-low: rgb(255 255 255 / 0.56);
+  --glass-refract-a: rgb(255 75 145 / 0.18);
+  --glass-refract-b: rgb(30 165 255 / 0.22);
   /* Brillo especular del borde del cristal (Liquid Glass). */
-  --glass-spec: rgb(255 255 255 / 0.95);
-  --glass-spec-soft: rgb(255 255 255 / 0.28);
-  --glass-sheen: rgb(255 255 255 / 0.42);
-  --glass-floor: rgb(0 0 0 / 0.1);
+  --glass-spec: rgb(255 255 255 / 0.98);
+  --glass-spec-soft: rgb(255 255 255 / 0.34);
+  --glass-sheen: rgb(255 255 255 / 0.48);
+  --glass-floor: rgb(0 0 0 / 0.09);
 
   /* Intensidad de la luz ambiente (ver .ambient). */
-  --amb-a: 30%;
-  --amb-b: 18%;
-  --amb-c: 12%;
-  --amb-warm: rgb(255 214 170 / 0.18);
-  --glass-rim: rgb(255 255 255 / 0.85);
-  --glass-edge: rgb(0 0 0 / 0.07);
-  --glass-shadow: 0 10px 30px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.05);
-  --glass-tint: rgb(0 0 0 / 0.055);
+  --amb-a: 32%;
+  --amb-b: 20%;
+  --amb-c: 14%;
+  --amb-warm: rgb(255 214 170 / 0.2);
+  --glass-rim: rgb(255 255 255 / 0.92);
+  --glass-edge: rgb(15 23 42 / 0.075);
+  --glass-shadow: 0 12px 34px -4px rgb(15 23 42 / 0.12), 0 2px 6px rgb(15 23 42 / 0.05);
+  --glass-tint: rgb(15 23 42 / 0.055);
 
-  --scrim: rgb(0 0 0 / 0.28);
+  --scrim: rgb(15 20 35 / 0.26);
 
   /* --- Panel (capa de contenido) ---
-     Cristal «de contenido»: translúcido sobre la luz ambiente, SIN
-     desenfoque (detrás solo hay un degradado suave, desenfocarlo no aporta
-     nada y costaría fotogramas al desplazar). Canto de luz arriba, borde de
-     medio punto y una sombra muy abierta: flota sin pesar. */
-  --pane: rgb(255 255 255 / 0.66);
+     Cristal perlado luminoso sobre la luz ambiente: translúcido con desenfoque
+     suave, canto superior especular de 1 px y reflejo direccional sutil. */
+  --pane: rgb(255 255 255 / 0.72);
   --pane-solid: #ffffff;
-  --pane-rim: rgb(255 255 255 / 0.95);
-  --pane-edge: rgb(15 20 40 / 0.06);
-  --pane-shadow: 0 1px 1px rgb(15 20 40 / 0.03), 0 8px 24px -10px rgb(15 20 40 / 0.1),
-    0 24px 48px -24px rgb(15 20 40 / 0.08);
+  --pane-rim: rgb(255 255 255 / 0.98);
+  --pane-edge: rgb(15 23 42 / 0.065);
+  --pane-sheen: rgb(255 255 255 / 0.32);
+  --pane-hover-light: rgb(255 255 255 / 0.45);
+  --pane-shadow: 0 1px 2px rgb(15 23 42 / 0.035), 0 10px 28px -12px rgb(15 23 42 / 0.11),
+    0 24px 52px -24px rgb(15 23 42 / 0.08);
 
   /* --- Duraciones: tres y solo tres (más el instante) --- */
   --dur-instant: 120ms;
@@ -190,33 +190,36 @@
   --shadow-md: 0 2px 6px rgb(0 0 0 / 0.4), 0 10px 28px rgb(0 0 0 / 0.5);
   --shadow-lg: 0 6px 16px rgb(0 0 0 / 0.5), 0 28px 64px rgb(0 0 0 / 0.7);
 
-  --glass-bg: rgb(44 44 48 / 0.42);
-  --glass-bg-strong: rgb(22 22 25 / 0.8);
-  --glass-glow: rgb(255 255 255 / 0.1);
-  --glass-rim-low: rgb(255 255 255 / 0.08);
-  --glass-refract-a: rgb(255 70 140 / 0.22);
-  --glass-refract-b: rgb(30 160 255 / 0.26);
-  --glass-spec: rgb(255 255 255 / 0.32);
-  --glass-spec-soft: rgb(255 255 255 / 0.06);
-  --glass-sheen: rgb(255 255 255 / 0.07);
-  --glass-floor: rgb(0 0 0 / 0.5);
+  --glass-bg: rgb(38 38 44 / 0.48);
+  --glass-bg-strong: rgb(24 24 28 / 0.82);
+  --glass-glow: rgb(255 255 255 / 0.13);
+  --glass-rim-low: rgb(255 255 255 / 0.09);
+  --glass-refract-a: rgb(255 80 150 / 0.24);
+  --glass-refract-b: rgb(40 165 255 / 0.28);
+  --glass-spec: rgb(255 255 255 / 0.38);
+  --glass-spec-soft: rgb(255 255 255 / 0.08);
+  --glass-sheen: rgb(255 255 255 / 0.09);
+  --glass-floor: rgb(0 0 0 / 0.52);
 
-  --amb-a: 34%;
-  --amb-b: 20%;
-  --amb-c: 14%;
-  --amb-warm: rgb(255 140 80 / 0.06);
-  --glass-rim: rgb(255 255 255 / 0.14);
-  --glass-edge: rgb(255 255 255 / 0.06);
-  --glass-shadow: 0 10px 30px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
+  --amb-a: 38%;
+  --amb-b: 22%;
+  --amb-c: 15%;
+  --amb-warm: rgb(255 150 90 / 0.07);
+  --glass-rim: rgb(255 255 255 / 0.18);
+  --glass-edge: rgb(255 255 255 / 0.075);
+  --glass-shadow: 0 12px 36px rgb(0 0 0 / 0.55), 0 2px 8px rgb(0 0 0 / 0.35);
   --glass-tint: rgb(255 255 255 / 0.1);
 
-  --scrim: rgb(0 0 0 / 0.55);
+  --scrim: rgb(0 0 0 / 0.54);
 
-  --pane: rgb(38 38 44 / 0.52);
+  --pane: rgb(32 32 38 / 0.62);
   --pane-solid: #1c1c1e;
-  --pane-rim: rgb(255 255 255 / 0.13);
-  --pane-edge: rgb(255 255 255 / 0.06);
-  --pane-shadow: 0 1px 1px rgb(0 0 0 / 0.4), 0 12px 32px -12px rgb(0 0 0 / 0.6);
+  --pane-rim: rgb(255 255 255 / 0.18);
+  --pane-edge: rgb(255 255 255 / 0.08);
+  --pane-sheen: rgb(255 255 255 / 0.065);
+  --pane-hover-light: rgb(255 255 255 / 0.065);
+  --pane-shadow: 0 1px 1px rgb(0 0 0 / 0.45), 0 14px 36px -12px rgb(0 0 0 / 0.68),
+    0 0 0 0.5px rgb(255 255 255 / 0.04);
 }
 
 @theme inline {
@@ -419,15 +422,33 @@ html {
 }
 
 @utility card {
+  position: relative;
   background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.06), transparent 40%),
+    linear-gradient(165deg, var(--pane-sheen) 0%, transparent 42%),
     var(--pane);
+  -webkit-backdrop-filter: blur(14px) saturate(155%);
+  backdrop-filter: blur(14px) saturate(155%);
   border-radius: var(--radius-lg);
   box-shadow:
-    inset 0 1px 0 var(--pane-rim),
+    inset 0 1px 0.5px var(--pane-rim),
     inset 0 0 0 0.5px var(--pane-edge),
     var(--pane-shadow);
-  transition: box-shadow 260ms var(--ease-std);
+  transition: box-shadow 280ms var(--ease-std), transform 380ms var(--spring),
+    background-color 240ms var(--ease-std);
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(
+      340px circle at var(--gx, 50%) var(--gy, 0%),
+      var(--pane-hover-light),
+      transparent 65%
+    );
+    opacity: calc(var(--g-on, 0) * 0.65);
+    transition: opacity 320ms var(--ease-std);
+  }
 }
 
 /* Con puntero (trackpad del iPad, ordenador), las tarjetas que se pueden
@@ -435,10 +456,17 @@ html {
 @media (hover: hover) and (pointer: fine) {
   .card:has(a, button):hover {
     box-shadow:
-      inset 0 1px 0 var(--pane-rim),
+      inset 0 1px 0.5px var(--pane-rim),
       inset 0 0 0 0.5px var(--pane-edge),
       var(--pane-shadow),
-      0 10px 30px -8px rgb(15 20 40 / 0.08);
+      0 14px 36px -10px rgb(15 23 42 / 0.11);
+  }
+  [data-theme='dark'] .card:has(a, button):hover {
+    box-shadow:
+      inset 0 1px 0.5px rgb(255 255 255 / 0.24),
+      inset 0 0 0 0.5px rgb(255 255 255 / 0.1),
+      var(--pane-shadow),
+      0 16px 40px -10px rgb(0 0 0 / 0.6);
   }
 }
 
@@ -471,22 +499,23 @@ html {
   position: relative;
   isolation: isolate;
   background:
+    radial-gradient(240px circle at var(--gx, 25%) var(--gy, -20%), color-mix(in srgb, var(--glass-sheen) calc(var(--g-on, 0) * 100%), transparent), transparent 65%),
     linear-gradient(180deg, var(--glass-sheen), transparent 46%),
     var(--glass-bg);
   /* Menos desenfoque que antes y más saturación: se adivina lo que hay
      detrás (cristal «regular» de iOS 26, no un panel esmerilado). */
-  -webkit-backdrop-filter: blur(16px) saturate(190%) brightness(1.06);
-  backdrop-filter: blur(16px) saturate(190%) brightness(1.06);
+  -webkit-backdrop-filter: blur(18px) saturate(200%) brightness(1.06);
+  backdrop-filter: blur(18px) saturate(200%) brightness(1.06);
   box-shadow:
     inset 1.5px 1.5px 1px -1px var(--glass-rim),
     inset -1px -1px 1px -0.5px var(--glass-rim-low),
     inset 0 0 0 0.5px var(--glass-edge),
-    inset 0 0 22px -8px var(--glass-glow),
-    inset 5px 0 9px -7px var(--glass-refract-a),
-    inset -5px 0 9px -7px var(--glass-refract-b),
+    inset 0 0 24px -8px var(--glass-glow),
+    inset 5px 0 10px -7px var(--glass-refract-a),
+    inset -5px 0 10px -7px var(--glass-refract-b),
     inset 0 -6px 12px -8px var(--glass-floor),
     0 1px 2px rgb(0 0 0 / 0.06),
-    0 10px 30px rgb(0 0 0 / 0.1);
+    0 12px 34px -4px rgb(0 0 0 / 0.12);
   &::after {
     content: '';
     position: absolute;
@@ -494,11 +523,11 @@ html {
     border-radius: inherit;
     padding: 1.25px;
     background: linear-gradient(
-      150deg,
+      148deg,
       var(--glass-spec) 0%,
       var(--glass-spec-soft) 28%,
       transparent 50%,
-      var(--glass-spec-soft) 80%,
+      var(--glass-spec-soft) 78%,
       var(--glass-spec) 100%
     );
     -webkit-mask:
@@ -523,18 +552,18 @@ html {
   position: relative;
   isolation: isolate;
   background:
-    radial-gradient(140px circle at var(--gx, 30%) var(--gy, -30%), var(--glass-btn-light), transparent 62%),
+    radial-gradient(150px circle at var(--gx, 30%) var(--gy, -30%), var(--glass-btn-light), transparent 64%),
     linear-gradient(180deg, var(--glass-btn-top), var(--glass-btn-bottom));
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
-  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(190%);
+  backdrop-filter: blur(14px) saturate(190%);
   box-shadow:
-    inset 0 1px 0.5px var(--glass-btn-rim),
-    inset 0 -1px 1px var(--glass-btn-floor),
+    inset 0 1px 0.75px var(--glass-btn-rim),
+    inset 0 -1px 1.25px var(--glass-btn-floor),
     inset 0 0 0 0.5px var(--glass-btn-edge),
-    inset 4px 0 7px -6px var(--glass-refract-a),
-    inset -4px 0 7px -6px var(--glass-refract-b),
+    inset 4px 0 8px -6px var(--glass-refract-a),
+    inset -4px 0 8px -6px var(--glass-refract-b),
     0 1px 2px rgb(0 0 0 / 0.07),
-    0 4px 14px rgb(0 0 0 / 0.07);
+    0 5px 16px -2px rgb(0 0 0 / 0.08);
   &::before {
     content: '';
     position: absolute;
@@ -543,28 +572,28 @@ html {
     border-radius: inherit;
     pointer-events: none;
     background:
-      radial-gradient(120% 120% at var(--gx, 50%) var(--gy, 0%), rgb(255 255 255 / 0.85), transparent 60%);
+      radial-gradient(125% 125% at var(--gx, 50%) var(--gy, 0%), rgb(255 255 255 / 0.9), transparent 60%);
     box-shadow:
-      inset 0 0 0 1px rgb(255 255 255 / 0.7),
-      inset 0 0 14px rgb(255 255 255 / 0.5);
-    opacity: calc(var(--press, 0) * 0.75);
+      inset 0 0 0 1px rgb(255 255 255 / 0.75),
+      inset 0 0 16px rgb(255 255 255 / 0.5);
+    opacity: calc(var(--press, 0) * 0.78);
   }
 }
 :root {
-  --glass-btn-top: rgb(255 255 255 / 0.82);
-  --glass-btn-bottom: rgb(255 255 255 / 0.42);
-  --glass-btn-light: rgb(255 255 255 / 0.9);
+  --glass-btn-top: rgb(255 255 255 / 0.86);
+  --glass-btn-bottom: rgb(255 255 255 / 0.48);
+  --glass-btn-light: rgb(255 255 255 / 0.95);
   --glass-btn-rim: rgb(255 255 255 / 1);
   --glass-btn-floor: rgb(0 0 0 / 0.07);
-  --glass-btn-edge: rgb(0 0 0 / 0.07);
+  --glass-btn-edge: rgb(15 23 42 / 0.08);
 }
 [data-theme='dark'] {
-  --glass-btn-top: rgb(255 255 255 / 0.17);
-  --glass-btn-bottom: rgb(255 255 255 / 0.06);
-  --glass-btn-light: rgb(255 255 255 / 0.18);
-  --glass-btn-rim: rgb(255 255 255 / 0.28);
-  --glass-btn-floor: rgb(0 0 0 / 0.35);
-  --glass-btn-edge: rgb(255 255 255 / 0.08);
+  --glass-btn-top: rgb(255 255 255 / 0.19);
+  --glass-btn-bottom: rgb(255 255 255 / 0.07);
+  --glass-btn-light: rgb(255 255 255 / 0.24);
+  --glass-btn-rim: rgb(255 255 255 / 0.32);
+  --glass-btn-floor: rgb(0 0 0 / 0.38);
+  --glass-btn-edge: rgb(255 255 255 / 0.1);
 }
 /* Cristal teñido (botón principal): el color de acento con el mismo canto
    de luz, brillo superior y reflejo que sigue al dedo. */
@@ -572,15 +601,15 @@ html {
   position: relative;
   isolation: isolate;
   background:
-    radial-gradient(140px circle at var(--gx, 30%) var(--gy, -30%), rgb(255 255 255 / 0.32), transparent 62%),
-    linear-gradient(180deg, rgb(255 255 255 / 0.26), rgb(255 255 255 / 0) 55%),
+    radial-gradient(150px circle at var(--gx, 30%) var(--gy, -30%), rgb(255 255 255 / 0.38), transparent 62%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.3), rgb(255 255 255 / 0) 56%),
     var(--c-accent-fill);
   box-shadow:
-    inset 0 1px 0.5px rgb(255 255 255 / 0.55),
-    inset 0 -1.5px 2px rgb(0 0 0 / 0.14),
-    inset 0 0 0 0.5px rgb(255 255 255 / 0.18),
+    inset 0 1px 0.75px rgb(255 255 255 / 0.62),
+    inset 0 -1.5px 2px rgb(0 0 0 / 0.16),
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.22),
     0 1px 2px rgb(0 0 0 / 0.1),
-    0 6px 18px color-mix(in srgb, var(--c-accent-fill) 32%, transparent);
+    0 8px 22px -4px color-mix(in srgb, var(--c-accent-fill) 42%, transparent);
   &::before {
     content: '';
     position: absolute;
@@ -588,18 +617,133 @@ html {
     z-index: -1;
     border-radius: inherit;
     pointer-events: none;
-    background: radial-gradient(120% 140% at var(--gx, 50%) var(--gy, 0%), rgb(255 255 255 / 0.55), transparent 62%);
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.45);
+    background: radial-gradient(125% 145% at var(--gx, 50%) var(--gy, 0%), rgb(255 255 255 / 0.6), transparent 62%);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.5);
     opacity: var(--press, 0);
+  }
+}
+
+/* Cristal teñido destructivo (botón rojo Apple Liquid Glass). */
+@utility glass-danger {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(150px circle at var(--gx, 30%) var(--gy, -30%), rgb(255 255 255 / 0.34), transparent 62%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.24), rgb(255 255 255 / 0) 56%),
+    var(--c-danger-fill);
+  box-shadow:
+    inset 0 1px 0.75px rgb(255 255 255 / 0.52),
+    inset 0 -1.5px 2px rgb(0 0 0 / 0.18),
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.18),
+    0 1px 2px rgb(0 0 0 / 0.12),
+    0 8px 22px -4px color-mix(in srgb, var(--c-danger-fill) 38%, transparent);
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(125% 145% at var(--gx, 50%) var(--gy, 0%), rgb(255 255 255 / 0.52), transparent 62%);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.42);
+    opacity: var(--press, 0);
+  }
+}
+
+/* Campo de entrada de cristal (captura rápida y Spotlight). */
+@utility glass-input {
+  background:
+    linear-gradient(180deg, var(--pane-sheen), transparent 45%),
+    var(--pane);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+  backdrop-filter: blur(16px) saturate(170%);
+  box-shadow:
+    inset 0 1px 0.5px var(--pane-rim),
+    inset 0 0 0 0.5px var(--pane-edge),
+    0 2px 10px -4px rgb(15 23 42 / 0.08);
+  transition: box-shadow 220ms var(--ease-std), background-color 220ms var(--ease-std),
+    border-color 220ms var(--ease-std);
+}
+.glass-input:focus {
+  background: var(--pane-solid);
+  box-shadow:
+    inset 0 1px 0 var(--pane-rim),
+    0 0 0 1.5px var(--c-accent),
+    0 0 0 5px color-mix(in srgb, var(--c-accent) 16%, transparent),
+    0 8px 24px -8px color-mix(in srgb, var(--c-accent) 22%, transparent);
+}
+
+/* Indicador en reposo de la pestaña activa en la barra móvil. */
+.tab-pill-rest {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.55), rgb(255 255 255 / 0.18)),
+    var(--glass-tint);
+  box-shadow:
+    inset 0 1px 0.5px rgb(255 255 255 / 0.78),
+    inset 0 0 0 0.5px var(--glass-edge),
+    0 2px 8px rgb(0 0 0 / 0.05);
+}
+[data-theme='dark'] .tab-pill-rest {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.14), rgb(255 255 255 / 0.04)),
+    color-mix(in srgb, var(--c-accent) 12%, rgb(255 255 255 / 0.08));
+  box-shadow:
+    inset 0 1px 0.5px rgb(255 255 255 / 0.2),
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.08),
+    0 2px 10px rgb(0 0 0 / 0.28);
+}
+
+/* Velo sutil desenfocado tras hojas y modales (iOS / macOS). */
+.modal-scrim {
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(8px) saturate(135%);
+  backdrop-filter: blur(8px) saturate(135%);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .modal-scrim {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 }
 
 @media (hover: hover) and (pointer: fine) {
   .glass-btn:hover:not(:disabled) {
-    --glass-btn-top: rgb(255 255 255 / 0.92);
+    --glass-btn-top: rgb(255 255 255 / 0.94);
+    box-shadow:
+      inset 0 1px 0.75px var(--glass-btn-rim),
+      inset 0 -1px 1.25px var(--glass-btn-floor),
+      inset 0 0 0 0.5px var(--glass-btn-edge),
+      inset 4px 0 8px -6px var(--glass-refract-a),
+      inset -4px 0 8px -6px var(--glass-refract-b),
+      0 2px 4px rgb(0 0 0 / 0.08),
+      0 8px 22px -4px rgb(0 0 0 / 0.11);
   }
   [data-theme='dark'] .glass-btn:hover:not(:disabled) {
-    --glass-btn-top: rgb(255 255 255 / 0.22);
+    --glass-btn-top: rgb(255 255 255 / 0.26);
+    box-shadow:
+      inset 0 1px 0.75px rgb(255 255 255 / 0.38),
+      inset 0 -1px 1.25px var(--glass-btn-floor),
+      inset 0 0 0 0.5px rgb(255 255 255 / 0.14),
+      inset 4px 0 8px -6px var(--glass-refract-a),
+      inset -4px 0 8px -6px var(--glass-refract-b),
+      0 2px 6px rgb(0 0 0 / 0.35),
+      0 10px 24px -4px rgb(0 0 0 / 0.5);
+  }
+  .glass-tinted:hover:not(:disabled) {
+    box-shadow:
+      inset 0 1px 0.75px rgb(255 255 255 / 0.7),
+      inset 0 -1.5px 2px rgb(0 0 0 / 0.16),
+      inset 0 0 0 0.5px rgb(255 255 255 / 0.28),
+      0 2px 4px rgb(0 0 0 / 0.12),
+      0 10px 28px -4px color-mix(in srgb, var(--c-accent-fill) 52%, transparent);
+  }
+  .glass-danger:hover:not(:disabled) {
+    box-shadow:
+      inset 0 1px 0.75px rgb(255 255 255 / 0.6),
+      inset 0 -1.5px 2px rgb(0 0 0 / 0.18),
+      inset 0 0 0 0.5px rgb(255 255 255 / 0.24),
+      0 2px 4px rgb(0 0 0 / 0.14),
+      0 10px 28px -4px color-mix(in srgb, var(--c-danger-fill) 48%, transparent);
   }
 }
 
@@ -607,20 +751,20 @@ html {
   box-shadow:
     inset 1.5px 1.5px 1px -1px var(--glass-rim),
     inset 0 0 0 0.5px var(--glass-edge),
-    inset 0 0 22px -8px var(--glass-glow),
-    inset 5px 0 9px -7px var(--glass-refract-a),
-    inset -5px 0 9px -7px var(--glass-refract-b),
-    0 1px 2px rgb(0 0 0 / 0.4),
-    0 8px 24px rgb(0 0 0 / 0.45);
+    inset 0 0 24px -8px var(--glass-glow),
+    inset 5px 0 10px -7px var(--glass-refract-a),
+    inset -5px 0 10px -7px var(--glass-refract-b),
+    0 1px 2px rgb(0 0 0 / 0.42),
+    0 12px 32px rgb(0 0 0 / 0.52);
 }
 
 /* Ficha de icono (Ajustes de iOS): canto de luz arriba, borde oscuro abajo y
    una sombra mínima. El color lo pone el degradado en línea. */
 @utility tile {
   box-shadow:
-    inset 0 0.5px 0 rgb(255 255 255 / 0.5),
-    inset 0 -0.5px 0 rgb(0 0 0 / 0.14),
-    0 1px 2px rgb(0 0 0 / 0.14);
+    inset 0 0.75px 0 rgb(255 255 255 / 0.55),
+    inset 0 -0.75px 0 rgb(0 0 0 / 0.16),
+    0 2px 5px -1px rgb(0 0 0 / 0.18);
 }
 
 /* Luz ambiente. Un solo tono, el del CONTEXTO: la asignatura que toca ahora
@@ -636,9 +780,18 @@ html {
   --amb: var(--c-accent-fill);
   transition: --amb 900ms var(--ease-std);
 }
+@keyframes ambient-breathe {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(1.5%, -1.2%, 0) scale(1.045);
+  }
+}
 .ambient {
   position: fixed;
-  inset: 0;
+  inset: -6%;
   z-index: -1;
   pointer-events: none;
   /* Toda la pantalla iluminada, no solo la cabecera: los paneles de cristal
@@ -646,10 +799,12 @@ html {
      contexto (arriba a la izquierda, fuerte; abajo a la derecha, rebote
      suave) y un velo neutro en el centro para que el texto siga limpio. */
   background:
-    radial-gradient(80% 60% at 0% 0%, color-mix(in srgb, var(--amb) var(--amb-a), transparent), transparent 70%),
-    radial-gradient(60% 50% at 100% 0%, color-mix(in srgb, var(--amb) var(--amb-b), transparent), transparent 72%),
-    radial-gradient(70% 55% at 100% 100%, color-mix(in srgb, var(--amb) var(--amb-c), transparent), transparent 70%),
-    radial-gradient(60% 50% at 0% 100%, var(--amb-warm), transparent 70%);
+    radial-gradient(75% 58% at 6% 4%, color-mix(in srgb, var(--amb) var(--amb-a), transparent), transparent 70%),
+    radial-gradient(58% 48% at 96% 6%, color-mix(in srgb, var(--amb) var(--amb-b), transparent), transparent 72%),
+    radial-gradient(68% 54% at 94% 94%, color-mix(in srgb, var(--amb) var(--amb-c), transparent), transparent 70%),
+    radial-gradient(58% 48% at 6% 96%, var(--amb-warm), transparent 70%);
+  animation: ambient-breathe 26s ease-in-out infinite;
+  will-change: transform;
 }
 
 /* Controles fijos de arriba (asistente, avatar, volver): siempre nítidos, en
@@ -732,9 +887,11 @@ html {
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .card,
   .glass,
   .glass-bar,
   .glass-btn,
+  .glass-input,
   .sheet-glass,
   .segmented,
   .liquid {
@@ -748,8 +905,10 @@ html {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
+  .card,
   .glass,
   .glass-bar,
+  .glass-input,
   .sheet-glass,
   .segmented,
   .liquid {
@@ -834,25 +993,30 @@ html {
    brillo arriba a la izquierda, sombra abajo y un leve corrimiento de color
    en los laterales, como el cristal real. */
 .lens {
-  background: var(--glass-bg-strong);
-  -webkit-backdrop-filter: blur(8px) saturate(190%) brightness(1.04);
-  backdrop-filter: blur(8px) saturate(190%) brightness(1.04);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.65), transparent 55%),
+    var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(10px) saturate(200%) brightness(1.05);
+  backdrop-filter: blur(10px) saturate(200%) brightness(1.05);
   box-shadow:
     inset 0 0 0 0.75px var(--glass-rim),
-    inset 2px 3px 7px -3px rgb(255 255 255 / 0.95),
-    inset -3px -4px 9px -4px rgb(0 0 0 / 0.14),
-    inset 4px 0 6px -4px rgb(255 70 140 / 0.38),
+    inset 2px 3px 7px -3px rgb(255 255 255 / 0.98),
+    inset -3px -4px 9px -4px rgb(0 0 0 / 0.12),
+    inset 4px 0 6px -4px rgb(255 75 145 / 0.36),
     inset -4px 0 6px -4px rgb(30 170 255 / 0.42),
-    0 8px 22px rgb(0 0 0 / 0.16);
+    0 8px 24px -2px rgb(15 23 42 / 0.16);
 }
 [data-theme='dark'] .lens {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.14), transparent 55%),
+    color-mix(in srgb, var(--c-accent) 11%, var(--glass-bg-strong));
   box-shadow:
-    inset 0 0 0 0.75px rgb(255 255 255 / 0.22),
-    inset 2px 3px 7px -3px rgb(255 255 255 / 0.35),
-    inset -3px -4px 9px -4px rgb(0 0 0 / 0.5),
-    inset 4px 0 6px -4px rgb(255 70 140 / 0.45),
-    inset -4px 0 6px -4px rgb(30 170 255 / 0.5),
-    0 8px 22px rgb(0 0 0 / 0.5);
+    inset 0 0 0 0.75px rgb(255 255 255 / 0.25),
+    inset 2px 3px 7px -3px rgb(255 255 255 / 0.36),
+    inset -3px -4px 9px -4px rgb(0 0 0 / 0.52),
+    inset 4px 0 6px -4px rgb(255 80 150 / 0.44),
+    inset -4px 0 6px -4px rgb(40 175 255 / 0.52),
+    0 10px 26px rgb(0 0 0 / 0.54);
 }
 @media (prefers-reduced-transparency: reduce) {
   .lens {
@@ -1405,6 +1569,7 @@ html {
    poco, como un gel, y se ilumina desde el dedo. Vuelve con muelle. */
 .pressable.glass-btn:active:not(:disabled):not([data-liq]),
 .pressable.glass-tinted:active:not(:disabled):not([data-liq]),
+.pressable.glass-danger:active:not(:disabled):not([data-liq]),
 .pressable.filter-on:active:not(:disabled):not([data-liq]) {
   transform: scale(1.045);
   filter: brightness(1.06) saturate(1.1);
@@ -1418,13 +1583,36 @@ html {
 /* Filtro aplicado: cápsula teñida de acento, aún translúcida. */
 @utility filter-on {
   position: relative;
-  background: color-mix(in srgb, var(--c-accent-fill) 16%, transparent);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
-  backdrop-filter: blur(12px) saturate(180%);
+  isolation: isolate;
+  background:
+    radial-gradient(140px circle at var(--gx, 30%) var(--gy, -30%), color-mix(in srgb, var(--c-accent-fill) 22%, white), transparent 64%),
+    color-mix(in srgb, var(--c-accent-fill) 16%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(190%);
+  backdrop-filter: blur(14px) saturate(190%);
   box-shadow:
-    inset 0 1px 0.5px rgb(255 255 255 / 0.5),
-    inset 0 0 0 0.5px color-mix(in srgb, var(--c-accent-fill) 35%, transparent),
-    0 1px 2px rgb(0 0 0 / 0.06);
+    inset 0 1px 0.75px rgb(255 255 255 / 0.56),
+    inset 0 0 0 0.5px color-mix(in srgb, var(--c-accent-fill) 38%, transparent),
+    0 2px 8px -2px color-mix(in srgb, var(--c-accent-fill) 24%, transparent);
+}
+
+/* Tecla de atajo estilo macOS / Spotlight. */
+@utility kbd-apple {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.65), rgb(255 255 255 / 0.25)),
+    var(--c-fill);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.75),
+    inset 0 0 0 0.5px var(--glass-edge),
+    0 1px 2px rgb(0 0 0 / 0.08);
+}
+[data-theme='dark'] .kbd-apple {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.14), rgb(255 255 255 / 0.05)),
+    var(--c-fill);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.08),
+    0 1px 2px rgb(0 0 0 / 0.4);
 }
 
 /* Campo de búsqueda de iOS 26: cápsula gris; al escribir, se aclara. */
@@ -1457,27 +1645,53 @@ button:active > .switch-thumb {
    ========================================================================== */
 
 /* Cristal grueso para hojas: casi opaco (hay formularios que leer), con el
-   canto de luz de Liquid Glass y una sombra honda. */
+   canto especular biselado de Liquid Glass y una sombra honda. */
 .sheet-glass {
+  position: relative;
+  isolation: isolate;
   background:
-    linear-gradient(180deg, var(--glass-sheen), transparent 30%),
-    color-mix(in srgb, var(--c-surface) 93%, transparent);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
-  backdrop-filter: blur(40px) saturate(180%);
+    linear-gradient(180deg, var(--glass-sheen), transparent 28%),
+    color-mix(in srgb, var(--c-surface) 91%, transparent);
+  -webkit-backdrop-filter: blur(42px) saturate(190%);
+  backdrop-filter: blur(42px) saturate(190%);
   box-shadow:
     inset 1.5px 1.5px 1px -1px var(--glass-rim),
     inset 0 0 0 0.5px var(--glass-edge),
     0 2px 8px rgb(0 0 0 / 0.08),
-    0 30px 80px rgb(0 0 0 / 0.25);
+    0 32px 84px -8px rgb(15 23 42 / 0.28);
+}
+.sheet-glass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    148deg,
+    var(--glass-spec) 0%,
+    var(--glass-spec-soft) 28%,
+    transparent 52%,
+    var(--glass-spec-soft) 82%,
+    var(--glass-spec) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  pointer-events: none;
+  z-index: 3;
 }
 [data-theme='dark'] .sheet-glass {
   background:
-    linear-gradient(180deg, var(--glass-sheen), transparent 30%),
-    color-mix(in srgb, #1c1c1e 93%, transparent);
+    linear-gradient(180deg, var(--glass-sheen), transparent 28%),
+    color-mix(in srgb, #1c1c1e 90%, transparent);
   box-shadow:
     inset 1.5px 1.5px 1px -1px var(--glass-rim),
     inset 0 0 0 0.5px var(--glass-edge),
-    0 30px 80px rgb(0 0 0 / 0.6);
+    0 34px 90px -8px rgb(0 0 0 / 0.72);
 }
 .sheet-footer::before {
   content: '';

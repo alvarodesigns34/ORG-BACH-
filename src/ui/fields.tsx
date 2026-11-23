@@ -371,13 +371,13 @@ export function Checkbox({
         className={cx(
           box,
           'relative grid place-items-center rounded-full border-[1.75px] shrink-0',
-          'transition-[background-color,border-color,transform] duration-300 ease-[var(--spring)]',
+          'transition-[background-color,border-color,transform,box-shadow] duration-300 ease-[var(--spring)]',
           // Como una gota de cristal: al pulsar se hincha, no se hunde.
-          'group-active:scale-[1.18]',
+          'group-hover:scale-[1.07] group-active:scale-[1.18]',
           'peer-focus-visible:outline peer-focus-visible:outline-[2.5px] peer-focus-visible:outline-accent peer-focus-visible:outline-offset-2',
           checked
-            ? 'bg-accent-fill border-accent-fill text-white shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.55),inset_0_-1px_1.5px_rgb(0_0_0/0.15),0_2px_8px_color-mix(in_srgb,var(--c-accent-fill)_40%,transparent)]'
-            : 'bg-transparent border-hairline-strong group-hover:border-ink-3',
+            ? 'bg-accent-fill border-accent-fill text-white shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.6),inset_0_-1px_1.5px_rgb(0_0_0/0.16),0_3px_10px_color-mix(in_srgb,var(--c-accent-fill)_44%,transparent)]'
+            : 'bg-transparent border-hairline-strong group-hover:border-accent/65',
         )}
       >
         {checked && (
@@ -470,16 +470,18 @@ export function SwitchControl({
         onChange(!checked)
       }}
       className={cx(
-        'group relative shrink-0 w-[51px] h-[31px] rounded-full transition-colors duration-300',
+        'group relative shrink-0 w-[51px] h-[31px] rounded-full transition-[background-color,box-shadow] duration-300',
         'disabled:opacity-45',
-        checked ? 'bg-[var(--c-switch-on)]' : 'bg-fill',
+        checked
+          ? 'bg-[var(--c-switch-on)] shadow-[inset_0_1px_2px_rgb(0_0_0/0.12),0_2px_10px_-2px_color-mix(in_srgb,var(--c-switch-on)_45%,transparent)]'
+          : 'bg-fill shadow-[inset_0_1px_2px_rgb(0_0_0/0.08)]',
       )}
     >
       <span
         aria-hidden
         className={cx(
           'switch-thumb absolute top-[2px] left-[2px] h-[27px] w-[27px] rounded-full bg-white',
-          'shadow-[0_3px_8px_rgb(0_0_0/0.15),0_1px_1px_rgb(0_0_0/0.16)]',
+          'shadow-[0_3px_8px_rgb(0_0_0/0.16),0_1px_1.5px_rgb(0_0_0/0.16)]',
           'transition-[transform,width,background-color,box-shadow] duration-500 ease-[var(--spring)]',
           // Al pulsar, la bola se estira como en iOS.
           'group-active:w-[33px]',

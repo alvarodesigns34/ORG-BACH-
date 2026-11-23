@@ -41,12 +41,15 @@ export function ExamCard({ exam, subject, today, onOpen, hideSubject }: ExamCard
       className={cx(
         'w-full text-left flex items-center gap-3.5 pl-4 pr-3 py-3',
         'transition-colors duration-150',
-        onOpen && 'active:bg-fill hover:bg-fill/50',
+        onOpen && 'group active:bg-fill hover:bg-fill/55',
       )}
     >
       <span
         aria-hidden
-        className="grid w-11 shrink-0 overflow-hidden rounded-[10px] bg-fill border border-hairline text-center"
+        className={cx(
+          'grid w-11 shrink-0 overflow-hidden rounded-[10px] bg-fill border border-hairline text-center shadow-[0_1px_3px_rgb(0_0_0/0.06)]',
+          onOpen && 'transition-transform duration-300 ease-[var(--spring)] group-hover:scale-[1.06]',
+        )}
       >
         <span
           className="text-[0.625rem] font-bold uppercase tracking-[0.04em] leading-[1.6]"
@@ -80,7 +83,7 @@ export function ExamCard({ exam, subject, today, onOpen, hideSubject }: ExamCard
 
       <span
         className={cx(
-          'shrink-0 rounded-full px-2.5 h-7 inline-flex items-center text-[0.8125rem] font-semibold tabular-nums',
+          'tag-glass shrink-0 rounded-full px-2.5 h-7 inline-flex items-center text-[0.8125rem] font-semibold tabular-nums',
           urgent
             ? 'bg-danger-quiet text-danger'
             : soon
@@ -90,7 +93,12 @@ export function ExamCard({ exam, subject, today, onOpen, hideSubject }: ExamCard
       >
         {countdown}
       </span>
-      {onOpen && <ChevronRight className="size-4 text-ink-3 shrink-0 -ml-1" strokeWidth={2.4} />}
+      {onOpen && (
+        <ChevronRight
+          className="size-4 text-ink-3 shrink-0 -ml-1 transition-[transform,color] duration-300 ease-[var(--spring)] group-hover:translate-x-0.5 group-hover:text-ink-2"
+          strokeWidth={2.4}
+        />
+      )}
     </Wrapper>
   )
 }

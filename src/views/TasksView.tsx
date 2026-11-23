@@ -253,14 +253,14 @@ export function TasksView() {
             >
               <div className="relative flex items-center gap-2">
                 <Sparkles
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-accent pointer-events-none"
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 z-[1] size-4 text-accent pointer-events-none"
                   aria-hidden
                 />
                 <Input
                   value={quickText}
                   aria-label="Captura rápida de tarea"
                   placeholder="Añadir rápido… ej.: Derivadas #MAT mañana 18:00 45m !alta"
-                  className="pl-10 pr-12 sm:pr-24 h-11 rounded-full bg-surface shadow-[var(--shadow-sm)]"
+                  className="glass-input pl-10 pr-12 sm:pr-24 h-11 rounded-full border-transparent"
                   onChange={(e) => setQuickText(e.target.value)}
                 />
                 <Button
@@ -276,7 +276,7 @@ export function TasksView() {
               </div>
               {parsedQuick && parsedQuick.title && (
                 <div
-                  className="flex flex-wrap items-center gap-1.5 px-2 text-[0.75rem] text-ink-2"
+                  className="animate-pop flex flex-wrap items-center gap-1.5 px-2 text-[0.75rem] text-ink-2"
                   aria-live="polite"
                 >
                   <span className="font-medium text-ink truncate max-w-[260px]">

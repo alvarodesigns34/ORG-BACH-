@@ -159,14 +159,21 @@ async function onHashChange(): Promise<void> {
         : from.id === to.id && fromId && !toId
           ? 'pop'
           : 'section'
-  const transition = (document as Document & { startViewTransition: StartViewTransition })
-    .startViewTransition(() => flushSync(() => commit(next)))
+  const transition = (
+    document as Document & {
+      startViewTransition: StartViewTransition
+    }
+  ).startViewTransition(() => flushSync(() => commit(next)))
   running = transition
-  void transition.finished.finally(() => {
-    if (running !== transition) return
-    running = null
-    delete root.dataset.nav
-  })
+  const t = transition as { ready?: Promise<void>; finished: Promise<void> }
+  void t.ready?.catch(() => undefined)
+  void t.finished
+    .catch(() => undefined)
+    .finally(() => {
+      if (running !== transition) return
+      running = null
+      delete root.dataset.nav
+    })
 }
 
 if (typeof window !== 'undefined') {

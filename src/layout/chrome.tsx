@@ -440,6 +440,7 @@ export function ChromeActions({
     <div className={cx('flex items-center gap-2', className)}>
       <button
         type="button"
+        data-liquid=""
         onClick={() => {
           haptic()
           openSearch()
@@ -451,6 +452,7 @@ export function ChromeActions({
       </button>
       <button
         type="button"
+        data-liquid=""
         onClick={() => {
           haptic()
           openAssistant()
@@ -514,8 +516,8 @@ export function AccountAvatar({
     <Tag
       {...(decorative
         ? { 'aria-hidden': true }
-        : { href: hrefFor('ajustes'), 'aria-label': label })}
-      className="pressable relative grid place-items-center rounded-full text-white font-semibold shrink-0 shadow-[inset_0_1px_0_rgb(255_255_255/0.35),inset_0_-1px_0_rgb(0_0_0/0.12),0_1px_3px_rgb(0_0_0/0.18)]"
+        : { href: hrefFor('ajustes'), 'aria-label': label, 'data-liquid': '' })}
+      className="pressable relative grid place-items-center rounded-full text-white font-semibold shrink-0 shadow-[inset_0_1px_0.75px_rgb(255_255_255/0.42),inset_0_-1px_0_rgb(0_0_0/0.14),0_2px_6px_rgb(0_0_0/0.2)]"
       style={{
         width: size,
         height: size,

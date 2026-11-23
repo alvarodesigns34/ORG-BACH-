@@ -227,7 +227,7 @@ export function MobileNav({ current, badges }: MobileNavProps) {
       >
         <nav
           aria-label="Secciones"
-          className="liquid pointer-events-auto flex-1 min-w-0 max-w-[430px] md:max-w-[640px] rounded-full p-1"
+          className="liquid pointer-events-auto flex-1 min-w-0 max-w-[430px] md:max-w-[740px] rounded-full p-1"
         >
           <div
             ref={row}
@@ -298,7 +298,7 @@ export function MobileNav({ current, badges }: MobileNavProps) {
                 className={cx(
                   'absolute left-0 top-1/2 z-[2] rounded-full overflow-hidden pointer-events-none',
                   'duration-[520ms] ease-[var(--spring)]',
-                  pressing ? 'lens' : 'bg-[var(--glass-tint)]',
+                  pressing ? 'lens' : 'tab-pill-rest',
                 )}
                 style={lensStyle}
               >
@@ -465,14 +465,12 @@ function CreateButton() {
           haptic()
           setOpen((v) => !v)
         }}
-        whileTap={{ scale: 0.9 }}
+        whileTap={{ scale: 0.92 }}
         transition={spring.snappy}
-        className="liquid relative grid place-items-center rounded-full text-white"
+        className="glass-tinted liquid relative grid place-items-center rounded-full text-white"
         style={{
           width: ROW_HEIGHT + 8,
           height: ROW_HEIGHT + 8,
-          background:
-            'linear-gradient(180deg, rgb(255 255 255 / 0.3), transparent 55%), var(--c-accent-fill)',
         }}
       >
         <motion.span
@@ -509,14 +507,19 @@ function TabFace({
         forceColor ? '' : lit ? 'text-accent' : 'text-ink-2',
       )}
     >
-      <span className="relative">
+      <span
+        className={cx(
+          'relative transition-transform duration-300 ease-[var(--spring)]',
+          lit && !forceColor && 'scale-[1.06]',
+        )}
+      >
         <Icon className="size-[23px]" strokeWidth={lit ? 2.3 : 1.85} />
         {count !== undefined && count > 0 && (
           <span
             className={cx(
               'absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 rounded-full',
               'text-[0.625rem] font-bold tabular-nums leading-[18px] text-center',
-              'bg-danger text-white ring-2 ring-[var(--c-surface)]',
+              'bg-danger text-white ring-2 ring-[var(--c-surface)] shadow-[0_2px_6px_color-mix(in_srgb,var(--c-danger)_45%,transparent)]',
             )}
           >
             {count > 99 ? '99+' : count}

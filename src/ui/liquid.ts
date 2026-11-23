@@ -16,7 +16,7 @@
  * Con «reducir movimiento» no hay deformación: solo el brillo.
  */
 
-const SELECTOR = '.glass-btn, .glass-tinted, .liquid-press, [data-liquid]'
+const SELECTOR = '.glass-btn, .glass-tinted, .glass-danger, .filter-on, .liquid-press, [data-liquid]'
 
 /** Muelle amortiguado de un grado de libertad (integración semi-implícita). */
 interface Spring {
@@ -124,21 +124,21 @@ function tick(now: number): void {
   for (const st of active) {
     const pressed = st.pointerId !== null
     for (let i = 0; i < steps; i++) {
-      // Agarrado: muelle firme (sigue al dedo). Suelto: algo más blando y con
-      // menos amortiguación, para que rebote como una gota.
-      stepSpring(st.x, dt, pressed ? 900 : 420, pressed ? 46 : 19)
-      stepSpring(st.y, dt, pressed ? 900 : 420, pressed ? 46 : 19)
-      stepSpring(st.sx, dt, pressed ? 700 : 520, pressed ? 34 : 17)
-      stepSpring(st.sy, dt, pressed ? 700 : 520, pressed ? 34 : 17)
-      stepSpring(st.glow, dt, 380, pressed ? 30 : 34)
+      // Agarrado: muelle firme (sigue al dedo). Suelto: rebote limpio y sedoso
+      // al estilo iOS 26, sin vibración excesiva.
+      stepSpring(st.x, dt, pressed ? 920 : 460, pressed ? 48 : 24)
+      stepSpring(st.y, dt, pressed ? 920 : 460, pressed ? 48 : 24)
+      stepSpring(st.sx, dt, pressed ? 740 : 540, pressed ? 36 : 21)
+      stepSpring(st.sy, dt, pressed ? 740 : 540, pressed ? 36 : 21)
+      stepSpring(st.glow, dt, 420, pressed ? 30 : 34)
     }
     write(st)
     if (
       !pressed &&
-      settled(st.x, 0.05) &&
-      settled(st.y, 0.05) &&
-      settled(st.sx, 0.0008) &&
-      settled(st.sy, 0.0008) &&
+      settled(st.x, 0.04) &&
+      settled(st.y, 0.04) &&
+      settled(st.sx, 0.0007) &&
+      settled(st.sy, 0.0007) &&
       settled(st.glow, 0.004)
     ) {
       // En reposo bajo el cursor se queda levantado, pero sin gastar fotogramas.
@@ -172,7 +172,7 @@ function eligible(target: EventTarget | null): HTMLElement | null {
  * redondo crece bastante, uno ancho apenas), con tope.
  */
 function growFor(w: number, h: number): number {
-  return 1 + Math.min(0.13, 7 / Math.max(w, h, 1))
+  return 1 + Math.min(0.125, 6.5 / Math.max(w, h, 1))
 }
 
 function onDown(event: PointerEvent): void {
@@ -192,14 +192,17 @@ function onDown(event: PointerEvent): void {
   st.glow.target = 1
   // El toque inicial empuja un poco la escala: se nota al instante aunque
   // el dedo no se mueva.
-  st.sx.velocity += 2.4
-  st.sy.velocity += 2.4
+  st.sx.velocity += 2.2
+  st.sy.velocity += 2.2
+  st.glow.velocity += 3.5
   run(st)
 }
 
 function onMove(event: PointerEvent): void {
+  let handledPressed = false
   for (const st of active) {
     if (st.pointerId !== event.pointerId) continue
+    handledPressed = true
     const dx = event.clientX - st.originX
     const dy = event.clientY - st.originY
     // El cristal se desplaza hacia el dedo con resistencia creciente…
@@ -208,13 +211,29 @@ function onMove(event: PointerEvent): void {
     st.x.target = ex
     st.y.target = ey
     // …y se estira en esa dirección conservando más o menos el volumen.
-    const kx = Math.min(0.2, (Math.abs(ex) / Math.max(st.w, 24)) * 0.9)
-    const ky = Math.min(0.2, (Math.abs(ey) / Math.max(st.h, 24)) * 0.9)
+    const kx = Math.min(0.18, (Math.abs(ex) / Math.max(st.w, 24)) * 0.85)
+    const ky = Math.min(0.18, (Math.abs(ey) / Math.max(st.h, 24)) * 0.85)
     st.sx.target = st.grow * (1 + kx - ky * 0.45)
     st.sy.target = st.grow * (1 + ky - kx * 0.45)
     // Si el dedo se aleja mucho, el botón «suelta» la luz: no se activará.
     const far = Math.hypot(dx, dy) > Math.max(st.w, st.h) * 0.5 + 56
     st.glow.target = far ? 0.25 : 1
+  }
+
+  // Micro-atracción magnética en ratón (estilo Apple TV / macOS Tahoe):
+  // controles compactos (<340px) siguen suavemente al cursor ±2.2px.
+  if (!handledPressed && event.pointerType === 'mouse' && !reduceMotion) {
+    const el = eligible(event.target)
+    if (!el) return
+    const st = states.get(el)
+    if (!st || !st.hovering || st.pointerId !== null || st.glowOnly) return
+    const rect = el.getBoundingClientRect()
+    if (rect.width > 340 || rect.height > 120) return
+    const nx = ((event.clientX - rect.left) / Math.max(rect.width, 1) - 0.5) * 2
+    const ny = ((event.clientY - rect.top) / Math.max(rect.height, 1) - 0.5) * 2
+    st.x.target = nx * 2.2
+    st.y.target = ny * 2.0
+    run(st)
   }
 }
 
@@ -224,10 +243,10 @@ function release(event: PointerEvent): void {
     st.pointerId = null
     st.x.target = 0
     st.y.target = 0
-    const rest = st.hovering ? 1.02 : 1
+    const rest = st.hovering ? 1 + Math.min(0.035, 2 / Math.max(st.w || 44, st.h || 44)) : 1
     st.sx.target = rest
     st.sy.target = rest
-    st.glow.target = st.hovering ? 0.35 : 0
+    st.glow.target = st.hovering ? 0.4 : 0
   }
 }
 
@@ -239,10 +258,10 @@ function onOver(event: PointerEvent): void {
   if (st.hovering) return
   st.hovering = true
   if (st.pointerId === null) {
-    const lift = 1 + Math.min(0.04, 2 / Math.max(el.offsetWidth, el.offsetHeight, 1))
+    const lift = 1 + Math.min(0.04, 2.2 / Math.max(el.offsetWidth, el.offsetHeight, 1))
     st.sx.target = lift
     st.sy.target = lift
-    st.glow.target = 0.35
+    st.glow.target = 0.4
   }
   run(st)
 }
@@ -255,6 +274,8 @@ function onOut(event: PointerEvent): void {
   if (!st) return
   st.hovering = false
   if (st.pointerId === null) {
+    st.x.target = 0
+    st.y.target = 0
     st.sx.target = 1
     st.sy.target = 1
     st.glow.target = 0

@@ -580,14 +580,27 @@ function WidgetCard({
   const color = `color-mix(in srgb, ${meta.tint} 82%, var(--c-ink))`
   const head = (
     <>
-      <meta.icon aria-hidden className="size-[18px] shrink-0" strokeWidth={2.4} style={{ color }} />
+      <meta.icon
+        aria-hidden
+        className={cx(
+          'size-[18px] shrink-0',
+          meta.href && 'transition-transform duration-300 ease-[var(--spring)] group-hover:scale-110',
+        )}
+        strokeWidth={2.4}
+        style={{ color }}
+      />
       <h2
         className="text-[0.9375rem] font-semibold tracking-[-0.01em] truncate"
         style={{ color }}
       >
         {meta.label}
       </h2>
-      {meta.href && <ChevronRight className="size-4 text-ink-3 -ml-0.5" strokeWidth={2.6} />}
+      {meta.href && (
+        <ChevronRight
+          className="size-4 text-ink-3 -ml-0.5 transition-[transform,color] duration-300 ease-[var(--spring)] group-hover:translate-x-0.5 group-hover:text-ink-2"
+          strokeWidth={2.6}
+        />
+      )}
     </>
   )
   return (
@@ -598,7 +611,7 @@ function WidgetCard({
     >
       <header className="flex items-center justify-between gap-2 pl-[1.125rem] pr-3.5 pt-4 pb-2 min-h-[3.25rem]">
         {meta.href ? (
-          <a href={meta.href} className="pressable flex items-center gap-2 min-w-0 rounded-full">
+          <a href={meta.href} className="group pressable flex items-center gap-2 min-w-0 rounded-full">
             {head}
           </a>
         ) : (
@@ -1068,7 +1081,7 @@ function WeekWidget() {
               key={day}
               href={hrefFor('calendario', { dia: day })}
               aria-label={`${formatLongDate(day)}: ${items.length} ${items.length === 1 ? 'elemento' : 'elementos'}`}
-              className="pressable flex flex-col items-center gap-1.5 min-w-0 rounded-xl py-1 hover:bg-fill/60 transition-colors"
+              className="group pressable flex flex-col items-center gap-1.5 min-w-0 rounded-2xl py-1 hover:bg-fill/60 transition-colors"
             >
               <span className="text-[0.6875rem] font-semibold text-ink-3">
                 {WEEKDAYS_SHORT[date.getDay()]}
@@ -1076,10 +1089,11 @@ function WeekWidget() {
               <span
                 className={cx(
                   'numeral grid place-items-center size-9 rounded-full text-[1.0625rem]',
+                  'transition-transform duration-300 ease-[var(--spring)] group-hover:scale-[1.08]',
                   i === 0
-                    ? 'bg-accent-fill text-white'
+                    ? 'bg-accent-fill text-white shadow-[inset_0_1px_0.5px_rgb(255_255_255/0.55),0_4px_14px_-2px_color-mix(in_srgb,var(--c-accent-fill)_55%,transparent)]'
                     : exam
-                      ? 'bg-danger-quiet text-danger'
+                      ? 'tag-glass bg-danger-quiet text-danger'
                       : 'text-ink',
                 )}
               >

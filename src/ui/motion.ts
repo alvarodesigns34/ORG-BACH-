@@ -14,15 +14,15 @@ import type { Transition } from 'motion/react'
 
 export const spring = {
   /** Respuesta directa a un toque: pestañas, selectores, casillas. */
-  snappy: { type: 'spring', visualDuration: 0.26, bounce: 0.18 },
+  snappy: { type: 'spring', visualDuration: 0.25, bounce: 0.16 },
   /** Superficies que entran o salen: hojas, páginas, menús. */
-  smooth: { type: 'spring', visualDuration: 0.38, bounce: 0.12 },
+  smooth: { type: 'spring', visualDuration: 0.36, bounce: 0.1 },
   /** Algo que se celebra o que se suelta: completar, soltar una tarjeta. */
-  bouncy: { type: 'spring', visualDuration: 0.42, bounce: 0.34 },
+  bouncy: { type: 'spring', visualDuration: 0.4, bounce: 0.3 },
 } as const satisfies Record<string, Transition>
 
 /** Salidas: más rápidas que las entradas y sin rebote. */
-export const exitFast: Transition = { duration: 0.18, ease: [0.3, 0, 0.8, 0.15] }
+export const exitFast: Transition = { duration: 0.16, ease: [0.32, 0, 0.67, 0] }
 
 // ---------------------------------------------------------------------------
 // Háptica

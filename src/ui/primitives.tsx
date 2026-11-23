@@ -20,12 +20,12 @@ type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerFill'
 type ButtonSize = 'sm' | 'md' | 'lg'
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'glass-tinted text-accent-ink hover:brightness-[1.08]',
+  primary: 'glass-tinted text-accent-ink hover:brightness-[1.07]',
   // Botón de cristal: el control secundario de iOS 26.
   secondary: 'glass-btn text-ink',
   ghost: 'liquid-press bg-transparent text-accent hover:bg-fill',
-  danger: 'bg-transparent text-danger hover:bg-danger-quiet',
-  dangerFill: 'bg-[var(--c-danger-fill)] text-white hover:brightness-110',
+  danger: 'liquid-press bg-transparent text-danger hover:bg-danger-quiet',
+  dangerFill: 'glass-danger text-white hover:brightness-[1.07]',
 }
 
 const SIZES: Record<ButtonSize, string> = {
@@ -272,9 +272,13 @@ const PROGRESS_TONE = {
 
 export function Progress({ value, className, tone = 'accent', color, label }: ProgressProps) {
   const pct = Math.max(0, Math.min(100, value))
+  const fill = color ?? PROGRESS_TONE[tone]
   return (
     <div
-      className={cx('h-1.5 rounded-full bg-fill overflow-hidden', className)}
+      className={cx(
+        'h-1.5 rounded-full bg-fill overflow-hidden shadow-[inset_0_0.5px_1px_rgb(0_0_0/0.08)]',
+        className,
+      )}
       role="progressbar"
       aria-valuenow={Math.round(pct)}
       aria-valuemin={0}
@@ -286,8 +290,11 @@ export function Progress({ value, className, tone = 'accent', color, label }: Pr
         className="h-full rounded-full"
         initial={{ width: 0 }}
         animate={{ width: `${pct}%` }}
-        transition={{ ...spring.smooth, visualDuration: 0.7, bounce: 0 }}
-        style={{ background: color ?? PROGRESS_TONE[tone] }}
+        transition={{ ...spring.smooth, visualDuration: 0.65, bounce: 0 }}
+        style={{
+          background: `linear-gradient(180deg, color-mix(in srgb, ${fill} 82%, white), ${fill})`,
+          boxShadow: pct > 0 ? 'inset 0 0.5px 0 rgb(255 255 255 / 0.45)' : undefined,
+        }}
       />
     </div>
   )

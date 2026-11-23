@@ -172,7 +172,7 @@ export function Modal({
     ? { opacity: 0 }
     : sheet
       ? { y: '100%' }
-      : { opacity: 0, scale: 0.88, y: 36 }
+      : { opacity: 0, scale: 0.93, y: 22 }
   const shown = { opacity: 1, scale: 1, y: 0 }
 
   return createPortal(
@@ -187,12 +187,11 @@ export function Modal({
           exit={{ pointerEvents: 'none' }}
         >
           <motion.div
-            className="absolute inset-0"
-            style={{ background: 'var(--scrim)' }}
+            className="modal-scrim absolute inset-0"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.22 } }}
-            transition={{ duration: 0.28 }}
+            exit={{ opacity: 0, transition: { duration: 0.2 } }}
+            transition={{ duration: 0.24 }}
             onClick={onClose}
             aria-hidden
           />

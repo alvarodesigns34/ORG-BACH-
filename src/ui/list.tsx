@@ -84,7 +84,10 @@ export function ListRow({
       {Icon && (
         <span
           aria-hidden
-          className="tile grid place-items-center size-[30px] rounded-[8px] text-white shrink-0"
+          className={cx(
+            'tile grid place-items-center size-[30px] rounded-[8px] text-white shrink-0',
+            interactive && 'transition-transform duration-300 ease-[var(--spring)] group-hover:scale-[1.08]',
+          )}
           style={{ background: tintFill(tint ?? '#8e8e93') }}
         >
           <Icon className="size-[17px]" strokeWidth={2.2} />
@@ -121,7 +124,10 @@ export function ListRow({
         )}
         {accessory && <span className="shrink-0 flex items-center">{accessory}</span>}
         {interactive && !action && (
-          <ChevronRight className="size-4 text-ink-3 shrink-0 -mr-1" strokeWidth={2.6} />
+          <ChevronRight
+            className="size-4 text-ink-3 shrink-0 -mr-1 transition-[transform,color] duration-300 ease-[var(--spring)] group-hover:translate-x-0.5 group-hover:text-ink-2"
+            strokeWidth={2.6}
+          />
         )}
       </span>
     </>
@@ -129,7 +135,7 @@ export function ListRow({
 
   const rowClass = cx(
     'list-row flex items-center gap-3 pl-4 w-full text-left',
-    interactive && 'transition-colors duration-150 active:bg-fill hover:bg-fill/50',
+    interactive && 'group transition-colors duration-150 active:bg-fill hover:bg-fill/55',
     disabled && 'opacity-45 pointer-events-none',
   )
 

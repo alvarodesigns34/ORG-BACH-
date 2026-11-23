@@ -72,22 +72,24 @@ export function Sidebar({ current, badges }: SidebarProps) {
 
         {/* --- El asistente, con forma de campo de búsqueda --- */}
         <div className="px-3 pb-3">
-          <div className="sidebar-field flex items-center h-10 rounded-full">
+          <div className="sidebar-field group flex items-center h-10 rounded-full transition-[background-color,box-shadow] duration-200 hover:ring-1 hover:ring-accent/25">
             <button
               type="button"
               onClick={() => openAssistant('text')}
               aria-label="Asistente: escríbele lo que quieras apuntar o preguntar"
               className="flex-1 min-w-0 h-full flex items-center gap-2 pl-3 rounded-full text-left"
             >
-              <AssistantIcon className="size-[17px] text-accent shrink-0" />
-              <span className="truncate text-[0.9375rem] text-ink-3">Pregunta o apunta</span>
+              <AssistantIcon className="size-[17px] text-accent shrink-0 transition-transform duration-300 ease-[var(--spring)] group-hover:scale-110" />
+              <span className="truncate text-[0.9375rem] text-ink-3 group-hover:text-ink-2 transition-colors">
+                Pregunta o apunta
+              </span>
             </button>
             <button
               type="button"
               onClick={() => openAssistant('voice')}
               aria-label="Dictar al asistente"
               title="Dictar"
-              className="pressable grid place-items-center size-10 rounded-full text-ink-2 hover:text-accent shrink-0"
+              className="pressable liquid-press grid place-items-center size-10 rounded-full text-ink-2 hover:text-accent shrink-0"
             >
               <Mic className="size-[17px]" strokeWidth={2.2} />
             </button>
@@ -150,7 +152,7 @@ export function Sidebar({ current, badges }: SidebarProps) {
                             data-nav={item.id}
                             aria-current={active ? 'page' : undefined}
                             className={cx(
-                              'pressable relative flex items-center gap-3 h-11 pl-3.5 pr-4 rounded-[18px]',
+                              'group pressable relative flex items-center gap-3 h-11 pl-3.5 pr-4 rounded-[18px]',
                               'text-[1rem] tracking-[-0.01em] transition-colors duration-150',
                               active
                                 ? 'text-ink font-semibold'
@@ -159,7 +161,10 @@ export function Sidebar({ current, badges }: SidebarProps) {
                           >
                             <item.icon
                               aria-hidden
-                              className="relative size-[20px] text-accent shrink-0"
+                              className={cx(
+                                'relative size-[20px] text-accent shrink-0 transition-transform duration-300 ease-[var(--spring)]',
+                                active ? 'scale-[1.06]' : 'group-hover:scale-110',
+                              )}
                               strokeWidth={active ? 2.4 : 2}
                             />
                             <span className="relative truncate">{item.label}</span>

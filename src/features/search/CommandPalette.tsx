@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { m as motion } from 'motion/react'
 import {
   BookOpen,
   CalendarDays,
@@ -28,6 +29,7 @@ import { useSubjectMap } from '@/state/selectors'
 import { NAV_ITEMS } from '@/layout/navigation'
 import type { CreateKind } from '@/layout/chrome'
 import { Modal } from '@/ui/Modal'
+import { spring } from '@/ui/motion'
 import { useToast } from '@/ui/Toast'
 import { PRIORITY_LABEL, cx } from '@/ui/primitives'
 
@@ -448,7 +450,7 @@ export function CommandPalette({
       <div className="flex flex-col gap-3">
         <div className="relative">
           <Search
-            className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-ink-3 pointer-events-none"
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 z-[1] size-4 text-ink-3 pointer-events-none"
             aria-hidden
           />
           <input
@@ -474,7 +476,7 @@ export function CommandPalette({
               }
             }}
             placeholder="Busca tareas, exámenes, asignaturas… o escribe para crear"
-            className="w-full h-11 rounded-full bg-fill pl-10 pr-10 text-[0.9375rem] text-ink placeholder:text-ink-3 focus-visible:outline-2 focus-visible:outline-accent"
+            className="glass-input w-full h-11 rounded-full pl-10 pr-10 text-[0.9375rem] text-ink placeholder:text-ink-3 focus:outline-none"
           />
           {query && (
             <button
@@ -484,7 +486,7 @@ export function CommandPalette({
                 setQuery('')
                 inputRef.current?.focus()
               }}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 size-8 grid place-items-center rounded-full text-ink-3 hover:text-ink"
+              className="pressable absolute right-1.5 top-1/2 -translate-y-1/2 size-8 grid place-items-center rounded-full text-ink-3 hover:text-ink hover:bg-fill/70"
             >
               <X className="size-4" />
             </button>
@@ -516,14 +518,29 @@ export function CommandPalette({
                     onMouseEnter={() => setActiveIndex(flatIndex)}
                     onClick={() => item.run()}
                     className={cx(
-                      'w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-[14px] transition-colors',
-                      selected ? 'bg-accent-soft text-ink' : 'hover:bg-fill/70 text-ink',
+                      'pressable relative w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-[16px] transition-colors',
+                      'text-ink',
                     )}
                   >
-                    <span className="grid place-items-center size-8 rounded-full bg-surface shrink-0">
+                    {selected && (
+                      <motion.span
+                        layoutId="cmd-active-pill"
+                        aria-hidden
+                        transition={spring.snappy}
+                        className="absolute inset-0 rounded-[16px] filter-on pointer-events-none"
+                      />
+                    )}
+                    <span
+                      className={cx(
+                        'relative z-[1] grid place-items-center size-8 rounded-full shrink-0 transition-transform duration-200',
+                        selected
+                          ? 'bg-surface shadow-[0_2px_8px_rgb(0_0_0/0.08)] scale-[1.05]'
+                          : 'bg-surface/80',
+                      )}
+                    >
                       {item.icon}
                     </span>
-                    <span className="min-w-0 flex-1">
+                    <span className="relative z-[1] min-w-0 flex-1">
                       <span className="block text-[0.9375rem] font-medium truncate">
                         {item.label}
                       </span>
@@ -534,12 +551,12 @@ export function CommandPalette({
                       )}
                     </span>
                     {item.badge && (
-                      <kbd className="shrink-0 min-w-6 h-6 px-1.5 inline-grid place-items-center rounded-[6px] bg-fill text-[0.6875rem] font-semibold text-ink-2 tabular-nums">
+                      <kbd className="kbd-apple relative z-[1] shrink-0 min-w-6 h-6 px-1.5 inline-grid place-items-center rounded-[7px] text-[0.6875rem] font-semibold text-ink-2 tabular-nums">
                         {item.badge}
                       </kbd>
                     )}
                     {selected && !item.badge && (
-                      <CornerDownLeft className="size-3.5 text-accent shrink-0" aria-hidden />
+                      <CornerDownLeft className="relative z-[1] size-3.5 text-accent shrink-0" aria-hidden />
                     )}
                   </button>
                 )
