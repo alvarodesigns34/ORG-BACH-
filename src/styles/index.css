@@ -2012,3 +2012,16 @@ button:active > .switch-thumb {
 .row-date[value=''] {
   color: var(--c-ink-3);
 }
+
+/* Día de examen en el mes: brilla con el color de su asignatura. */
+@media (min-width: 1024px) {
+  .cal-exam {
+    background-image: radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--exam) 16%, transparent), transparent 70%);
+  }
+}
+@media (max-width: 1023.98px) {
+  .cal-exam > span:first-child:not(.glass-tinted):not(.lens) {
+    background: color-mix(in srgb, var(--exam) 15%, transparent);
+    color: var(--exam);
+  }
+}

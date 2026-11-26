@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { CalendarPlus, Check, ChevronLeft, ChevronRight, GripVertical, ListPlus, Plus } from 'lucide-react'
 
 import {
@@ -422,11 +422,10 @@ function MonthGrid({
           return (
             <button
               key={day}
-              style={
-                examColor
-                  ? { backgroundImage: `radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, ${examColor} 16%, transparent), transparent 70%)` }
-                  : undefined
-              }
+              // En el iPad la celda entera brilla; en el iPhone, la celda es
+              // pequeña y el brillo parecía una mancha: se tiñe el círculo
+              // del número (ver .cal-exam en index.css).
+              style={examColor ? ({ ['--exam' as string]: examColor } as CSSProperties) : undefined}
               type="button"
               onClick={() => onSelect(day)}
               aria-label={`${formatDayMonth(day)}${items.length ? `, ${items.length} elementos` : ', sin nada'}`}
@@ -435,6 +434,7 @@ function MonthGrid({
               data-drop-day={day}
               className={cx(
                 'group relative flex flex-col items-center gap-1 pt-1.5 pb-1 rounded-[12px] text-left',
+                examColor && 'cal-exam',
                 'min-h-[3.375rem] lg:min-h-[7.25rem] lg:items-stretch lg:rounded-none lg:px-1.5 lg:pt-1.5 lg:pb-2',
                 // Líneas finas entre semanas y días, como el mes de Calendario.
                 'lg:border-t lg:border-hairline',
