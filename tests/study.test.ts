@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import { DEFAULT_SCALE } from '../src/domain/grades.ts'
-import { comparePrep, minutesBetween, minutesByDay, studyBeforeExams, studyStreak } from '../src/domain/study.ts'
+import { comparePrep, examPlan, minutesBetween, minutesByDay, studyBeforeExams, studyStreak } from '../src/domain/study.ts'
 import type { Exam, FocusSession, GradeEntry } from '../src/domain/types.ts'
 
 /** Vuelo cerrado que termina el día `day` a la hora `hour` (local). */
@@ -143,5 +143,61 @@ describe('estudio antes de cada examen', () => {
     assert.equal(z.more.count, 1)
     assert.equal(z.more.average, 9)
     assert.equal(z.less.count, 3)
+  })
+})
+
+describe('plan de repaso de un examen', () => {
+  const exam = (date: string, extra: Partial<Exam> = {}): Exam => ({
+    id: `e-${date}`,
+    subjectId: 'mat',
+    title: 'Derivadas',
+    date,
+    term: 'T1',
+    createdAt: '2026-11-01T00:00:00.000Z',
+    ...extra,
+  })
+
+  it('reparte lo que falta entre los días que quedan', () => {
+    const e = exam('2026-11-20')
+    const plan = examPlan(e, [], [e], '2026-11-16')
+    assert.equal(plan.daysLeft, 4)
+    assert.equal(plan.studied, 0)
+    assert.equal(plan.todayTarget, 60)
+    assert.equal(plan.todayLeft, 60)
+  })
+
+  it('lo estudiado hoy descuenta de hoy, no del reparto', () => {
+    const e = exam('2026-11-20')
+    const plan = examPlan(e, [flight('2026-11-16', 25, { subjectId: 'mat' })], [e], '2026-11-16')
+    assert.equal(plan.todayTarget, 60)
+    assert.equal(plan.studiedToday, 25)
+    assert.equal(plan.todayLeft, 35)
+  })
+
+  it('no cuenta lo estudiado antes del examen anterior de la asignatura ni de otras', () => {
+    const before = exam('2026-11-10', { id: 'antes' })
+    const e = exam('2026-11-20')
+    const sessions = [
+      flight('2026-11-08', 120, { subjectId: 'mat' }),
+      flight('2026-11-12', 30, { subjectId: 'fis' }),
+      flight('2026-11-12', 40, { subjectId: 'mat' }),
+      flight('2026-11-13', 20, { examId: e.id }),
+    ]
+    const plan = examPlan(e, sessions, [before, e], '2026-11-16')
+    assert.equal(plan.studied, 60)
+  })
+
+  it('con el objetivo cumplido, hoy no toca nada', () => {
+    const e = exam('2026-11-18')
+    const plan = examPlan(e, [flight('2026-11-15', 240, { subjectId: 'mat' })], [e], '2026-11-16')
+    assert.equal(plan.todayTarget, 0)
+    assert.equal(plan.todayLeft, 0)
+  })
+
+  it('a última hora, como mucho dos horas al día y nunca más de lo que falta', () => {
+    const e = exam('2026-11-17')
+    assert.equal(examPlan(e, [], [e], '2026-11-16').todayTarget, 120)
+    const almost = examPlan(e, [flight('2026-11-15', 230, { subjectId: 'mat' })], [e], '2026-11-16')
+    assert.equal(almost.todayTarget, 10)
   })
 })

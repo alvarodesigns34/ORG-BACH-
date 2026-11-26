@@ -219,3 +219,83 @@ export function minutesBetween(
   }
   return out
 }
+
+// ---------------------------------------------------------------------------
+// Plan de repaso de un examen
+// ---------------------------------------------------------------------------
+
+/** Tiempo de repaso que se propone para cada examen, en minutos. */
+export const PREP_TARGET_MINUTES = 240
+
+export interface ExamPlan {
+  /** Minutos ya estudiados para este examen (su asignatura en la ventana, o vuelos ligados a él). */
+  studied: number
+  /** Objetivo de repaso. */
+  target: number
+  /** Lo que tocaba hoy al empezar el día (reparto del resto entre los días que quedan). */
+  todayTarget: number
+  /** Lo que queda de hoy. 0 = hoy ya está. */
+  todayLeft: number
+  /** Minutos estudiados hoy para este examen. */
+  studiedToday: number
+  /** Días que faltan (0 = hoy). */
+  daysLeft: number
+}
+
+function round5(n: number): number {
+  return Math.round(n / 5) * 5
+}
+
+/**
+ * Reparto del repaso de un examen próximo: cuánto llevas, cuánto te queda y
+ * cuánto toca HOY para llegar al objetivo repartiendo lo que falta entre los
+ * días que quedan (el día del examen no cuenta salvo que sea hoy).
+ *
+ * Cuenta lo estudiado de la asignatura desde el examen anterior de esa misma
+ * asignatura (o en las tres semanas previas) y cualquier vuelo ligado a este
+ * examen. No guarda nada: se recalcula con cada vuelo.
+ */
+export function examPlan(
+  exam: Exam,
+  sessions: FocusSession[],
+  exams: Exam[],
+  today: string,
+  target = PREP_TARGET_MINUTES,
+): ExamPlan {
+  const end = examMoment(exam)
+  const [ty, tm, td] = today.split('-').map(Number)
+  const todayStart = new Date(ty, tm - 1, td).getTime()
+  const [ey, em, ed] = exam.date.split('-').map(Number)
+  const daysLeft = Math.max(0, Math.round((new Date(ey, em - 1, ed).getTime() - todayStart) / DAY_MS))
+
+  const previous = exams
+    .filter((e) => e.id !== exam.id && e.subjectId === exam.subjectId && examMoment(e) < end)
+    .reduce((max, e) => Math.max(max, examMoment(e)), 0)
+  const start = Math.max(previous, end - PREP_WINDOW_DAYS * DAY_MS)
+
+  let studied = 0
+  let studiedToday = 0
+  for (const s of sessions) {
+    if (s.status === 'en_vuelo' || !s.endedAt) continue
+    const ended = Date.parse(s.endedAt)
+    const linked = s.examId === exam.id
+    const inWindow = s.subjectId === exam.subjectId && ended > start && ended <= end
+    if (!linked && !inWindow) continue
+    const minutes = s.focusedMinutes ?? 0
+    studied += minutes
+    if (ended >= todayStart) studiedToday += minutes
+  }
+
+  const remainingAtDawn = Math.max(0, target - (studied - studiedToday))
+  const daysToSplit = Math.max(1, daysLeft)
+  const todayTarget =
+    remainingAtDawn === 0 ? 0 : Math.min(remainingAtDawn, Math.max(15, Math.min(120, round5(remainingAtDawn / daysToSplit))))
+  return {
+    studied,
+    target,
+    todayTarget,
+    todayLeft: Math.max(0, todayTarget - studiedToday),
+    studiedToday,
+    daysLeft,
+  }
+}

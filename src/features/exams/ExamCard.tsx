@@ -5,6 +5,7 @@ import { colorVar, quietVar } from '@/domain/palette'
 import { formatPercent } from '@/domain/grades'
 import type { Exam, Subject } from '@/domain/types'
 import { cx } from '@/ui/primitives'
+import { ExamPrep } from './ExamPrep'
 
 interface ExamCardProps {
   exam: Exam
@@ -79,6 +80,7 @@ export function ExamCard({ exam, subject, today, onOpen, hideSubject }: ExamCard
           {exam.time && ` · ${exam.time}`}
           {exam.weight ? ` · Peso ${formatPercent(exam.weight)}` : ''}
         </span>
+        <ExamPrep exam={exam} color={tint} />
       </span>
 
       <span

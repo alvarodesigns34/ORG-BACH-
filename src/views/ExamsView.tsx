@@ -3,7 +3,6 @@ import { CalendarPlus, ClipboardList, PlaneTakeoff } from 'lucide-react'
 
 import { MONTHS_LONG, daysUntil, parseDay, WEEKDAYS_LONG } from '@/domain/dates'
 import { clockOf, isExamOver } from '@/domain/exams'
-import { formatFlightTime } from '@/domain/flights'
 import { studyHref } from '@/router'
 import { colorVar, quietVar } from '@/domain/palette'
 import { TERMS, termName, type Exam, type GradeEntry, type Subject, type TermId } from '@/domain/types'
@@ -11,6 +10,7 @@ import { useSettings, useStore, useToday } from '@/state/StoreProvider'
 import { useMinuteClock, useSubjectMap } from '@/state/selectors'
 import { Page, PageHeader } from '@/layout/AppShell'
 import { ExamEditor } from '@/features/exams/ExamEditor'
+import { ExamPrep, useExamPlan } from '@/features/exams/ExamPrep'
 import { Button, Card, EmptyState, GroupTitle, Segmented, cx } from '@/ui/primitives'
 
 type Scope = TermId | 'todas'
@@ -46,15 +46,6 @@ function countdown(days: number): string {
 export function ExamsView() {
   const settings = useSettings()
   const { data } = useStore()
-  const preparation = useMemo(() => {
-    const byExam = new Map<string, number>()
-    for (const session of data.sessions) {
-      if (session.examId && session.status !== 'en_vuelo') {
-        byExam.set(session.examId, (byExam.get(session.examId) ?? 0) + (session.focusedMinutes ?? 0))
-      }
-    }
-    return byExam
-  }, [data.sessions])
   const today = useToday()
   const minute = useMinuteClock()
   const subjects = useSubjectMap()
@@ -202,9 +193,7 @@ export function ExamsView() {
                       {exam.topics && (
                         <span className="block text-[0.75rem] text-ink-3 mt-0.5 truncate">{exam.topics}</span>
                       )}
-                      {!!preparation.get(exam.id) && (
-                        <span className="block text-xs text-accent mt-1">{formatFlightTime(preparation.get(exam.id)!)} de preparación</span>
-                      )}
+                      <ExamPrep exam={exam} color={subject ? colorVar(subject.color) : 'var(--c-accent)'} />
                     </span>
                     <span
                       className={cx(
@@ -219,16 +208,7 @@ export function ExamsView() {
                       {countdown(days)}
                     </span>
                   </button>
-                  <a
-                    href={studyHref({ examId: exam.id, subjectId: exam.subjectId })}
-                    aria-label={`Preparar ${exam.title}`}
-                    title="Preparar examen"
-                    // Preparar es un vuelo de Estudio, que se usa en el iPad: en
-                    // el iPhone el botón solo robaba ancho al nombre del examen.
-                    className="pressable max-sm:hidden grid place-items-center size-11 shrink-0 rounded-full text-accent hover:bg-accent-quiet"
-                  >
-                    <PlaneTakeoff className="size-4" aria-hidden="true" />
-                  </a>
+                  <PrepareLink exam={exam} />
                 </li>
               )
             })}
@@ -325,5 +305,23 @@ function DateLeaf({ date, subject }: { date: string; subject?: Subject }) {
         {day.getDate()}
       </span>
     </span>
+  )
+}
+
+/** Preparar el examen: un vuelo de Estudio con lo que toca hoy (en el iPad). */
+function PrepareLink({ exam }: { exam: Exam }) {
+  const plan = useExamPlan(exam)
+  const minutes = plan && plan.todayLeft > 0 ? Math.max(15, plan.todayLeft) : 25
+  return (
+    <a
+      href={studyHref({ examId: exam.id, subjectId: exam.subjectId, minutes })}
+      aria-label={`Preparar ${exam.title}: ${minutes} minutos`}
+      title={`Preparar examen · ${minutes} min`}
+      // Preparar es un vuelo de Estudio, que se usa en el iPad: en
+      // el iPhone el botón solo robaba ancho al nombre del examen.
+      className="pressable max-sm:hidden grid place-items-center size-11 shrink-0 rounded-full text-accent hover:bg-accent-quiet"
+    >
+      <PlaneTakeoff className="size-4" aria-hidden="true" />
+    </a>
   )
 }
