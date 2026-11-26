@@ -255,3 +255,47 @@ export function saveConversations(account: string, store: ConversationStore): vo
     // Sin almacenamiento (modo privado, cuota): la charla vive solo en memoria.
   }
 }
+
+/** Vuelve a poner una conversación borrada (el «Deshacer» del historial). */
+export function restoreConversation(store: ConversationStore, conversation: Conversation): ConversationStore {
+  if (store.conversations.some((c) => c.id === conversation.id)) return store
+  const conversations = [...store.conversations, conversation]
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, KEEP_CONVERSATIONS)
+  return { ...store, conversations }
+}
+
+/** Última línea útil de la conversación, para la vista previa del historial. */
+export function conversationPreview(conversation: Conversation): string {
+  for (let i = conversation.messages.length - 1; i >= 0; i--) {
+    const m = conversation.messages[i]
+    if (m.error || !m.text.trim()) continue
+    const text = m.text.replace(/[•\s]+/g, ' ').trim()
+    return text.length > 90 ? `${text.slice(0, 89).trimEnd()}…` : text
+  }
+  return ''
+}
+
+export type ConversationGroup = 'Hoy' | 'Ayer' | 'Últimos 7 días' | 'Este mes' | 'Anteriores'
+
+/** Agrupa por fecha de la última actividad, como el historial de Safari o ChatGPT. */
+export function groupConversations(
+  conversations: Conversation[],
+  now = Date.now(),
+): { group: ConversationGroup; items: Conversation[] }[] {
+  const start = new Date(now)
+  start.setHours(0, 0, 0, 0)
+  const today = start.getTime()
+  const day = 86_400_000
+  const month = new Date(start.getFullYear(), start.getMonth(), 1).getTime()
+  const pick = (at: number): ConversationGroup =>
+    at >= today ? 'Hoy' : at >= today - day ? 'Ayer' : at >= today - 6 * day ? 'Últimos 7 días' : at >= month ? 'Este mes' : 'Anteriores'
+  const out: { group: ConversationGroup; items: Conversation[] }[] = []
+  for (const c of conversations) {
+    const group = pick(c.updatedAt)
+    const last = out.at(-1)
+    if (last?.group === group) last.items.push(c)
+    else out.push({ group, items: [c] })
+  }
+  return out
+}
