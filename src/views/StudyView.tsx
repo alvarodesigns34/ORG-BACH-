@@ -486,9 +486,15 @@ export default function StudyView() {
     if (!duration) return
     // El parámetro se consume: recargar no debe volver a despegar.
     navigate('estudio', undefined, true)
-    const wanted = focusMinutes(Number(duration))
+    let wanted = focusMinutes(Number(duration))
     if (active || wanted === null) return
-    const destination = destinationsFor(origin, AIRPORTS, wanted, 1)[0]
+    // Destino pedido («vuelo a Tokio» desde el asistente): la duración es la del viaje real.
+    const asked = AIRPORT_BY_IATA.get(params.get('destino') ?? '')
+    const askedKm = asked && asked.iata !== origin.iata ? distanceKm(origin, asked) : 0
+    const askedMinutes = askedKm ? minutesFor(askedKm) : 0
+    const fits = askedMinutes >= 15 && askedMinutes <= 240
+    if (fits) wanted = askedMinutes
+    const destination = fits && asked ? { airport: asked, km: askedKm } : destinationsFor(origin, AIRPORTS, wanted, 1)[0]
     if (!destination) return
     const exam = data.exams.find((e) => e.id === params.get('examen'))
     const task = data.tasks.find((t) => t.id === params.get('tarea') && t.status !== 'completada')

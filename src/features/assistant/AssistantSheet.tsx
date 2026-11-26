@@ -33,6 +33,7 @@ import {
   flightHref,
   isEmptyPlan,
   planUndo,
+  type PlaceResolver,
 } from '@/assistant/actions'
 import {
   askAssistant,
@@ -60,6 +61,7 @@ import {
   type Conversation,
   type ConversationStore,
 } from '@/assistant/conversation'
+import { currentAirport, distanceKm, minutesFor } from '@/domain/flights'
 import { newId } from '@/domain/id'
 import { hrefFor } from '@/router'
 import { useStore } from '@/state/StoreProvider'
@@ -121,6 +123,23 @@ export function AssistantSheet({
 
   const latest = useRef(data)
   latest.current = data
+
+  // Destinos del modo estudio («vuelo a Tokio»): los aeropuertos se cargan al
+  // abrir el asistente, aparte, para no engordar su arranque.
+  const places = useRef<PlaceResolver | undefined>(undefined)
+  useEffect(() => {
+    if (!open || places.current) return
+    void import('@/features/study/airports')
+      .then(({ AIRPORT_BY_IATA, searchAirports }) => {
+        places.current = (query) => {
+          const from = AIRPORT_BY_IATA.get(currentAirport(latest.current.sessions))
+          const to = searchAirports(query, 1)[0]
+          if (!from || !to || to.iata === from.iata) return null
+          return { iata: to.iata, city: to.city, from: from.city, minutes: minutesFor(distanceKm(from, to)) }
+        }
+      })
+      .catch(() => {})
+  }, [open])
 
   const [store, setStore] = useState<ConversationStore>(() =>
     account ? loadConversations(account, () => newId('chat')) : EMPTY_STORE,
@@ -295,7 +314,7 @@ export function AssistantSheet({
     setMessages((list) => [...list, { id, role: 'assistant', at: Date.now(), ...message }])
   }
 
-  const commit = (answer: AssistantReply, result = applyAssistantActions(latest.current, answer.actions, today)) => {
+  const commit = (answer: AssistantReply, result = applyAssistantActions(latest.current, answer.actions, today, places.current)) => {
     const plan = planUndo(latest.current, result.data)
     if (!isEmptyPlan(plan) && !replaceAndSave(result.data)) {
       throw new Error('Los cambios no se pudieron guardar. Tu curso actual sigue abierto.')
@@ -336,7 +355,7 @@ export function AssistantSheet({
       if (controller.signal.aborted) return
       if (input.audio) patchMessage(userId, { text: answer.heard || 'Mensaje de voz' })
       const current = latest.current
-      const result = applyAssistantActions(current, answer.actions, today)
+      const result = applyAssistantActions(current, answer.actions, today, places.current)
       const protectedAction = answer.actions.some(
         ({ type }) => type.startsWith('delete_') || type === 'update_exam' || type === 'update_grade',
       )
@@ -587,7 +606,7 @@ export function AssistantSheet({
   const reviewChanges = () => {
     if (!pendingReview) return
     const current = latest.current
-    const result = applyAssistantActions(current, pendingReview.answer.actions, today)
+    const result = applyAssistantActions(current, pendingReview.answer.actions, today, places.current)
     const items = result.applied.map((item) => item.text)
     if (pendingReview.start !== current && JSON.stringify(items) !== JSON.stringify(pendingReview.items)) {
       setReview({ ...pendingReview, start: current, items })

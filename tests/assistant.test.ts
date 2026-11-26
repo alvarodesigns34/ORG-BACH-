@@ -492,6 +492,25 @@ describe('asistente: vuelos del modo estudio', () => {
     assert.equal(two.skipped.length, 1)
   })
 
+  it('«vuelo a Londres»: el destino marca la duración real', () => {
+    const places = (q: string) =>
+      /londres/i.test(q)
+        ? { iata: 'LHR', city: 'Londres', from: 'Madrid', minutes: 126 }
+        : /tokio/i.test(q)
+          ? { iata: 'HND', city: 'Tokio', from: 'Madrid', minutes: 1076 }
+          : null
+    const r = applyAssistantActions(course(), [{ type: 'start_flight', destination: 'Londres' }], TODAY, places)
+    assert.equal(r.flight?.minutes, 126)
+    assert.equal(r.flight?.destination, 'LHR')
+    assert.match(r.applied[0].text, /Londres/)
+    assert.equal(flightHref(r.flight!), '#/estudio?despegar=126&destino=LHR')
+    const far = applyAssistantActions(course(), [{ type: 'start_flight', destination: 'Tokio' }], TODAY, places)
+    assert.equal(far.flight, undefined)
+    assert.match(far.skipped[0], /Tokio.*17 h 56 min/)
+    const none = applyAssistantActions(course(), [{ type: 'start_flight', destination: 'Narnia' }], TODAY, places)
+    assert.match(none.skipped[0], /Narnia/)
+  })
+
   it('no prepara otro si ya hay uno en el aire', () => {
     const data = course()
     data.sessions = [
