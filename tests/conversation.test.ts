@@ -7,7 +7,10 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import {
+  conversationPreview,
   conversationTitle,
+  groupConversations,
+  restoreConversation,
   currentConversation,
   deleteConversation,
   EMPTY_STORE,
@@ -99,5 +102,38 @@ describe('conversaciones del asistente', () => {
     assert.ok(conversationTitle(currentConversation(store)!).length <= 70)
     store = updateCurrent(EMPTY_STORE, [msg('user', '  Pon   45 min ', 1)], id)
     assert.equal(conversationTitle(currentConversation(store)!), 'Pon 45 min')
+  })
+})
+
+describe('historial del asistente', () => {
+  const day = 86_400_000
+  const now = new Date(2026, 10, 26, 16, 0).getTime()
+  const conv = (cid: string, at: number, text = 'hola') => ({
+    id: cid,
+    startedAt: at,
+    updatedAt: at,
+    messages: [msg('user', text, at), msg('assistant', '• Lunes\n• Martes', at)],
+  })
+
+  it('agrupa por fecha como el historial de Safari', () => {
+    const groups = groupConversations(
+      [conv('a', now - 60_000), conv('b', now - day), conv('c', now - 3 * day), conv('d', now - 40 * day)],
+      now,
+    )
+    assert.deepEqual(groups.map((g) => g.group), ['Hoy', 'Ayer', 'Últimos 7 días', 'Anteriores'])
+  })
+
+  it('la vista previa es la última línea útil, sin viñetas', () => {
+    assert.equal(conversationPreview(conv('a', now)), 'Lunes Martes')
+  })
+
+  it('deshacer un borrado devuelve la conversación a su sitio', () => {
+    const a = conv('a', now)
+    const b = conv('b', now - day)
+    const store = { currentId: null, conversations: [a, b] }
+    const removed = deleteConversation(store, 'a')
+    const back = restoreConversation(removed, a)
+    assert.deepEqual(back.conversations.map((c) => c.id), ['a', 'b'])
+    assert.equal(restoreConversation(back, a), back)
   })
 })

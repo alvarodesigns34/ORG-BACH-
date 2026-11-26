@@ -1,0 +1,279 @@
+/* ==========================================================================
+   ASISTENTE
+   Superficie propia (no un diálogo de formulario): cristal grueso a pantalla
+   completa en el iPhone y una ventana flotante con barra lateral en el iPad,
+   como Mensajes o ChatGPT. Todo lo de aquí se carga solo al abrirlo.
+   ========================================================================== */
+
+.asst-surface {
+  position: fixed;
+  isolation: isolate;
+  display: flex;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 60% at 50% -10%, color-mix(in srgb, var(--c-accent-fill) 9%, transparent), transparent 62%),
+    linear-gradient(180deg, var(--glass-sheen), transparent 22%),
+    color-mix(in srgb, var(--c-surface) 93%, transparent);
+  -webkit-backdrop-filter: blur(44px) saturate(190%);
+  backdrop-filter: blur(44px) saturate(190%);
+  box-shadow:
+    inset 1.5px 1.5px 1px -1px var(--glass-rim),
+    inset 0 0 0 0.5px var(--glass-edge),
+    0 2px 8px rgb(0 0 0 / 0.08),
+    0 40px 100px -10px rgb(15 23 42 / 0.32);
+  outline: none;
+}
+[data-theme='dark'] .asst-surface {
+  background:
+    radial-gradient(120% 60% at 50% -10%, color-mix(in srgb, var(--c-accent-fill) 16%, transparent), transparent 62%),
+    linear-gradient(180deg, var(--glass-sheen), transparent 22%),
+    color-mix(in srgb, #121214 92%, transparent);
+  box-shadow:
+    inset 1.5px 1.5px 1px -1px var(--glass-rim),
+    inset 0 0 0 0.5px var(--glass-edge),
+    0 40px 110px -8px rgb(0 0 0 / 0.78);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .asst-surface {
+    background: var(--c-surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* Barras de cristal que flotan sobre la conversación: el texto se ve pasar
+   por debajo, difuminado. */
+.asst-bar {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c-surface) 92%, transparent) 55%, color-mix(in srgb, var(--c-surface) 70%, transparent));
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-mask: linear-gradient(180deg, #000 80%, transparent);
+  mask: linear-gradient(180deg, #000 80%, transparent);
+}
+[data-theme='dark'] .asst-bar {
+  background: linear-gradient(180deg, color-mix(in srgb, #121214 92%, transparent) 55%, color-mix(in srgb, #121214 70%, transparent));
+}
+.asst-dock {
+  background: linear-gradient(0deg, color-mix(in srgb, var(--c-surface) 82%, transparent) 40%, transparent);
+}
+[data-theme='dark'] .asst-dock {
+  background: linear-gradient(0deg, color-mix(in srgb, #121214 86%, transparent) 40%, transparent);
+}
+
+/* La cápsula donde se escribe: cristal con el canto de luz de iOS 26. */
+.asst-composer {
+  background: color-mix(in srgb, var(--c-surface) 72%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  backdrop-filter: blur(24px) saturate(190%);
+  box-shadow:
+    inset 0 1px 0.75px var(--glass-btn-rim),
+    inset 0 0 0 0.5px var(--glass-btn-edge),
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 10px 30px -8px rgb(15 23 42 / 0.18);
+  transition: box-shadow var(--dur-fast) var(--ease-out);
+}
+.asst-composer:focus-within {
+  box-shadow:
+    inset 0 1px 0.75px var(--glass-btn-rim),
+    inset 0 0 0 1px color-mix(in srgb, var(--c-accent-fill) 45%, transparent),
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 12px 34px -8px color-mix(in srgb, var(--c-accent-fill) 30%, transparent);
+}
+[data-theme='dark'] .asst-composer {
+  background: color-mix(in srgb, #2a2a2e 70%, transparent);
+}
+
+/* Barra lateral de conversaciones (iPad) y cajón (iPhone). */
+.asst-side {
+  background: color-mix(in srgb, var(--c-canvas) 58%, transparent);
+  box-shadow: inset -0.5px 0 0 var(--c-hairline);
+}
+[data-theme='dark'] .asst-side {
+  background: color-mix(in srgb, #000 42%, transparent);
+}
+.asst-drawer {
+  background: color-mix(in srgb, var(--c-surface) 94%, transparent);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: 12px 0 40px -12px rgb(0 0 0 / 0.3);
+}
+[data-theme='dark'] .asst-drawer {
+  background: color-mix(in srgb, #1c1c1e 94%, transparent);
+}
+
+.asst-row-current {
+  background: color-mix(in srgb, var(--c-accent-fill) 14%, transparent);
+}
+.asst-row:hover .asst-row-delete,
+.asst-row:focus-within .asst-row-delete {
+  opacity: 1;
+}
+
+/* ---------------------------------------------------------------- Orbe ---- */
+/* El «planeta» del asistente: un degradado que gira despacio. Respira cuando
+   piensa y crece con la voz en el modo voz. */
+.asst-orb {
+  position: relative;
+  border-radius: 9999px;
+  background:
+    radial-gradient(circle at 32% 28%, rgb(255 255 255 / 0.9), rgb(255 255 255 / 0) 34%),
+    conic-gradient(from var(--orb-a, 0deg), #5ac8fa, #0071e3, #7d5cff, #ff6fb1, #ffb35a, #5ac8fa);
+  box-shadow:
+    inset 0 -6px 14px rgb(0 0 0 / 0.22),
+    inset 0 2px 4px rgb(255 255 255 / 0.6),
+    0 8px 26px -6px color-mix(in srgb, #0071e3 55%, transparent);
+  animation: asst-orb-spin 9s linear infinite;
+}
+.asst-orb::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 50% 120%, rgb(255 255 255 / 0.35), transparent 55%);
+  mix-blend-mode: soft-light;
+}
+@property --orb-a {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes asst-orb-spin {
+  to {
+    --orb-a: 360deg;
+  }
+}
+.asst-orb-think {
+  animation:
+    asst-orb-spin 2.4s linear infinite,
+    asst-orb-breathe 1.6s ease-in-out infinite;
+}
+@keyframes asst-orb-breathe {
+  50% {
+    transform: scale(0.84);
+  }
+}
+
+/* Texto «pensando» con un brillo que lo recorre, como en las apps de IA de iOS. */
+.asst-shimmer {
+  background: linear-gradient(90deg, var(--c-ink-3) 0%, var(--c-ink-3) 40%, var(--c-ink) 50%, var(--c-ink-3) 60%, var(--c-ink-3) 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: asst-shimmer 1.8s linear infinite;
+}
+@keyframes asst-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -150% 0;
+  }
+}
+
+/* Respuesta nueva: las palabras aparecen en cascada rápida, sin esperar. */
+.asst-word {
+  animation: asst-word 420ms var(--ease-out) both;
+  animation-delay: calc(min(var(--w, 0), 90) * 11ms);
+}
+@keyframes asst-word {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+
+/* Burbuja propia: el azul de Mensajes. */
+.asst-me {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c-accent-fill) 82%, white), var(--c-accent-fill));
+  box-shadow: 0 1px 1px rgb(0 0 0 / 0.04), 0 6px 18px -8px color-mix(in srgb, var(--c-accent-fill) 60%, transparent);
+}
+.asst-in {
+  animation: asst-in 520ms var(--spring) both;
+}
+@keyframes asst-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.9);
+  }
+}
+
+/* Tarjeta de lo que se ha hecho en la app. */
+.asst-card {
+  background: color-mix(in srgb, var(--c-surface) 66%, transparent);
+  box-shadow:
+    inset 0 1px 0.5px var(--glass-btn-rim),
+    inset 0 0 0 0.5px var(--glass-btn-edge),
+    0 8px 24px -12px rgb(15 23 42 / 0.18);
+}
+[data-theme='dark'] .asst-card {
+  background: rgb(255 255 255 / 0.06);
+}
+
+/* Sugerencias del principio. */
+.asst-chip {
+  background: color-mix(in srgb, var(--c-surface) 60%, transparent);
+  box-shadow:
+    inset 0 1px 0.5px var(--glass-btn-rim),
+    inset 0 0 0 0.5px var(--glass-btn-edge),
+    0 4px 14px -8px rgb(15 23 42 / 0.16);
+}
+[data-theme='dark'] .asst-chip {
+  background: rgb(255 255 255 / 0.065);
+}
+
+/* --------------------------------------------------------- Modo voz ---- */
+.asst-voice {
+  background:
+    radial-gradient(80% 55% at 50% 42%, color-mix(in srgb, #0071e3 26%, transparent), transparent 70%),
+    radial-gradient(60% 40% at 30% 80%, color-mix(in srgb, #7d5cff 16%, transparent), transparent 70%),
+    color-mix(in srgb, #05070d 90%, transparent);
+  -webkit-backdrop-filter: blur(30px) saturate(160%);
+  backdrop-filter: blur(30px) saturate(160%);
+  color: #f5f5f7;
+}
+.asst-voice-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 1.5px solid rgb(255 255 255 / 0.22);
+  animation: asst-ring 2.4s var(--ease-out) infinite;
+}
+.asst-voice-ring:nth-child(2) {
+  animation-delay: 0.8s;
+}
+.asst-voice-ring:nth-child(3) {
+  animation-delay: 1.6s;
+}
+@keyframes asst-ring {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+.asst-voice-btn {
+  background: rgb(255 255 255 / 0.14);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  box-shadow:
+    inset 0 1px 0.75px rgb(255 255 255 / 0.35),
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.16);
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .asst-orb,
+  .asst-orb-think,
+  .asst-voice-ring,
+  .asst-shimmer {
+    animation: none;
+  }
+  .asst-word,
+  .asst-in {
+    animation: none;
+  }
+}
