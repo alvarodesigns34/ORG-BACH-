@@ -77,7 +77,7 @@ export function GradesView() {
           <>
             <Button variant="secondary" aria-label="Calculadora de notas" onClick={() => openCalculator(undefined)}>
               <Calculator className="size-4" />
-              <span className="hidden sm:inline">Calculadora</span>
+              <span>Calcular</span>
             </Button>
             <Button onClick={() => setCreating({})}>
               <Plus className="size-4" strokeWidth={2.5} />
