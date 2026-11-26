@@ -20,6 +20,27 @@ const CONTROL = [
   'disabled:opacity-50 disabled:pointer-events-none',
 ].join(' ')
 
+/**
+ * Control dentro de una fila de formulario agrupado (estilo Ajustes de iOS):
+ * sin caja ni relleno, el valor alineado a la derecha y en gris secundario,
+ * como «Calendario › Nuevo evento». La fila entera es la superficie.
+ */
+const ROW_CONTROL = [
+  'w-full min-w-0 bg-transparent border-0 text-right text-[1rem] text-ink-2 h-11',
+  'placeholder:text-ink-3 focus:outline-none focus:text-ink',
+  'aria-[invalid=true]:text-danger',
+  'disabled:opacity-50 disabled:pointer-events-none',
+].join(' ')
+
+export type ControlVariant = 'box' | 'row' | 'title'
+
+function controlClass(variant: ControlVariant = 'box'): string {
+  if (variant === 'row') return ROW_CONTROL
+  if (variant === 'title')
+    return 'w-full min-w-0 bg-transparent border-0 px-4 h-[3.25rem] text-[1.0625rem] font-medium text-ink placeholder:text-ink-3 placeholder:font-normal focus:outline-none aria-[invalid=true]:placeholder:text-danger'
+  return cx(CONTROL, 'h-11')
+}
+
 // ---------------------------------------------------------------------------
 // Envoltorio de campo
 // ---------------------------------------------------------------------------
@@ -88,21 +109,130 @@ export function Field({
 // Controles
 // ---------------------------------------------------------------------------
 
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cx(CONTROL, 'h-11', className)} {...props} />
+export function Input({
+  className,
+  variant,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & { variant?: ControlVariant }) {
+  const date = variant === 'row' && (props.type === 'date' || props.type === 'time')
+  return (
+    <input
+      className={cx(date ? 'row-date' : controlClass(variant), className)}
+      {...props}
+      onClick={
+        date
+          ? (event) => {
+              props.onClick?.(event)
+              // La cápsula no lleva el icono del calendario: tocarla entera
+              // abre el selector también en el ordenador.
+              try {
+                event.currentTarget.showPicker?.()
+              } catch {
+                /* Safari antiguo o el selector ya abierto */
+              }
+            }
+          : props.onClick
+      }
+    />
+  )
 }
 
 export function Textarea({
   className,
   rows = 3,
+  variant,
   ...props
-}: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & { variant?: ControlVariant }) {
   return (
     <textarea
       rows={rows}
-      className={cx(CONTROL, 'py-2.5 resize-y min-h-20', className)}
+      className={cx(
+        variant === 'row'
+          ? 'w-full bg-transparent border-0 px-4 py-3 text-[1rem] text-ink placeholder:text-ink-3 resize-none min-h-[5.25rem] focus:outline-none'
+          : cx(CONTROL, 'py-2.5 resize-y min-h-20'),
+        className,
+      )}
       {...props}
     />
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Formulario agrupado (filas de iOS)
+// ---------------------------------------------------------------------------
+
+/**
+ * Grupo de filas con esquinas redondeadas, como las secciones de un
+ * formulario de iOS: cabecera opcional encima, nota al pie debajo.
+ */
+export function FormGroup({
+  header,
+  footer,
+  children,
+  className,
+}: {
+  header?: ReactNode
+  footer?: ReactNode
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <section className={cx('flex flex-col gap-1.5', className)}>
+      {header && <h3 className="px-4 text-[0.8125rem] font-medium text-ink-3">{header}</h3>}
+      <div className="form-group">{children}</div>
+      {footer && <div className="px-4 text-[0.75rem] leading-snug text-ink-3">{footer}</div>}
+    </section>
+  )
+}
+
+/**
+ * Fila de formulario: etiqueta a la izquierda y valor a la derecha. Con
+ * `bare` no se pinta la etiqueta (queda para lectores de pantalla) y el
+ * control ocupa toda la fila: título, notas.
+ */
+export function FormRow({
+  label,
+  children,
+  hint,
+  error,
+  required,
+  bare,
+  className,
+}: Omit<FieldProps, 'hideLabel'> & { bare?: boolean }) {
+  const id = useId()
+  const hintId = `${id}-hint`
+  const errorId = `${id}-error`
+  const describedBy =
+    [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ') || undefined
+  return (
+    <div data-field className={cx('form-row', className)}>
+      {bare ? (
+        <>
+          <label htmlFor={id} className="sr-only">
+            {label}
+          </label>
+          {children({ id, describedBy, required, invalid: !!error })}
+        </>
+      ) : (
+        <div className="flex items-center gap-3 pl-4 pr-3 min-h-11">
+          <label htmlFor={id} className="shrink-0 text-[1rem] text-ink">
+            {label}
+          </label>
+          <div className="flex-1 min-w-0 flex items-center justify-end">
+            {children({ id, describedBy, required, invalid: !!error })}
+          </div>
+        </div>
+      )}
+      {error ? (
+        <p id={errorId} role="alert" className="px-4 pb-2.5 -mt-0.5 text-[0.75rem] text-danger">
+          {error}
+        </p>
+      ) : hint ? (
+        <p id={hintId} className="px-4 pb-2.5 -mt-0.5 text-[0.75rem] leading-snug text-ink-3">
+          {hint}
+        </p>
+      ) : null}
+    </div>
   )
 }
 
@@ -111,13 +241,42 @@ export function Select({
   children,
   pill,
   active,
+  variant,
   ...props
 }: SelectHTMLAttributes<HTMLSelectElement> & {
+  /** 'row': valor a la derecha dentro de una fila de formulario agrupado. */
+  variant?: ControlVariant
   /** Píldora compacta para filas de filtros. */
   pill?: boolean
   /** En modo píldora: hay un filtro aplicado. */
   active?: boolean
 }) {
+  if (variant === 'row') {
+    return (
+      <div className="relative flex items-center min-w-0 max-w-full">
+        <select
+          className={cx(ROW_CONTROL, 'row-select appearance-none cursor-pointer pr-5 font-sans', className)}
+          {...props}
+        >
+          {children}
+        </select>
+        <svg
+          aria-hidden
+          viewBox="0 0 12 16"
+          className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 w-2.5 h-3.5 text-ink-3"
+        >
+          <path
+            d="M3 6 6 3l3 3M3 10l3 3 3-3"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+    )
+  }
   return (
     <div className={cx('relative', pill && 'shrink-0')}>
       <select
@@ -174,12 +333,35 @@ export function Select({
 export function NumberInput({
   className,
   suffix,
+  variant,
   onChange,
   // `step` solo tiene efecto en type="number"; se descarta para no dejar un
   // atributo que promete un comportamiento que no existe.
   step: _step,
   ...props
-}: InputHTMLAttributes<HTMLInputElement> & { suffix?: string }) {
+}: InputHTMLAttributes<HTMLInputElement> & { suffix?: string; variant?: ControlVariant }) {
+  if (variant === 'row') {
+    return (
+      <div className="flex items-center gap-1 min-w-0 w-full justify-end">
+        <input
+          {...props}
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          className={cx(ROW_CONTROL, 'tabular-nums', className)}
+          onChange={(event) => {
+            if (!onChange) return
+            const cleaned = sanitizeNumericInput(event.target.value)
+            if (cleaned !== event.target.value) event.target.value = cleaned
+            onChange(event)
+          }}
+        />
+        {suffix && props.value !== '' && props.value != null && (
+          <span className="shrink-0 text-[1rem] text-ink-3">{suffix}</span>
+        )}
+      </div>
+    )
+  }
   return (
     <div className="relative">
       <input

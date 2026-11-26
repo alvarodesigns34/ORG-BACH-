@@ -33,7 +33,7 @@ import { Page, PageHeader } from '@/layout/AppShell'
 import { TaskEditor } from '@/features/tasks/TaskEditor'
 import { TaskList } from '@/features/tasks/TaskRow'
 import { ReorderableTaskList } from '@/features/tasks/ReorderableTaskList'
-import { spring } from '@/ui/motion'
+import { spring, useMediaQuery } from '@/ui/motion'
 import { Menu } from '@/ui/Menu'
 import { Input, Select } from '@/ui/fields'
 import { useToast } from '@/ui/Toast'
@@ -117,6 +117,7 @@ export function TasksView() {
   }
   const [editing, setEditing] = useState<Task | null>(null)
   const [creating, setCreating] = useState(false)
+  const coarse = useMediaQuery('(max-width: 639px)')
   const [quickText, setQuickText] = useState('')
 
   // Las alertas enlazan a '#/tareas?vista=atrasadas': la vista se sincroniza
@@ -259,7 +260,7 @@ export function TasksView() {
                 <Input
                   value={quickText}
                   aria-label="Captura rápida de tarea"
-                  placeholder="Añadir rápido… ej.: Derivadas #MAT mañana 18:00 45m !alta"
+                  placeholder={coarse ? 'Apunta una tarea…' : 'Añadir rápido… ej.: Derivadas #MAT mañana 18:00 45m !alta'}
                   className="glass-input pl-10 pr-12 sm:pr-24 h-11 rounded-full border-transparent"
                   onChange={(e) => setQuickText(e.target.value)}
                 />
@@ -333,8 +334,16 @@ export function TasksView() {
               options={VIEW_LABELS.map((v) => ({ ...v, count: counts[v.value] }))}
             />
 
-            <div className="flex flex-wrap items-center gap-2">
-            <div className="relative w-full sm:w-72 shrink-0">
+            {/* En el iPhone, buscar y filtrar van en UNA fila: la lupa ocupa
+                poco y se abre al tocarla; antes eran dos filas enteras antes
+                de la primera tarea. */}
+            <div className="flex max-sm:flex-nowrap flex-wrap items-center gap-2">
+            <div
+              className={cx(
+                'relative shrink-0 sm:w-72 transition-[width] duration-300 ease-[var(--ease-std)]',
+                filters.query ? 'max-sm:w-full' : 'max-sm:w-[7rem] max-sm:focus-within:w-full',
+              )}
+            >
               <Search
                 className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-ink-3 pointer-events-none"
                 aria-hidden
@@ -342,8 +351,8 @@ export function TasksView() {
               <Input
                 value={filters.query}
                 aria-label="Buscar tareas"
-                placeholder="Buscar…"
-                className="search-field pl-10 pr-10 h-10 rounded-full"
+                placeholder="Buscar"
+                className={cx('search-field pl-10 h-10 rounded-full', filters.query ? 'pr-10' : 'pr-3')}
                 onChange={(e) => setFilters((prev) => ({ ...prev, query: e.target.value }))}
               />
               {filters.query && (
@@ -362,7 +371,7 @@ export function TasksView() {
 
             {/* Filtros como píldoras en una fila que se desliza: apilados,
                 ocupaban media pantalla del móvil antes de la primera tarea. */}
-            <div className="flex-1 min-w-0 flex items-center gap-2 overflow-x-auto no-scrollbar -mx-5 px-5 sm:mx-0 sm:px-0 py-1">
+            <div className="flex-1 min-w-0 flex items-center gap-2 overflow-x-auto no-scrollbar max-sm:-mr-5 max-sm:pr-5 py-1">
               <Select
                 aria-label="Filtrar por asignatura"
                 value={filters.subjectId ?? ''}

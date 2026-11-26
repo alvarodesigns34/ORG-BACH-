@@ -108,6 +108,11 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className, reorder
   // --- Deslizar ---
   const x = useMotionValue(0)
   const dragged = useRef(false)
+  const longPressed = useRef(false)
+  const pressTimer = useRef<number | undefined>(undefined)
+  const pressStart = useRef<{ x: number; y: number } | null>(null)
+  const menuButton = useRef<HTMLButtonElement | null>(null)
+  useEffect(() => () => window.clearTimeout(pressTimer.current), [])
   const armed = useRef<'left' | 'right' | null>(null)
   const completeOpacity = useTransform(x, [0, 24], [0, 1])
   const deleteOpacity = useTransform(x, [-24, 0], [1, 0])
@@ -192,9 +197,39 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className, reorder
       <button
         type="button"
         onClick={() => {
+          if (longPressed.current) {
+            longPressed.current = false
+            return
+          }
           if (!dragged.current) onOpen(task)
         }}
-        className="task-open flex-1 min-w-0 text-left rounded-xs"
+        // Mantener pulsado abre el menú de acciones, como el menú contextual
+        // de iOS; con el ratón, el clic derecho.
+        onPointerDown={(e) => {
+          longPressed.current = false
+          if (e.pointerType === 'mouse') return
+          pressStart.current = { x: e.clientX, y: e.clientY }
+          window.clearTimeout(pressTimer.current)
+          pressTimer.current = window.setTimeout(() => {
+            longPressed.current = true
+            haptic('tick')
+            menuButton.current?.click()
+          }, 460)
+        }}
+        onPointerMove={(e) => {
+          const start = pressStart.current
+          if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 8) {
+            window.clearTimeout(pressTimer.current)
+            pressStart.current = null
+          }
+        }}
+        onPointerUp={() => window.clearTimeout(pressTimer.current)}
+        onPointerCancel={() => window.clearTimeout(pressTimer.current)}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          if (!longPressed.current) menuButton.current?.click()
+        }}
+        className="task-open flex-1 min-w-0 text-left rounded-xs select-none [-webkit-touch-callout:none]"
       >
         <span
           className={cx(
@@ -288,7 +323,11 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className, reorder
           ]}
           trigger={({ onClick, ref, ...aria }) => (
             <button
-              ref={ref}
+              ref={(el) => {
+                menuButton.current = el
+                if (typeof ref === 'function') ref(el)
+                else if (ref) (ref as { current: HTMLButtonElement | null }).current = el
+              }}
               type="button"
               onClick={onClick}
               aria-label={`Acciones de ${task.title}`}
@@ -298,8 +337,12 @@ export function TaskRow({ task, subject, onOpen, hideSubject, className, reorder
                 'size-8 grid place-items-center rounded-sm text-ink-3 shrink-0',
                 'transition-[background-color,color,opacity] duration-150',
                 'hover:bg-sunken hover:text-ink',
-                // Visible siempre en táctil; en escritorio aparece al acercarse.
-                'opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100',
+                // En el iPhone no se pinta: el menú se abre manteniendo
+                // pulsada la tarea, y la fila respira. Se queda en el árbol
+                // (ancho cero) para que el menú sepa dónde brotar.
+                'max-sm:w-0 max-sm:overflow-hidden max-sm:opacity-0',
+                // En el iPad, visible siempre; en escritorio aparece al acercarse.
+                'sm:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100',
                 'aria-expanded:opacity-100 aria-expanded:bg-sunken',
               )}
             >

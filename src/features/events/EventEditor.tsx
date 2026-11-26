@@ -5,7 +5,7 @@ import { today as todayISO } from '@/domain/dates'
 import { EVENT_KINDS, type CalendarEvent, type EventKind } from '@/domain/types'
 import { useDispatch } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
-import { Field, Input, Select, Textarea } from '@/ui/fields'
+import { FormGroup, FormRow, Input, Select, Textarea } from '@/ui/fields'
 import { ConfirmDialog, Modal } from '@/ui/Modal'
 import { Button } from '@/ui/primitives'
 
@@ -104,27 +104,29 @@ export function EventEditor({ open, onClose, event, defaults }: EventEditorProps
         }
       >
         <div className="flex flex-col gap-5">
-          <Field label="Título" required error={error}>
-            {({ id, describedBy }) => (
-              <Input
-                id={id}
-                aria-describedby={describedBy}
-                value={title}
-                autoFocus
-                placeholder="Ej.: Entrega del trabajo de Filosofía"
-                onChange={(e) => {
-                  setTitle(e.target.value)
-                  if (error) setError(null)
-                }}
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), submit())}
-              />
-            )}
-          </Field>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Tipo">
+          <FormGroup>
+            <FormRow label="Título" bare required error={!title.trim() ? error : null}>
+              {({ id, describedBy, invalid }) => (
+                <Input
+                  id={id}
+                  variant="title"
+                  aria-describedby={describedBy}
+                  aria-invalid={invalid}
+                  value={title}
+                  autoFocus
+                  enterKeyHint="done"
+                  placeholder="Título, p. ej. Entrega del trabajo"
+                  onChange={(e) => {
+                    setTitle(e.target.value)
+                    if (error) setError(null)
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), submit())}
+                />
+              )}
+            </FormRow>
+            <FormRow label="Tipo">
               {({ id }) => (
-                <Select id={id} value={kind} onChange={(e) => setKind(e.target.value as EventKind)}>
+                <Select id={id} variant="row" value={kind} onChange={(e) => setKind(e.target.value as EventKind)}>
                   {EVENT_KINDS.map((k) => (
                     <option key={k.id} value={k.id}>
                       {k.label}
@@ -132,12 +134,11 @@ export function EventEditor({ open, onClose, event, defaults }: EventEditorProps
                   ))}
                 </Select>
               )}
-            </Field>
-
-            <Field label="Asignatura">
+            </FormRow>
+            <FormRow label="Asignatura">
               {({ id }) => (
-                <Select id={id} value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
-                  <option value="">Sin asignatura</option>
+                <Select id={id} variant="row" value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
+                  <option value="">Ninguna</option>
                   {subjects.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -145,15 +146,16 @@ export function EventEditor({ open, onClose, event, defaults }: EventEditorProps
                   ))}
                 </Select>
               )}
-            </Field>
-          </div>
+            </FormRow>
+          </FormGroup>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Field label="Fecha" required error={!date ? error : null}>
+          <FormGroup>
+            <FormRow label="Fecha" required error={!date ? error : null}>
               {({ id, describedBy, required, invalid }) => (
                 <Input
                   id={id}
                   type="date"
+                  variant="row"
                   required={required}
                   aria-invalid={invalid}
                   aria-describedby={describedBy}
@@ -161,12 +163,13 @@ export function EventEditor({ open, onClose, event, defaults }: EventEditorProps
                   onChange={(e) => setDate(e.target.value)}
                 />
               )}
-            </Field>
-            <Field label="Empieza">
+            </FormRow>
+            <FormRow label="Empieza">
               {({ id }) => (
                 <Input
                   id={id}
                   type="time"
+                  variant="row"
                   value={startTime}
                   onChange={(e) => {
                     setStartTime(e.target.value)
@@ -174,12 +177,13 @@ export function EventEditor({ open, onClose, event, defaults }: EventEditorProps
                   }}
                 />
               )}
-            </Field>
-            <Field label="Termina" error={timeError}>
+            </FormRow>
+            <FormRow label="Termina" error={timeError}>
               {({ id, describedBy }) => (
                 <Input
                   id={id}
                   type="time"
+                  variant="row"
                   aria-describedby={describedBy}
                   value={endTime}
                   onChange={(e) => {
@@ -188,14 +192,22 @@ export function EventEditor({ open, onClose, event, defaults }: EventEditorProps
                   }}
                 />
               )}
-            </Field>
-          </div>
+            </FormRow>
+          </FormGroup>
 
-          <Field label="Notas">
-            {({ id }) => (
-              <Textarea id={id} value={notes} onChange={(e) => setNotes(e.target.value)} />
-            )}
-          </Field>
+          <FormGroup>
+            <FormRow label="Notas" bare>
+              {({ id }) => (
+                <Textarea
+                  id={id}
+                  variant="row"
+                  placeholder="Notas"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              )}
+            </FormRow>
+          </FormGroup>
         </div>
       </Modal>
 

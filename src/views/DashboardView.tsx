@@ -671,10 +671,10 @@ function NowWidget({ hasSubjects }: { hasSubjects: boolean }) {
     )
   }
 
-  if (classes.length === 0) {
-    // Sin clase hoy: se mira cuál es la primera del siguiente día con horario.
-    let upcoming: { label: string; text: string } | null = null
-    for (let offset = 1; offset <= 7 && !upcoming; offset++) {
+  // La primera clase del siguiente día con horario: lo útil cuando hoy ya no
+  // queda ninguna.
+  const nextSchoolDay = () => {
+    for (let offset = 1; offset <= 7; offset++) {
       const day = new Date(now)
       day.setDate(day.getDate() + offset)
       const first = classesOn(subjects, day.getDay())[0]
@@ -683,20 +683,22 @@ function NowWidget({ hasSubjects }: { hasSubjects: boolean }) {
           offset === 1
             ? 'Mañana'
             : `El ${day.toLocaleDateString('es-ES', { weekday: 'long' })}`
-        upcoming = {
-          label,
-          text: `empiezas a las ${first.slot.start} con ${first.subject.name}`,
-        }
+        return `${label} empiezas a las ${first.slot.start} con ${first.subject.name}.`
       }
     }
+    return null
+  }
+
+  // Sin clase hoy, o ya terminadas: una tarjeta corta que mira a mañana. La
+  // franja del día ya pasado ocupaba media pantalla del iPhone sin decir nada.
+  if (classes.length === 0 || (!status.current && !status.next)) {
+    const upcoming = nextSchoolDay()
     return (
       <WidgetCard id="ahora">
-        <p className="display text-[1.5rem] leading-tight mt-1">Hoy no tienes clase</p>
-        {upcoming && (
-          <p className="text-[0.9375rem] text-ink-3 mt-1">
-            {upcoming.label} {upcoming.text}.
-          </p>
-        )}
+        <p className="display text-[1.375rem] leading-tight mt-0.5">
+          {classes.length === 0 ? 'Hoy no tienes clase' : 'Clases terminadas por hoy'}
+        </p>
+        {upcoming && <p className="text-[0.9375rem] text-ink-3 mt-1 text-pretty">{upcoming}</p>}
       </WidgetCard>
     )
   }

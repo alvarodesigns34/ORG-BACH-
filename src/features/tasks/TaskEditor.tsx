@@ -14,7 +14,7 @@ import {
 } from '@/domain/types'
 import { useDispatch, useToday } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
-import { Checkbox, Field, Input, Select, Textarea } from '@/ui/fields'
+import { Checkbox, FormGroup, FormRow, Input, Select, Textarea } from '@/ui/fields'
 import { Modal } from '@/ui/Modal'
 import { useToast } from '@/ui/Toast'
 import { Button, IconButton, PRIORITY_LABEL, Progress, cx } from '@/ui/primitives'
@@ -177,39 +177,122 @@ export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
         }
       >
         <div className="flex flex-col gap-5">
-          <Field label="Título" required error={error}>
-            {({ id, describedBy }) => (
-              <Input
-                id={id}
-                aria-describedby={describedBy}
-                value={form.title}
-                autoFocus
-                placeholder="Ej.: Ejercicios de derivadas, tema 4"
-                onChange={(e) => {
-                  set('title', e.target.value)
-                  if (error) setError(null)
-                }}
-                // Enter guarda directamente: crear una tarea no debería
-                // obligar a mover la mano hasta el botón.
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    submit()
-                  }
-                }}
-              />
-            )}
-          </Field>
+          <FormGroup>
+            <FormRow label="Título" bare required error={error}>
+              {({ id, describedBy, invalid }) => (
+                <Input
+                  id={id}
+                  variant="title"
+                  aria-describedby={describedBy}
+                  aria-invalid={invalid}
+                  value={form.title}
+                  autoFocus
+                  enterKeyHint="done"
+                  placeholder="Título, p. ej. Ejercicios tema 4"
+                  onChange={(e) => {
+                    set('title', e.target.value)
+                    if (error) setError(null)
+                  }}
+                  // Enter guarda directamente: crear una tarea no debería
+                  // obligar a mover la mano hasta el botón.
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      submit()
+                    }
+                  }}
+                />
+              )}
+            </FormRow>
+            <FormRow label="Notas" bare>
+              {({ id }) => (
+                <Textarea
+                  id={id}
+                  variant="row"
+                  rows={2}
+                  className="min-h-[3.5rem] pt-2.5"
+                  value={form.description}
+                  placeholder="Notas"
+                  onChange={(e) => set('description', e.target.value)}
+                />
+              )}
+            </FormRow>
+          </FormGroup>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Asignatura">
+          <FormGroup>
+            <FormRow label="Fecha">
+              {({ id }) =>
+                form.dueDate ? (
+                  <Input
+                    id={id}
+                    type="date"
+                    variant="row"
+                    value={form.dueDate}
+                    onChange={(e) => set('dueDate', e.target.value)}
+                  />
+                ) : (
+                  <span id={id} className="text-[1rem] text-ink-3">Sin fecha</span>
+                )
+              }
+            </FormRow>
+            <div className="form-row flex flex-wrap items-center gap-1.5 px-4 py-2.5">
+              {(
+                [
+                  { label: 'Hoy', value: today },
+                  { label: 'Mañana', value: addDays(today, 1) },
+                  { label: 'Próx. lunes', value: nextMonday },
+                ] as const
+              ).map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  aria-pressed={form.dueDate === preset.value}
+                  onClick={() => set('dueDate', preset.value)}
+                  className={cx(
+                      'pressable px-3 h-8 rounded-full text-[0.8125rem] font-medium transition-colors',
+                      form.dueDate === preset.value
+                        ? 'bg-accent-fill text-white'
+                        : 'bg-fill text-ink-2 hover:text-ink',
+                    )}
+                >
+                  {preset.label}
+                </button>
+              ))}
+              {form.dueDate && (
+                <button
+                  type="button"
+                  onClick={() => setForm((p) => ({ ...p, dueDate: '', dueTime: '' }))}
+                  className="pressable px-3 h-8 rounded-full text-[0.8125rem] text-ink-3 hover:text-ink"
+                >
+                  Quitar fecha
+                </button>
+              )}
+            </div>
+            {form.dueDate && (
+              <FormRow label="Hora">
+                {({ id }) => (
+                  <Input
+                    id={id}
+                    type="time"
+                    variant="row"
+                    value={form.dueTime}
+                    onChange={(e) => set('dueTime', e.target.value)}
+                  />
+                )}
+              </FormRow>
+            )}
+          </FormGroup>
+
+          <FormGroup>
+            <FormRow label="Asignatura">
               {({ id }) => (
                 <Select
                   id={id}
+                  variant="row"
                   value={form.subjectId}
                   onChange={(e) => set('subjectId', e.target.value)}
                 >
-                  <option value="">Sin asignatura</option>
+                  <option value="">Ninguna</option>
                   {subjects.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -217,12 +300,12 @@ export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
                   ))}
                 </Select>
               )}
-            </Field>
-
-            <Field label="Prioridad">
+            </FormRow>
+            <FormRow label="Prioridad">
               {({ id }) => (
                 <Select
                   id={id}
+                  variant="row"
                   value={form.priority}
                   onChange={(e) => set('priority', e.target.value as Priority)}
                 >
@@ -233,195 +316,140 @@ export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
                   ))}
                 </Select>
               )}
-            </Field>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Field label="Fecha límite">
+            </FormRow>
+            {task && (
+              <FormRow label="Estado">
                 {({ id }) => (
-                  <Input
+                  <Select
                     id={id}
-                    type="date"
-                    value={form.dueDate}
-                    onChange={(e) => set('dueDate', e.target.value)}
-                  />
-                )}
-              </Field>
-
-              <Field label="Hora" hint={form.dueDate ? undefined : 'Necesita una fecha.'}>
-                {({ id, describedBy }) => (
-                  <Input
-                    id={id}
-                    type="time"
-                    aria-describedby={describedBy}
-                    value={form.dueTime}
-                    disabled={!form.dueDate}
-                    onChange={(e) => set('dueTime', e.target.value)}
-                  />
-                )}
-              </Field>
-
-              <Field label="Duración (min)">
-                {({ id }) => (
-                  <Input
-                    id={id}
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    max={1440}
-                    step={5}
-                    placeholder="Ej.: 45"
-                    value={form.estimatedMinutes}
-                    onChange={(e) => set('estimatedMinutes', e.target.value)}
-                  />
-                )}
-              </Field>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-1.5">
-                {(
-                  [
-                    { label: 'Hoy', value: today },
-                    { label: 'Mañana', value: addDays(today, 1) },
-                    { label: 'Próx. lunes', value: nextMonday },
-                  ] as const
-                ).map((preset) => (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() => set('dueDate', preset.value)}
-                    className={cx(
-                      'px-2.5 py-1 rounded-full text-[0.75rem] font-medium transition-colors',
-                      form.dueDate === preset.value
-                        ? 'bg-accent-soft text-accent'
-                        : 'bg-fill text-ink-2 hover:text-ink',
-                    )}
+                    variant="row"
+                    value={form.status}
+                    onChange={(e) => set('status', e.target.value as TaskStatus)}
                   >
-                    {preset.label}
-                  </button>
-                ))}
-                {form.dueDate && (
-                  <button
-                    type="button"
-                    onClick={() => setForm((p) => ({ ...p, dueDate: '', dueTime: '' }))}
-                    className="px-2 py-1 rounded-full text-[0.75rem] text-ink-3 hover:text-ink"
-                  >
-                    Sin fecha
-                  </button>
+                    {TASK_STATUSES.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </Select>
                 )}
-              </div>
-
-              <div className="flex items-center gap-1">
-                {[15, 30, 45, 60].map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => set('estimatedMinutes', String(m))}
-                    className={cx(
-                      'px-2 py-1 rounded-full text-[0.75rem] tabular-nums font-medium transition-colors',
-                      form.estimatedMinutes === String(m)
-                        ? 'bg-accent-soft text-accent'
-                        : 'bg-fill text-ink-2 hover:text-ink',
-                    )}
-                  >
-                    {m === 60 ? '1 h' : `${m}m`}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {task && (
-            <Field label="Estado">
+              </FormRow>
+            )}
+            <FormRow label="Duración">
               {({ id }) => (
-                <Select
-                  id={id}
-                  value={form.status}
-                  onChange={(e) => set('status', e.target.value as TaskStatus)}
-                >
-                  {TASK_STATUSES.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.label}
-                    </option>
-                  ))}
-                </Select>
+                <div className="flex items-center gap-1 justify-end">
+                  <input
+                    id={id}
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder="—"
+                    aria-label="Duración estimada en minutos"
+                    value={form.estimatedMinutes}
+                    onChange={(e) => set('estimatedMinutes', e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+                    className="w-16 bg-transparent border-0 text-right text-[1rem] text-ink-2 h-11 tabular-nums placeholder:text-ink-3 focus:outline-none focus:text-ink"
+                  />
+                  <span className="text-[1rem] text-ink-3">min</span>
+                </div>
               )}
-            </Field>
-          )}
+            </FormRow>
+            <div className="form-row flex flex-wrap items-center gap-1.5 px-4 py-2.5">
+              {[15, 30, 45, 60, 120].map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  aria-pressed={form.estimatedMinutes === String(m)}
+                  onClick={() => set('estimatedMinutes', String(m))}
+                  className={cx(
+                      'pressable px-3 h-8 rounded-full text-[0.8125rem] font-medium transition-colors',
+                      form.estimatedMinutes === String(m)
+                        ? 'bg-accent-fill text-white'
+                        : 'bg-fill text-ink-2 hover:text-ink',
+                    )}
+                >
+                  {m === 60 ? '1 h' : m === 120 ? '2 h' : `${m}′`}
+                </button>
+              ))}
+            </div>
+          </FormGroup>
 
           {/* --- Subtareas --- */}
-          <div className="flex flex-col gap-2.5">
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="text-[0.8125rem] font-medium text-ink-2">Subtareas</span>
-              {progress && (
-                <span className="text-[0.75rem] text-ink-3 tabular-nums">
-                  {progress.done}/{progress.total} completadas — {progress.percent} %
-                </span>
-              )}
-            </div>
-
-            {progress && <Progress value={progress.percent} label="Progreso de subtareas" />}
-
-            {form.subtasks.length > 0 && (
-              <ul className="flex flex-col rounded-sm border border-hairline overflow-hidden">
-                {form.subtasks.map((subtask) => (
-                  <li
-                    key={subtask.id}
-                    className="flex items-center gap-2.5 px-2.5 py-2 border-b border-hairline last:border-b-0 bg-raised"
-                  >
-                    <Checkbox
-                      size="sm"
-                      checked={subtask.done}
-                      label={`Completar ${subtask.title}`}
-                      hideLabel
-                      onChange={(done) =>
-                        set(
-                          'subtasks',
-                          form.subtasks.map((s) => (s.id === subtask.id ? { ...s, done } : s)),
-                        )
-                      }
-                    />
-                    <input
-                      value={subtask.title}
-                      aria-label="Título de la subtarea"
-                      onChange={(e) =>
-                        set(
-                          'subtasks',
-                          form.subtasks.map((s) =>
-                            s.id === subtask.id ? { ...s, title: e.target.value } : s,
-                          ),
-                        )
-                      }
-                      className={cx(
-                        'flex-1 min-w-0 bg-transparent text-[1rem] rounded-[4px] px-1 -mx-1',
-                        'focus-visible:outline-2 focus-visible:outline-accent focus-visible:outline-offset-2',
-                        subtask.done && 'line-through text-ink-3',
-                      )}
-                    />
-                    <IconButton
-                      label={`Quitar subtarea ${subtask.title}`}
-                      size="sm"
-                      onClick={() =>
-                        set(
-                          'subtasks',
-                          form.subtasks.filter((s) => s.id !== subtask.id),
-                        )
-                      }
-                    >
-                      <X className="size-3.5" />
-                    </IconButton>
-                  </li>
-                ))}
-              </ul>
+          <FormGroup
+            header={
+              <span className="flex items-baseline justify-between gap-3">
+                <span>Subtareas</span>
+                {progress && (
+                  <span className="tabular-nums">
+                    {progress.done} de {progress.total}
+                  </span>
+                )}
+              </span>
+            }
+          >
+            {progress && (
+              <div className="form-row px-4 pt-3 pb-2.5">
+                <Progress value={progress.percent} label="Progreso de subtareas" />
+              </div>
             )}
-
-            <div className="flex gap-2">
-              <Input
+            {form.subtasks.map((subtask) => (
+              <div key={subtask.id} className="form-row flex items-center gap-3 pl-4 pr-2 min-h-11">
+                <Checkbox
+                  size="sm"
+                  checked={subtask.done}
+                  label={`Completar ${subtask.title}`}
+                  hideLabel
+                  onChange={(done) =>
+                    set(
+                      'subtasks',
+                      form.subtasks.map((s) => (s.id === subtask.id ? { ...s, done } : s)),
+                    )
+                  }
+                />
+                <input
+                  value={subtask.title}
+                  aria-label="Título de la subtarea"
+                  onChange={(e) =>
+                    set(
+                      'subtasks',
+                      form.subtasks.map((s) =>
+                        s.id === subtask.id ? { ...s, title: e.target.value } : s,
+                      ),
+                    )
+                  }
+                  className={cx(
+                    'flex-1 min-w-0 h-11 bg-transparent text-[1rem] focus:outline-none',
+                    subtask.done && 'line-through text-ink-3',
+                  )}
+                />
+                <IconButton
+                  label={`Quitar subtarea ${subtask.title}`}
+                  size="sm"
+                  onClick={() =>
+                    set(
+                      'subtasks',
+                      form.subtasks.filter((s) => s.id !== subtask.id),
+                    )
+                  }
+                >
+                  <X className="size-3.5" />
+                </IconButton>
+              </div>
+            ))}
+            <div className="form-row flex items-center gap-3 pl-4 pr-2 min-h-11">
+              <button
+                type="button"
+                onClick={addSubtask}
+                disabled={!newSubtask.trim()}
+                aria-label="Añadir subtarea"
+                className="grid place-items-center size-[20px] rounded-full bg-accent-fill text-white disabled:bg-fill disabled:text-ink-3 transition-colors"
+              >
+                <Plus className="size-3.5" strokeWidth={2.6} />
+              </button>
+              <input
                 value={newSubtask}
-                placeholder="Añadir subtarea y pulsar Intro"
+                placeholder="Añadir subtarea"
                 aria-label="Nueva subtarea"
+                enterKeyHint="enter"
                 onChange={(e) => setNewSubtask(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -429,39 +457,24 @@ export function TaskEditor({ open, onClose, task, defaults }: TaskEditorProps) {
                     addSubtask()
                   }
                 }}
+                className="flex-1 min-w-0 h-11 bg-transparent text-[1rem] placeholder:text-ink-3 focus:outline-none"
               />
-              <Button
-                onClick={addSubtask}
-                disabled={!newSubtask.trim()}
-                aria-label="Añadir subtarea"
-              >
-                <Plus className="size-4" />
-              </Button>
             </div>
-          </div>
+          </FormGroup>
 
-          <Field label="Notas">
-            {({ id }) => (
-              <Textarea
-                id={id}
-                value={form.description}
-                placeholder="Detalles, páginas, enunciados, lo que sea."
-                onChange={(e) => set('description', e.target.value)}
-              />
-            )}
-          </Field>
-
-          <Field label="Etiquetas" hint="Separadas por comas.">
-            {({ id, describedBy }) => (
-              <Input
-                id={id}
-                aria-describedby={describedBy}
-                value={form.tags}
-                placeholder="repaso, entrega, grupo"
-                onChange={(e) => set('tags', e.target.value)}
-              />
-            )}
-          </Field>
+          <FormGroup footer="Separadas por comas.">
+            <FormRow label="Etiquetas">
+              {({ id }) => (
+                <Input
+                  id={id}
+                  variant="row"
+                  value={form.tags}
+                  placeholder="repaso, entrega"
+                  onChange={(e) => set('tags', e.target.value)}
+                />
+              )}
+            </FormRow>
+          </FormGroup>
         </div>
       </Modal>
     </>

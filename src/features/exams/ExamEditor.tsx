@@ -8,7 +8,7 @@ import { TERMS, type Exam, type TermId } from '@/domain/types'
 import { useDispatch, useSettings, useStore } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
 import { GradeEditor } from '@/features/grades/GradeEditor'
-import { Field, Input, NumberInput, Select, Textarea } from '@/ui/fields'
+import { Field, FormGroup, FormRow, Input, NumberInput, Select, Textarea } from '@/ui/fields'
 import { ConfirmDialog, Modal } from '@/ui/Modal'
 import { Button } from '@/ui/primitives'
 
@@ -189,16 +189,33 @@ export function ExamEditor({ open, onClose, exam, defaults }: ExamEditorProps) {
         }
       >
         <div className="flex flex-col gap-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Asignatura" required error={errors.subjectId}>
-              {({ id, describedBy }) => (
+          <FormGroup>
+            <FormRow label="Nombre del examen" bare required error={errors.title}>
+              {({ id, describedBy, invalid }) => (
+                <Input
+                  id={id}
+                  variant="title"
+                  aria-describedby={describedBy}
+                  aria-invalid={invalid}
+                  value={form.title}
+                  autoFocus
+                  enterKeyHint="done"
+                  placeholder="Nombre, p. ej. Derivadas"
+                  onChange={(e) => set('title', e.target.value)}
+                />
+              )}
+            </FormRow>
+            <FormRow label="Asignatura" required error={errors.subjectId}>
+              {({ id, describedBy, invalid }) => (
                 <Select
                   id={id}
+                  variant="row"
                   aria-describedby={describedBy}
+                  aria-invalid={invalid}
                   value={form.subjectId}
                   onChange={(e) => set('subjectId', e.target.value)}
                 >
-                  <option value="">Elige una…</option>
+                  <option value="">Elegir</option>
                   {subjects.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -206,12 +223,38 @@ export function ExamEditor({ open, onClose, exam, defaults }: ExamEditorProps) {
                   ))}
                 </Select>
               )}
-            </Field>
+            </FormRow>
+          </FormGroup>
 
-            <Field label="Evaluación">
+          <FormGroup>
+            <FormRow label="Fecha" required error={errors.date}>
+              {({ id, describedBy }) => (
+                <Input
+                  id={id}
+                  type="date"
+                  variant="row"
+                  aria-describedby={describedBy}
+                  value={form.date}
+                  onChange={(e) => set('date', e.target.value)}
+                />
+              )}
+            </FormRow>
+            <FormRow label="Hora">
+              {({ id }) => (
+                <Input
+                  id={id}
+                  type="time"
+                  variant="row"
+                  value={form.time}
+                  onChange={(e) => set('time', e.target.value)}
+                />
+              )}
+            </FormRow>
+            <FormRow label="Evaluación">
               {({ id }) => (
                 <Select
                   id={id}
+                  variant="row"
                   value={form.term}
                   onChange={(e) => set('term', e.target.value as TermId)}
                 >
@@ -222,79 +265,41 @@ export function ExamEditor({ open, onClose, exam, defaults }: ExamEditorProps) {
                   ))}
                 </Select>
               )}
-            </Field>
-          </div>
-
-          <Field label="Nombre del examen" required error={errors.title}>
-            {({ id, describedBy }) => (
-              <Input
-                id={id}
-                aria-describedby={describedBy}
-                value={form.title}
-                autoFocus
-                placeholder="Ej.: Derivadas"
-                onChange={(e) => set('title', e.target.value)}
-              />
-            )}
-          </Field>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Field label="Fecha" required error={errors.date}>
-              {({ id, describedBy }) => (
-                <Input
-                  id={id}
-                  type="date"
-                  aria-describedby={describedBy}
-                  value={form.date}
-                  onChange={(e) => set('date', e.target.value)}
-                />
-              )}
-            </Field>
-
-            <Field label="Hora">
+            </FormRow>
+            <FormRow label="Peso">
               {({ id }) => (
-                <Input
-                  id={id}
-                  type="time"
-                  value={form.time}
-                  onChange={(e) => set('time', e.target.value)}
-                />
-              )}
-            </Field>
-
-            <Field label="Peso en la evaluación" hint="Opcional.">
-              {({ id, describedBy }) => (
                 <NumberInput
                   id={id}
-                  aria-describedby={describedBy}
-                  min={0}
-                  max={100}
-                  step={5}
+                  variant="row"
+                  aria-label="Peso en la evaluación (opcional)"
                   suffix="%"
-                  placeholder="30"
+                  placeholder="Opcional"
                   value={form.weight}
                   onChange={(e) => set('weight', e.target.value)}
                 />
               )}
-            </Field>
-          </div>
+            </FormRow>
+          </FormGroup>
 
-          <Field label="Temario que entra">
-            {({ id }) => (
-              <Textarea
-                id={id}
-                value={form.topics}
-                placeholder="Temas 3 y 4: límites, continuidad y derivadas."
-                onChange={(e) => set('topics', e.target.value)}
-              />
-            )}
-          </Field>
+          <FormGroup header="Temario que entra">
+            <FormRow label="Temario que entra" bare>
+              {({ id }) => (
+                <Textarea
+                  id={id}
+                  variant="row"
+                  value={form.topics}
+                  placeholder="Temas 3 y 4: límites, continuidad y derivadas."
+                  onChange={(e) => set('topics', e.target.value)}
+                />
+              )}
+            </FormRow>
+          </FormGroup>
 
           {/* Puente examen → nota. Sin esto, el «Peso 30 %» de un examen era
               un número con pinta de contar que no contaba en ninguna media:
               al pasar por aquí, ese peso viaja a la nota, que sí pondera. */}
           {exam && (
-            <div className="pt-4 border-t border-hairline flex flex-col gap-3">
+            <div className="flex flex-col gap-3">
               {linkedGrade ? (
                 <div className="flex items-center justify-between gap-3 text-[0.8125rem] text-ok bg-ok-quiet rounded-sm px-3 py-2.5">
                   <span className="flex items-center gap-2 min-w-0">

@@ -222,7 +222,7 @@ function GradeHero({ average, scopeLabel, averages, scale, active, onSelect, mod
         <p className="mt-1">
           <Numeral value={formatGrade(average, scale)} size="xl" tone={numeralTone(average, scale)} className="grade-hero-figure" />
         </p>
-        <div className="flex flex-wrap gap-1.5 mt-4" role="group" aria-label="Media por evaluación">
+        <div className="grid grid-cols-4 gap-1 mt-4 p-1 rounded-[14px] bg-fill max-w-[24rem]" role="group" aria-label="Media por evaluación">
           {averages.map((entry) => {
             const isFinal = entry.term === 'final'
             const selected = isFinal ? active === 'todas' : active === entry.term
@@ -234,12 +234,19 @@ function GradeHero({ average, scopeLabel, averages, scale, active, onSelect, mod
                 onClick={() => onSelect(isFinal ? 'todas' : (entry.term as Scope))}
                 title={isFinal ? `Nota final: media ${mode === 'ponderada' ? 'ponderada por horas' : 'de las asignaturas'}` : termName(entry.term as TermId)}
                 className={cx(
-                  'glass-btn inline-flex items-baseline gap-1.5 h-8 px-3 rounded-full text-[0.75rem] font-semibold transition-colors',
-                  selected ? 'filter-on text-accent' : 'text-ink-3 hover:text-ink-2',
+                  'pressable flex flex-col items-center justify-center gap-0.5 h-12 rounded-[10px] transition-[background-color,color,box-shadow] duration-200',
+                  selected ? 'bg-raised shadow-[0_1px_3px_rgb(0_0_0/0.12)] text-ink' : 'text-ink-3 hover:text-ink-2',
                 )}
               >
-                {isFinal ? 'Curso' : TERMS.find((t) => t.id === entry.term)?.short}
-                <span className={cx('tabular-nums', selected ? 'text-accent font-bold' : 'text-ink-2')}>
+                <span className="text-[0.6875rem] font-semibold leading-none">
+                  {isFinal ? 'Curso' : TERMS.find((t) => t.id === entry.term)?.short}
+                </span>
+                <span
+                  className={cx(
+                    'text-[0.9375rem] font-bold tabular-nums leading-none',
+                    entry.average === null ? 'text-ink-3 font-medium' : selected ? 'text-ink' : 'text-ink-2',
+                  )}
+                >
                   {formatGrade(entry.average, scale)}
                 </span>
               </button>
@@ -249,7 +256,7 @@ function GradeHero({ average, scopeLabel, averages, scale, active, onSelect, mod
       </div>
 
       <div className="grade-ruler px-3 sm:px-4" aria-label={`Asignaturas en la escala de ${lo} a ${hi}`}>
-        <div className="relative h-[5.5rem]">
+        <div className="relative" style={{ height: `${1.75 + Math.max(0, ...rows) * 1.375}rem` }}>
           {points.map((p, i) => {
             const pct = at(p.value)
             const edgeAlign =

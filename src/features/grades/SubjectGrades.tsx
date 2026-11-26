@@ -144,7 +144,9 @@ export function SubjectGrades({
       )}
 
       {/* --- Cuánto se ha evaluado --- */}
-      {hasGrades && result.weightsDeclared && !hideHeader && (
+      {/* Con todo evaluado la barra llena no dice nada que la cabecera no
+          diga ya («100 % evaluado»): solo ocupaba sitio en cada tarjeta. */}
+      {hasGrades && result.weightsDeclared && !hideHeader && result.evaluatedPercent < 99.5 && (
         <div className="px-5 sm:px-6 pb-5">
           <Progress
             value={result.evaluatedPercent}

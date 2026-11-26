@@ -7,9 +7,9 @@ import { parseDecimal, toDecimalInput } from '@/domain/number'
 import { GRADE_KINDS, TERMS, type GradeEntry, type GradeKind, type TermId } from '@/domain/types'
 import { useDispatch, useSettings, useStore } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
-import { Field, Input, NumberInput, Select, Textarea } from '@/ui/fields'
+import { FormGroup, FormRow, Input, NumberInput, Select, Textarea } from '@/ui/fields'
 import { ConfirmDialog, Modal } from '@/ui/Modal'
-import { Button, cx } from '@/ui/primitives'
+import { Button } from '@/ui/primitives'
 
 interface GradeEditorProps {
   open: boolean
@@ -254,16 +254,34 @@ export function GradeEditor({ open, onClose, grade, defaults }: GradeEditorProps
         }
       >
         <div className="flex flex-col gap-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Asignatura" required error={errors.subjectId}>
-              {({ id, describedBy }) => (
+          <FormGroup>
+            <FormRow label="Nombre" bare required error={errors.name}>
+              {({ id, describedBy, invalid }) => (
+                <Input
+                  id={id}
+                  variant="title"
+                  aria-describedby={describedBy}
+                  aria-invalid={invalid}
+                  value={form.name}
+                  autoFocus
+                  placeholder="Nombre, p. ej. Examen tema 4"
+                  enterKeyHint="done"
+                  onChange={(e) => set('name', e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), submit())}
+                />
+              )}
+            </FormRow>
+            <FormRow label="Asignatura" required error={errors.subjectId}>
+              {({ id, describedBy, invalid }) => (
                 <Select
                   id={id}
+                  variant="row"
                   aria-describedby={describedBy}
+                  aria-invalid={invalid}
                   value={form.subjectId}
                   onChange={(e) => set('subjectId', e.target.value)}
                 >
-                  <option value="">Elige una…</option>
+                  <option value="">Elegir</option>
                   {subjects.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -271,67 +289,12 @@ export function GradeEditor({ open, onClose, grade, defaults }: GradeEditorProps
                   ))}
                 </Select>
               )}
-            </Field>
-
-            <Field label="Evaluación">
+            </FormRow>
+            <FormRow label="Tipo">
               {({ id }) => (
                 <Select
                   id={id}
-                  value={form.term}
-                  onChange={(e) => set('term', e.target.value as TermId)}
-                >
-                  {TERMS.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-          </div>
-
-          {categories.length > 0 && (
-            <Field
-              label="Categoría"
-              hint="Determina con qué peso entra esta nota en la media de la asignatura."
-            >
-              {({ id, describedBy }) => (
-                <Select
-                  id={id}
-                  aria-describedby={describedBy}
-                  value={form.categoryId}
-                  onChange={(e) => set('categoryId', e.target.value)}
-                >
-                  <option value="">Sin categoría (pondera directamente)</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} — {formatPercent(c.weight)} de la asignatura
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-4">
-            <Field label="Nombre" required error={errors.name}>
-              {({ id, describedBy }) => (
-                <Input
-                  id={id}
-                  aria-describedby={describedBy}
-                  value={form.name}
-                  autoFocus
-                  placeholder="Ej.: Examen tema 4"
-                  onChange={(e) => set('name', e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), submit())}
-                />
-              )}
-            </Field>
-
-            <Field label="Tipo">
-              {({ id }) => (
-                <Select
-                  id={id}
+                  variant="row"
                   value={form.kind}
                   onChange={(e) => set('kind', e.target.value as GradeKind)}
                 >
@@ -342,39 +305,65 @@ export function GradeEditor({ open, onClose, grade, defaults }: GradeEditorProps
                   ))}
                 </Select>
               )}
-            </Field>
-          </div>
+            </FormRow>
+          </FormGroup>
 
           {/* --- Nota --- */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <Field label="Nota" required error={errors.score}>
-              {({ id, describedBy }) => (
+          <FormGroup
+            footer={
+              (normalized !== null && parsed.maxScore !== settings.gradeScale.max) || overWeight ? (
+                <div className="flex flex-col gap-1.5">
+                  {normalized !== null && parsed.maxScore !== settings.gradeScale.max && (
+                    <p>
+                      {form.score.replace('.', ',')} sobre {form.maxScore} equivale a{' '}
+                      <strong className="text-ink tabular-nums">
+                        {normalized.toLocaleString('es-ES', {
+                          minimumFractionDigits: settings.gradeScale.decimals,
+                          maximumFractionDigits: settings.gradeScale.decimals,
+                        })}
+                      </strong>{' '}
+                      sobre {settings.gradeScale.max}.
+                    </p>
+                  )}
+                  {overWeight && (
+                    <p className="flex items-start gap-1.5 text-warn">
+                      <TriangleAlert className="size-3.5 shrink-0 mt-px" />
+                      <span>
+                        Con este peso, las notas de esta categoría suman más del 100 %. Puedes
+                        guardarlo igual: la media se repartirá proporcionalmente.
+                      </span>
+                    </p>
+                  )}
+                </div>
+              ) : undefined
+            }
+          >
+            <FormRow label="Nota" required error={errors.score}>
+              {({ id, describedBy, invalid }) => (
                 <NumberInput
                   id={id}
+                  variant="row"
                   aria-describedby={describedBy}
-                  min={0}
-                  step={0.25}
-                  placeholder="8,5"
+                  aria-invalid={invalid}
+                  className="text-ink! font-semibold"
+                  placeholder="Obligatoria"
                   value={form.score}
                   onChange={(e) => set('score', e.target.value)}
                 />
               )}
-            </Field>
-
-            <Field label="Sobre" hint="Si el examen era sobre 20 o sobre 100.">
-              {({ id, describedBy }) => (
+            </FormRow>
+            <FormRow label="Sobre">
+              {({ id }) => (
                 <NumberInput
                   id={id}
-                  aria-describedby={describedBy}
-                  min={0.1}
-                  step={1}
+                  variant="row"
+                  aria-label="Puntuación máxima del examen (10, 20, 100…)"
                   value={form.maxScore}
                   onChange={(e) => set('maxScore', e.target.value)}
                 />
               )}
-            </Field>
-
-            <Field
+            </FormRow>
+            <FormRow
               label="Peso"
               // Dejarlo vacío no es «no cuenta»: la nota se reparte el hueco
               // libre. Decirlo aquí evita que el alumno crea que ha guardado
@@ -386,79 +375,84 @@ export function GradeEditor({ open, onClose, grade, defaults }: GradeEditorProps
                     ? 'Ya está todo repartido: si lo dejas vacío, esta nota no contará.'
                     : undefined
               }
-              className="col-span-2 sm:col-span-1"
             >
               {({ id, describedBy }) => (
                 <NumberInput
                   id={id}
+                  variant="row"
                   aria-describedby={describedBy}
-                  min={0}
-                  max={100}
-                  step={5}
                   suffix="%"
-                  placeholder={remainingWeight ? toDecimalInput(remainingWeight) : '0'}
+                  placeholder={remainingWeight ? toDecimalInput(remainingWeight) : 'Automático'}
                   value={form.weight}
                   onChange={(e) => set('weight', e.target.value)}
                 />
               )}
-            </Field>
-          </div>
+            </FormRow>
+          </FormGroup>
 
-          {/* Confirmación en el sitio: qué nota es esto realmente. */}
-          {(normalized !== null || overWeight) && (
-            <div className="flex flex-col gap-2">
-              {normalized !== null && parsed.maxScore !== settings.gradeScale.max && (
-                <p className="text-[0.8125rem] text-ink-2 bg-sunken rounded-sm px-3 py-2">
-                  {form.score.replace('.', ',')} sobre {form.maxScore} equivale a{' '}
-                  <strong className="text-ink tabular-nums">
-                    {normalized.toLocaleString('es-ES', {
-                      minimumFractionDigits: settings.gradeScale.decimals,
-                      maximumFractionDigits: settings.gradeScale.decimals,
-                    })}
-                  </strong>{' '}
-                  sobre {settings.gradeScale.max}.
-                </p>
-              )}
-              {overWeight && (
-                <p
-                  className={cx(
-                    'flex items-start gap-2 text-[0.8125rem] text-warn',
-                    'bg-warn-quiet rounded-sm px-3 py-2',
-                  )}
+          <FormGroup>
+            <FormRow label="Evaluación">
+              {({ id }) => (
+                <Select
+                  id={id}
+                  variant="row"
+                  value={form.term}
+                  onChange={(e) => set('term', e.target.value as TermId)}
                 >
-                  <TriangleAlert className="size-4 shrink-0 mt-px" />
-                  <span>
-                    Con este peso, las notas de esta categoría suman más del 100 %. Puedes guardarlo
-                    igual: la media se repartirá proporcionalmente.
-                  </span>
-                </p>
+                  {TERMS.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </Select>
               )}
-            </div>
-          )}
-
-          <Field label="Fecha">
-            {({ id }) => (
-              <Input
-                id={id}
-                type="date"
-                className="max-w-[14rem]"
-                value={form.date}
-                onChange={(e) => set('date', e.target.value)}
-              />
+            </FormRow>
+            {categories.length > 0 && (
+              <FormRow label="Categoría">
+                {({ id }) => (
+                  <Select
+                    id={id}
+                    variant="row"
+                    value={form.categoryId}
+                    onChange={(e) => set('categoryId', e.target.value)}
+                  >
+                    <option value="">Ninguna</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} · {formatPercent(c.weight)}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </FormRow>
             )}
-          </Field>
+            <FormRow label="Fecha">
+              {({ id }) => (
+                <Input
+                  id={id}
+                  type="date"
+                  variant="row"
+                  value={form.date}
+                  onChange={(e) => set('date', e.target.value)}
+                />
+              )}
+            </FormRow>
+          </FormGroup>
 
-          <Field label="Comentario">
-            {({ id }) => (
-              <Textarea
-                id={id}
-                rows={2}
-                value={form.comment}
-                placeholder="Qué falló, qué repasar, lo que dijo el profesor…"
-                onChange={(e) => set('comment', e.target.value)}
-              />
-            )}
-          </Field>
+          <FormGroup>
+            <FormRow label="Comentario" bare>
+              {({ id }) => (
+                <Textarea
+                  id={id}
+                  variant="row"
+                  rows={2}
+                  value={form.comment}
+                  placeholder="Comentario: qué falló, qué repasar…"
+                  onChange={(e) => set('comment', e.target.value)}
+                />
+              )}
+            </FormRow>
+          </FormGroup>
         </div>
       </Modal>
 

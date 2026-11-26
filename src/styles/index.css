@@ -1931,3 +1931,84 @@ button:active > .switch-thumb {
   }
 }
 
+
+/* ==========================================================================
+   FORMULARIO AGRUPADO
+   Las hojas de alta y edición (nota, examen, tarea, evento) se leen como
+   «Calendario › Nuevo evento»: grupos redondeados con filas de 44 px,
+   etiqueta a la izquierda y valor a la derecha, separador que empieza donde
+   empieza el texto. Sin cajas dentro de cajas.
+   ========================================================================== */
+
+:root {
+  --form-group: rgb(118 118 128 / 0.085);
+  --form-sep: rgb(60 60 67 / 0.16);
+}
+[data-theme='dark'] {
+  --form-group: rgb(255 255 255 / 0.075);
+  --form-sep: rgb(84 84 88 / 0.55);
+}
+
+.form-group {
+  border-radius: 18px;
+  background: var(--form-group);
+  overflow: hidden;
+}
+.form-row {
+  position: relative;
+  transition: background-color var(--dur-fast) var(--ease-std);
+}
+.form-row + .form-row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 1rem;
+  height: 0.5px;
+  background: var(--form-sep);
+}
+/* El dedo sabe dónde está: la fila con el foco se ilumina apenas. */
+.form-row:focus-within {
+  background: color-mix(in srgb, var(--c-accent-fill) 6%, transparent);
+}
+
+/* Selector nativo con el valor a la derecha (Safari lo respeta con
+   text-align-last). */
+.row-select {
+  text-align-last: right;
+  max-width: 100%;
+  text-overflow: ellipsis;
+}
+
+/* Fecha y hora: la cápsula gris de iOS, que se toca para abrir el selector. */
+.row-date {
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 0;
+  height: 2.125rem;
+  padding: 0 0.7rem;
+  border: 0;
+  border-radius: 9px;
+  background: var(--c-fill);
+  color: var(--c-ink);
+  font: inherit;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  cursor: pointer;
+}
+.row-date:focus {
+  outline: none;
+  color: var(--c-accent);
+  background: var(--c-accent-quiet);
+}
+.row-date::-webkit-date-and-time-value {
+  text-align: center;
+}
+.row-date::-webkit-calendar-picker-indicator {
+  display: none;
+}
+.row-date:invalid,
+.row-date[value=''] {
+  color: var(--c-ink-3);
+}
