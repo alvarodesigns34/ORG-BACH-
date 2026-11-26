@@ -8,7 +8,7 @@ import { SUBJECT_COLORS, colorVar, nextColor } from '@/domain/palette'
 import type { GradeCategory, ScheduleSlot, Subject, SubjectColor } from '@/domain/types'
 import { useDispatch, useSettings } from '@/state/StoreProvider'
 import { useSubjects } from '@/state/selectors'
-import { Field, Input, NumberField, NumberInput } from '@/ui/fields'
+import { FormGroup, FormRow, Input, NumberField, NumberInput } from '@/ui/fields'
 import { ConfirmDialog, Modal } from '@/ui/Modal'
 import { Button, IconButton, cx } from '@/ui/primitives'
 import { useToast } from '@/ui/Toast'
@@ -150,29 +150,46 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
         }
       >
         <div className="flex flex-col gap-5">
-          <Field label="Nombre" required error={error}>
-            {({ id, describedBy }) => (
-              <Input
-                id={id}
-                aria-describedby={describedBy}
-                value={name}
-                autoFocus
-                placeholder="Ej.: Matemáticas I"
-                onChange={(e) => {
-                  setName(e.target.value)
-                  if (error) setError(null)
-                }}
-              />
-            )}
-          </Field>
+          <FormGroup>
+            <FormRow label="Nombre" bare required error={error}>
+              {({ id, describedBy, invalid }) => (
+                <Input
+                  id={id}
+                  variant="title"
+                  aria-describedby={describedBy}
+                  aria-invalid={invalid}
+                  value={name}
+                  autoFocus
+                  enterKeyHint="done"
+                  placeholder="Nombre, p. ej. Matemáticas I"
+                  onChange={(e) => {
+                    setName(e.target.value)
+                    if (error) setError(null)
+                  }}
+                />
+              )}
+            </FormRow>
+            <FormRow label="Abreviatura">
+              {({ id }) => (
+                <Input
+                  id={id}
+                  variant="row"
+                  value={shortName}
+                  maxLength={5}
+                  placeholder="Automática"
+                  onChange={(e) => setShortName(e.target.value.toUpperCase())}
+                />
+              )}
+            </FormRow>
+          </FormGroup>
 
           {/* --- Color --- */}
           <div className="flex flex-col gap-2">
-            <span className="text-[0.8125rem] font-medium text-ink-2">Color identificativo</span>
+            <span className="px-4 text-[0.8125rem] font-medium text-ink-3">Color</span>
             <div
               role="radiogroup"
               aria-label="Color de la asignatura"
-              className="flex flex-wrap gap-2"
+              className="form-group flex flex-wrap justify-between gap-1 px-3 py-2.5"
             >
               {SUBJECT_COLORS.map((option) => {
                 const active = option.id === color
@@ -201,77 +218,55 @@ export function SubjectEditor({ open, onClose, subject }: SubjectEditorProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Field label="Abreviatura" hint="Se genera sola si la dejas vacía.">
-              {({ id, describedBy }) => (
-                <Input
-                  id={id}
-                  aria-describedby={describedBy}
-                  value={shortName}
-                  maxLength={5}
-                  placeholder="MAT"
-                  onChange={(e) => setShortName(e.target.value.toUpperCase())}
-                />
-              )}
-            </Field>
-
-            <Field label="Profesor/a">
+          <FormGroup>
+            <FormRow label="Profesor/a">
               {({ id }) => (
-                <Input id={id} value={teacher} onChange={(e) => setTeacher(e.target.value)} />
+                <Input id={id} variant="row" placeholder="Opcional" value={teacher} onChange={(e) => setTeacher(e.target.value)} />
               )}
-            </Field>
+            </FormRow>
+            <FormRow label="Aula">
+              {({ id }) => (
+                <Input id={id} variant="row" placeholder="Opcional" value={room} onChange={(e) => setRoom(e.target.value)} />
+              )}
+            </FormRow>
+          </FormGroup>
 
-            <Field label="Aula">
-              {({ id }) => <Input id={id} value={room} onChange={(e) => setRoom(e.target.value)} />}
-            </Field>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field
-              label="Horas semanales"
-              hint="Se usa como peso si calculas la media global de forma ponderada."
-            >
-              {({ id, describedBy }) => (
+          <FormGroup footer="Las horas pesan en la media global si la calculas ponderada. El objetivo sirve para avisarte si te alejas de él.">
+            <FormRow label="Horas semanales">
+              {({ id }) => (
                 <NumberInput
                   id={id}
-                  aria-describedby={describedBy}
-                  min={1}
-                  max={12}
-                  step={1}
+                  variant="row"
                   suffix="h"
                   value={weight}
                   onChange={(e) => setWeight(e.target.value)}
                 />
               )}
-            </Field>
-
-            <Field label="Nota objetivo" hint="Opcional. Sirve para avisarte si te alejas de ella.">
-              {({ id, describedBy }) => (
+            </FormRow>
+            <FormRow label="Nota objetivo">
+              {({ id }) => (
                 <NumberInput
                   id={id}
-                  aria-describedby={describedBy}
-                  min={0}
-                  max={settings.gradeScale.max}
-                  step={0.5}
-                  placeholder={String(settings.gradeScale.max)}
+                  variant="row"
+                  placeholder="Ninguna"
                   value={target}
                   onChange={(e) => setTarget(e.target.value)}
                 />
               )}
-            </Field>
-          </div>
+            </FormRow>
+          </FormGroup>
 
           {/* --- Horario --- */}
           <div className="flex flex-col gap-2.5">
             <div>
-              <span className="text-[0.8125rem] font-medium text-ink-2">Horario</span>
-              <p className="text-[0.75rem] text-ink-3 mt-0.5">
+              <span className="px-4 text-[0.8125rem] font-medium text-ink-3">Horario</span>
+              <p className="px-4 text-[0.75rem] text-ink-3 mt-0.5">
                 Cuándo tienes clase. Con esto, Inicio te dice qué toca ahora y qué viene después.
               </p>
             </div>
 
             {schedule.length > 0 && (
-              <ul className="flex flex-col rounded-[14px] bg-fill overflow-hidden">
+              <ul className="form-group flex flex-col">
                 {schedule.map((slot, index) => {
                   const patch = (change: Partial<ScheduleSlot>) =>
                     setSchedule((prev) =>
