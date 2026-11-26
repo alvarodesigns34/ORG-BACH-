@@ -35,7 +35,7 @@ function scoreText(grade: GradeEntry, decimals: number): string {
 function countdown(days: number): string {
   if (days <= 0) return 'Hoy'
   if (days === 1) return 'Mañana'
-  return `En ${days} días`
+  return `${days} días`
 }
 
 /**
@@ -181,7 +181,7 @@ export function ExamsView() {
               const days = daysUntil(exam.date, today)
               const near = days <= 3
               return (
-                <li key={exam.id} className={cx('flex items-center pr-2 sm:pr-3', i > 0 && 'inset-separator-wide')}>
+                <li key={exam.id} className={cx('flex items-center pr-1.5 sm:pr-3', i > 0 && 'inset-separator-wide')}>
                   <button
                     type="button"
                     onClick={() => setEditing(exam)}
@@ -196,7 +196,7 @@ export function ExamsView() {
                         {subject?.name ?? 'Sin asignatura'}
                         {exam.time ? ` · ${exam.time}` : ''}
                       </span>
-                      <span className="block text-[0.9375rem] font-medium text-ink leading-snug truncate">
+                      <span className="block text-[0.9375rem] font-medium text-ink leading-snug line-clamp-2">
                         {exam.title}
                       </span>
                       {exam.topics && (
@@ -223,7 +223,9 @@ export function ExamsView() {
                     href={studyHref({ examId: exam.id, subjectId: exam.subjectId })}
                     aria-label={`Preparar ${exam.title}`}
                     title="Preparar examen"
-                    className="pressable grid place-items-center size-11 shrink-0 rounded-full text-accent hover:bg-accent-quiet"
+                    // Preparar es un vuelo de Estudio, que se usa en el iPad: en
+                    // el iPhone el botón solo robaba ancho al nombre del examen.
+                    className="pressable max-sm:hidden grid place-items-center size-11 shrink-0 rounded-full text-accent hover:bg-accent-quiet"
                   >
                     <PlaneTakeoff className="size-4" aria-hidden="true" />
                   </a>
