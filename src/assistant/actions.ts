@@ -15,7 +15,7 @@
 import { normalize } from '../domain/tasks.ts'
 import { addDays, formatDayMonth } from '../domain/dates.ts'
 import { globalAverage, requiredGrade, round, subjectResult } from '../domain/grades.ts'
-import { activeSession, layoverPoints, layoversTaken, remainingMs } from '../domain/flights.ts'
+import { activeSession, currentAirport, layoverPoints, layoversTaken, remainingMs } from '../domain/flights.ts'
 import { minutesBetween, studyBeforeExams, studyStreak } from '../domain/study.ts'
 import { newId } from '../domain/id.ts'
 import type {
@@ -86,6 +86,8 @@ export interface AssistantAction {
   target?: number | null
   /** Ambiente del vuelo (start_flight). */
   sound?: string
+  /** Ciudad o código IATA de destino del vuelo (start_flight), «vuelo a Tokio». */
+  destination?: string
 }
 
 export type AppliedKind =
@@ -119,7 +121,18 @@ export interface FlightRequest {
   subjectId?: string
   taskId?: string
   sound?: string
+  /** Aeropuerto de destino (IATA) si lo pidió; si no, la app elige uno a la distancia justa. */
+  destination?: string
 }
+
+/**
+ * Busca un destino del modo estudio por ciudad o código y dice cuánto dura
+ * el vuelo desde donde estás. Lo da la vista del asistente (los aeropuertos
+ * viven en el modo estudio); sin él no se pueden pedir destinos concretos.
+ */
+export type PlaceResolver = (
+  query: string,
+) => { iata: string; city: string; minutes: number; from: string } | null
 
 export interface ApplyResult {
   data: AppData
@@ -146,12 +159,19 @@ export const FLIGHT_SOUNDS: Record<string, string> = {
 export const FLIGHT_MIN_MINUTES = 15
 export const FLIGHT_MAX_MINUTES = 240
 
+function formatMinutes(total: number): string {
+  const h = Math.floor(total / 60)
+  const m = total % 60
+  return h ? `${h} h${m ? ` ${m} min` : ''}` : `${m} min`
+}
+
 /** El enlace que prepara ese vuelo en el modo estudio. */
 export function flightHref(flight: FlightRequest): string {
   const params = new URLSearchParams({ despegar: String(flight.minutes) })
   if (flight.subjectId) params.set('asignatura', flight.subjectId)
   if (flight.taskId) params.set('tarea', flight.taskId)
   if (flight.sound) params.set('sonido', flight.sound)
+  if (flight.destination) params.set('destino', flight.destination)
   return `#/estudio?${params.toString()}`
 }
 
@@ -226,6 +246,7 @@ export function applyAssistantActions(
   initial: AppData,
   actions: AssistantAction[],
   today: string,
+  places?: PlaceResolver,
 ): ApplyResult {
   let data = initial
   const applied: AppliedItem[] = []
@@ -817,7 +838,27 @@ export function applyAssistantActions(
           skipped.push('Solo se puede preparar un vuelo a la vez.')
           break
         }
-        const raw = num(action.minutes)
+        // Con destino, la duración es la del vuelo real (10 km por minuto).
+        let place: ReturnType<PlaceResolver> = null
+        const wantedPlace = typeof action.destination === 'string' ? action.destination.trim() : ''
+        if (wantedPlace) {
+          place = places?.(wantedPlace) ?? null
+          if (!place) {
+            skipped.push(
+              places
+                ? `Vuelo: no encuentro «${wantedPlace}» entre los destinos.`
+                : 'Vuelo: ahora mismo no puedo buscar destinos; prueba otra vez en un momento.',
+            )
+            break
+          }
+          if (place.minutes < FLIGHT_MIN_MINUTES || place.minutes > FLIGHT_MAX_MINUTES) {
+            skipped.push(
+              `Vuelo: de ${place.from} a ${place.city} son ${formatMinutes(place.minutes)} de vuelo, y tiene que durar entre ${FLIGHT_MIN_MINUTES} min y ${FLIGHT_MAX_MINUTES / 60} h.`,
+            )
+            break
+          }
+        }
+        const raw = place ? place.minutes : num(action.minutes)
         if (raw === undefined || raw < FLIGHT_MIN_MINUTES || raw > FLIGHT_MAX_MINUTES) {
           skipped.push(
             `Vuelo: la duración tiene que estar entre ${FLIGHT_MIN_MINUTES} min y ${FLIGHT_MAX_MINUTES / 60} h.`,
@@ -844,12 +885,13 @@ export function applyAssistantActions(
           subjectId: s?.id ?? task?.subjectId,
           taskId: task?.id,
           sound,
+          ...(place ? { destination: place.iata } : {}),
         }
         const subjectLabel = s?.name ?? (task?.subjectId ? subjectName(task.subjectId) : undefined)
         applied.push({
           kind: 'vuelo',
-          text: `${minutes} min${subjectLabel ? ` de ${subjectLabel}` : ''}${sound ? ` · ${FLIGHT_SOUNDS[sound]}` : ''} · listo para despegar`,
-          memo: `vuelo preparado de ${minutes} min${subjectLabel ? ` de ${subjectLabel}` : ''}${task ? ` con la tarea [${task.id}]` : ''}${sound ? `, ambiente ${sound}` : ''} (falta que el alumno pulse Despegar)`,
+          text: `${place ? `A ${place.city} · ` : ''}${minutes} min${subjectLabel ? ` de ${subjectLabel}` : ''}${sound ? ` · ${FLIGHT_SOUNDS[sound]}` : ''} · listo para despegar`,
+          memo: `vuelo preparado${place ? ` a ${place.city}` : ''} de ${minutes} min${subjectLabel ? ` de ${subjectLabel}` : ''}${task ? ` con la tarea [${task.id}]` : ''}${sound ? `, ambiente ${sound}` : ''} (falta que el alumno pulse Despegar)`,
         })
         break
       }
@@ -1206,6 +1248,8 @@ function studyContext(data: AppData, today: string, now: Date) {
     streak_days: streak.current,
     studied_today: streak.today,
     best_streak_days: streak.best,
+    /** Aeropuerto (IATA) desde el que sale el próximo vuelo: donde aterrizó el último. */
+    current_airport: currentAirport(data.sessions),
     active_flight: active
       ? {
           from: active.from,
