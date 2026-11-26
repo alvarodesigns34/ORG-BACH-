@@ -200,6 +200,10 @@ export function parseQuickTask(
     .replace(/\s+(?:para|el|a\s+las)$/i, '')
     .trim()
 
+  // Sin «#», la asignatura nombrada de corrido («deberes física»); se deja en
+  // el título, que así se lee natural.
+  subjectId ??= subjectInText(raw, subjects)
+
   return {
     title: cleaned || raw.trim(),
     subjectId,
@@ -209,4 +213,156 @@ export function parseQuickTask(
     estimatedMinutes,
     tags,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Asignatura sin «#»: «deberes física mañana», «examen mates 7,5»
+// ---------------------------------------------------------------------------
+
+/** Palabras que nunca nombran una asignatura aunque empiecen igual. */
+const NOT_SUBJECT = new Set(['examen', 'examenes', 'trabajo', 'tarea', 'tareas', 'tema', 'ejercicios', 'practica', 'mañana', 'manana'])
+
+function commonPrefix(a: string, b: string): number {
+  let i = 0
+  while (i < a.length && i < b.length && a[i] === b[i]) i++
+  return i
+}
+
+/**
+ * La asignatura que se nombra en el texto sin «#»: una palabra de 4 letras o
+ * más que comparte al menos 4 con el principio del nombre («fisica» → Física,
+ * «mates» → Matemáticas), o la abreviatura escrita en mayúsculas («MAT»).
+ * Solo si apunta a UNA asignatura: con dudas, no adivina.
+ */
+export function subjectInText(raw: string, subjects: Subject[]): ID | undefined {
+  const active = subjects.filter((s) => !s.archived)
+  for (const token of raw.split(/[\s,.;:()¿?¡!]+/)) {
+    if (!token) continue
+    if (token.length >= 2 && token === token.toUpperCase() && /\p{L}/u.test(token)) {
+      const byShort = active.filter((s) => s.shortName && s.shortName.toUpperCase() === token)
+      if (byShort.length === 1) return byShort[0].id
+    }
+    const word = normalize(token)
+    if (word.length < 4 || NOT_SUBJECT.has(word)) continue
+    const hits = active.filter((s) => {
+      const name = normalize(s.name)
+      if (name.startsWith(word)) return true
+      // Cada palabra del nombre: «castellana», «historia», «ingles».
+      return name.split(/\s+/).some((part) => {
+        // La palabra es el principio de una del nombre, con como mucho una
+        // letra de más al final: «mates», «fisica», «castellana».
+        const shared = commonPrefix(part, word)
+        return part.length >= 4 && shared >= 4 && word.length - shared <= 1
+      })
+    })
+    if (hits.length === 1) return hits[0].id
+  }
+  return undefined
+}
+
+// ---------------------------------------------------------------------------
+// Asignatura sugerida por el horario
+// ---------------------------------------------------------------------------
+
+/**
+ * La clase que estás dando o la que acabas de terminar (hasta 90 minutos
+ * después): lo más probable es que lo que apuntas sea de ella.
+ */
+export function subjectFromSchedule(subjects: Subject[], now: Date): ID | undefined {
+  const minutes = now.getHours() * 60 + now.getMinutes()
+  let best: { id: ID; end: number } | undefined
+  for (const subject of subjects) {
+    if (subject.archived) continue
+    for (const slot of subject.schedule) {
+      if (slot.day !== now.getDay()) continue
+      const [sh, sm] = slot.start.split(':').map(Number)
+      const [eh, em] = slot.end.split(':').map(Number)
+      const start = sh * 60 + sm
+      const end = eh * 60 + em
+      if (!Number.isFinite(start) || !Number.isFinite(end)) continue
+      if (minutes >= start && minutes <= end + 90 && (!best || end > best.end)) best = { id: subject.id, end }
+    }
+  }
+  return best?.id
+}
+
+// ---------------------------------------------------------------------------
+// Nota en una línea: «Examen tema 4 mates 7,5», «trabajo historia 8/10»
+// ---------------------------------------------------------------------------
+
+export type QuickGradeKind = 'examen' | 'trabajo' | 'practica' | 'oral' | 'participacion' | 'otro'
+
+export interface ParsedQuickGrade {
+  name: string
+  subjectId?: ID
+  score?: number
+  maxScore?: number
+  kind: QuickGradeKind
+}
+
+const KIND_WORDS: [RegExp, QuickGradeKind][] = [
+  [/\b(examen|parcial|control|global|final)\b/i, 'examen'],
+  [/\b(trabajo|proyecto|redaccion|redacción|comentario)\b/i, 'trabajo'],
+  [/\b(practica|práctica|laboratorio|lab)\b/i, 'practica'],
+  [/\b(oral|exposicion|exposición|presentacion|presentación|speaking)\b/i, 'oral'],
+  [/\b(participacion|participación|actitud)\b/i, 'participacion'],
+]
+
+const KIND_NAMES: Record<QuickGradeKind, string> = {
+  examen: 'Examen',
+  trabajo: 'Trabajo',
+  practica: 'Práctica',
+  oral: 'Oral',
+  participacion: 'Participación',
+  otro: 'Nota',
+}
+
+/**
+ * Interpreta una nota escrita de corrido. La cifra es la que lleva decimales
+ * o «/», o si no la última; nunca la que va detrás de «tema», «unidad» o
+ * «pág.». «sobre 20» o «/20» fijan la escala del examen.
+ */
+export function parseQuickGrade(raw: string, subjects: Subject[], scaleMax = 10): ParsedQuickGrade {
+  let work = ` ${raw.trim()} `
+  let subjectId: ID | undefined
+  work = work.replace(/(\s)[#@]([\p{L}\p{N}_-]{2,32})/gu, (full, space: string, token: string) => {
+    const matched = !subjectId ? matchSubject(token, subjects) : undefined
+    if (matched) {
+      subjectId = matched.id
+      return space
+    }
+    return full
+  })
+
+  const NUM = String.raw`(\d{1,3}(?:[.,]\d{1,2})?)`
+  const candidates: { index: number; length: number; score: number; max?: number; strong: boolean }[] = []
+  const re = new RegExp(String.raw`(?<![\p{L}\d.,/])` + NUM + String.raw`(?:\s*(?:\/|sobre)\s*(\d{1,3}))?(?![\p{L}\d])`, 'giu')
+  for (const m of work.matchAll(re)) {
+    const before = work.slice(0, m.index).trimEnd()
+    if (/(tema|unidad|ud|t|p[aá]g|p|n[ºo°]|lecci[oó]n|cap[ií]tulo|bloque)\.?$/i.test(before)) continue
+    const score = Number(m[1].replace(',', '.'))
+    const max = m[2] ? Number(m[2]) : undefined
+    if (!Number.isFinite(score)) continue
+    if (max !== undefined && (max <= 0 || score > max)) continue
+    if (max === undefined && score > scaleMax) continue
+    candidates.push({ index: m.index!, length: m[0].length, score, max, strong: max !== undefined || /[.,]/.test(m[1]) })
+  }
+  const pick = candidates.filter((c) => c.strong).pop() ?? candidates.pop()
+  let score: number | undefined
+  let maxScore: number | undefined
+  if (pick) {
+    score = pick.score
+    maxScore = pick.max
+    work = work.slice(0, pick.index) + ' ' + work.slice(pick.index + pick.length)
+  }
+
+  // Muletillas alrededor de la cifra: «he sacado un», «nota:», «saqué un».
+  work = work
+    .replace(/\b(he\s+sacado|saqu[eé]|me\s+han\s+puesto|nota)\b:?/gi, ' ')
+    .replace(/\s(un|una|de|en|con)\s*$/i, ' ')
+
+  const kind = KIND_WORDS.find(([re]) => re.test(raw))?.[1] ?? 'examen'
+  subjectId ??= subjectInText(raw, subjects)
+  const name = work.replace(/\s{2,}/g, ' ').trim().replace(/[:,-]$/, '').trim()
+  return { name: name ? name.charAt(0).toUpperCase() + name.slice(1) : KIND_NAMES[kind], subjectId, score, maxScore, kind }
 }

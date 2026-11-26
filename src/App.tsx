@@ -11,6 +11,7 @@ import { TaskEditor } from '@/features/tasks/TaskEditor'
 import { ExamEditor } from '@/features/exams/ExamEditor'
 import { GradeEditor } from '@/features/grades/GradeEditor'
 import { EventEditor } from '@/features/events/EventEditor'
+import { QuickCapture } from '@/features/capture/QuickCapture'
 import { prewarmStudyMap, scheduleStudyMapPrewarm } from '@/features/study/prewarm'
 import { DashboardView } from '@/views/DashboardView'
 import { SubjectsView } from '@/views/SubjectsView'
@@ -125,10 +126,12 @@ function Shell() {
     setAssistantLoaded(true)
     setAssistantOpen(true)
   }, [])
+  const [quickOpen, setQuickOpen] = useState(false)
+  const openQuickCapture = useCallback(() => setQuickOpen(true), [])
   const hasSubjects = data.subjects.some((s) => !s.archived)
   const chrome = useMemo(
-    () => ({ openCreate, openAssistant, openSearch, hasSubjects }),
-    [openCreate, openAssistant, openSearch, hasSubjects],
+    () => ({ openCreate, openAssistant, openSearch, openQuickCapture, hasSubjects }),
+    [openCreate, openAssistant, openSearch, openQuickCapture, hasSubjects],
   )
   const closeCreate = useCallback(() => setCreating(null), [])
 
@@ -238,6 +241,7 @@ function Shell() {
             </Suspense>
           </ErrorBoundary>
         </AppShell>
+        <QuickCapture open={quickOpen} onClose={() => setQuickOpen(false)} />
       </ChromeProvider>
 
       <TaskEditor open={creating === 'tarea'} onClose={closeCreate} />

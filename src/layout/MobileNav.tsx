@@ -344,8 +344,12 @@ export function MobileNav({ current, badges }: MobileNavProps) {
  * apuntar. Todo con el mismo muelle, para que se lea como una sola pieza.
  */
 function CreateButton() {
-  const { openCreate, openAssistant, hasSubjects } = useChrome()
+  const { openCreate, openAssistant, openQuickCapture, hasSubjects } = useChrome()
   const [open, setOpen] = useState(false)
+  // Tocar = apuntar en una línea (lo de cada día); mantener = el menú
+  // completo (examen, evento, asistente), como los menús de iOS.
+  const holdTimer = useRef<number | undefined>(undefined)
+  const held = useRef(false)
 
   useEffect(() => {
     if (!open) return
@@ -458,12 +462,37 @@ function CreateButton() {
 
       <motion.button
         type="button"
-        aria-label={open ? 'Cerrar el menú de crear' : 'Crear'}
-        aria-haspopup="menu"
+        aria-label={open ? 'Cerrar el menú de crear' : 'Apuntar (mantén pulsado para más opciones)'}
+        aria-haspopup="dialog"
         aria-expanded={open}
+        onPointerDown={() => {
+          held.current = false
+          window.clearTimeout(holdTimer.current)
+          holdTimer.current = window.setTimeout(() => {
+            held.current = true
+            haptic()
+            setOpen(true)
+          }, 420)
+        }}
+        onPointerUp={() => window.clearTimeout(holdTimer.current)}
+        onPointerLeave={() => window.clearTimeout(holdTimer.current)}
+        onContextMenu={(e) => e.preventDefault()}
         onClick={() => {
+          window.clearTimeout(holdTimer.current)
+          if (held.current) {
+            held.current = false
+            return
+          }
           haptic()
-          setOpen((v) => !v)
+          if (open) {
+            setOpen(false)
+            return
+          }
+          // Safari de iPhone solo sube el teclado si el foco llega dentro del
+          // propio toque: se enfoca ya un campo invisible y la hoja pasa el
+          // foco a su campo al abrirse, con el teclado ya arriba.
+          primeKeyboard()
+          openQuickCapture()
         }}
         whileTap={{ scale: 0.92 }}
         transition={spring.snappy}
@@ -582,4 +611,18 @@ function MoreSheet({
       </ul>
     </Modal>
   )
+}
+
+/** Campo fuera de la vista que retiene el teclado mientras se abre «Apuntar». */
+function primeKeyboard() {
+  let proxy = document.getElementById('keyboard-primer') as HTMLInputElement | null
+  if (!proxy) {
+    proxy = document.createElement('input')
+    proxy.id = 'keyboard-primer'
+    proxy.setAttribute('aria-hidden', 'true')
+    proxy.tabIndex = -1
+    proxy.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px;pointer-events:none;'
+    document.body.appendChild(proxy)
+  }
+  proxy.focus({ preventScroll: true })
 }

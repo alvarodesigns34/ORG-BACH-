@@ -70,10 +70,13 @@
    la actividad a la derecha. */
 .study-home-scrim {
   background:
-    radial-gradient(75% 60% at 0% 0%, color-mix(in srgb, var(--study-scrim) 78%, transparent), transparent 72%),
+    radial-gradient(70% 58% at 0% 0%, color-mix(in srgb, var(--study-scrim) 92%, transparent) 30%, transparent 78%),
     radial-gradient(60% 45% at 0% 100%, color-mix(in srgb, var(--study-scrim) 40%, transparent), transparent 70%);
 }
 .study-home-title {
+  /* Halo del color del fondo, como los rótulos de Mapas: el saludo y la
+     ciudad se leen aunque el globo pase por detrás con sus etiquetas. */
+  text-shadow: 0 0 22px var(--study-scrim), 0 0 3px var(--study-scrim);
   left: max(1.5rem, calc(env(safe-area-inset-left) + 0.5rem));
   top: calc(max(1rem, env(safe-area-inset-top)) + 3.75rem);
   max-width: min(560px, calc(100vw - 7rem));

@@ -43,6 +43,8 @@ interface Chrome {
   openAssistant: (mode?: 'text' | 'voice') => void
   /** Abre la búsqueda global y paleta de acciones (⌘K). */
   openSearch: () => void
+  /** Apuntar en una línea (tarea o nota): el «+» del iPhone. */
+  openQuickCapture: () => void
   /** Hay asignaturas: exámenes y notas necesitan una. */
   hasSubjects: boolean
 }
@@ -51,6 +53,7 @@ const ChromeContext = createContext<Chrome>({
   openCreate: () => {},
   openAssistant: () => {},
   openSearch: () => {},
+  openQuickCapture: () => {},
   hasSubjects: false,
 })
 

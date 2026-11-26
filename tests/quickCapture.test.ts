@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { parseQuickTask } from '../src/domain/quickCapture.ts'
+import { parseQuickGrade, parseQuickTask, subjectFromSchedule, subjectInText } from '../src/domain/quickCapture.ts'
 import type { Subject } from '../src/domain/types.ts'
 
 const SUBJECTS: Subject[] = [
@@ -92,5 +92,68 @@ describe('parseQuickTask', () => {
     const parsed = parseQuickTask('hoy', SUBJECTS, TODAY)
     assert.equal(parsed.title, 'hoy')
     assert.equal(parsed.dueDate, TODAY)
+  })
+})
+
+describe('asignatura sin # y nota en una línea', () => {
+  const S = (id: string, name: string, shortName?: string) =>
+    ({ id, name, shortName, color: 'sky', weight: 1, schedule: [], categories: [], createdAt: '' }) as Subject
+  const subjects = [
+    S('mat', 'Matemáticas II', 'MAT'),
+    S('fis', 'Física'),
+    S('qui', 'Química'),
+    S('len', 'Lengua Castellana II', 'LCI'),
+    S('his', 'Historia de España'),
+  ]
+
+  it('reconoce la asignatura escrita de corrido', () => {
+    assert.equal(subjectInText('deberes física mañana', subjects), 'fis')
+    assert.equal(subjectInText('ejercicios de mates', subjects), 'mat')
+    assert.equal(subjectInText('comentario historia', subjects), 'his')
+    assert.equal(subjectInText('repasar LCI', subjects), 'len')
+    assert.equal(subjectInText('examen tema 4', subjects), undefined)
+    assert.equal(subjectInText('comprar pan', subjects), undefined)
+  })
+
+  it('la tarea rápida la usa si no hay #', () => {
+    const t = parseQuickTask('Problemas física mañana', subjects, '2026-11-16')
+    assert.equal(t.subjectId, 'fis')
+    assert.equal(t.dueDate, '2026-11-17')
+    assert.equal(t.title, 'Problemas física')
+  })
+
+  it('saca nota, escala, tipo y asignatura de una frase', () => {
+    const g = parseQuickGrade('Examen tema 4 mates 7,5', subjects)
+    assert.equal(g.score, 7.5)
+    assert.equal(g.maxScore, undefined)
+    assert.equal(g.subjectId, 'mat')
+    assert.equal(g.kind, 'examen')
+    assert.equal(g.name, 'Examen tema 4 mates')
+
+    const w = parseQuickGrade('trabajo historia 16/20', subjects)
+    assert.equal(w.score, 16)
+    assert.equal(w.maxScore, 20)
+    assert.equal(w.kind, 'trabajo')
+
+    const o = parseQuickGrade('#QUI he sacado un 9', subjects)
+    assert.equal(o.score, 9)
+    assert.equal(o.subjectId, 'qui')
+    assert.equal(o.name, 'Examen')
+  })
+
+  it('no confunde el número del tema con la nota', () => {
+    assert.equal(parseQuickGrade('Examen tema 4', subjects).score, undefined)
+    assert.equal(parseQuickGrade('Examen 12', subjects).score, undefined)
+  })
+
+  it('sugiere la clase en curso o la recién terminada', () => {
+    const withSchedule = [
+      { ...S('fis', 'Física'), schedule: [{ id: 'a', day: 1, start: '09:00', end: '09:55' }] },
+      { ...S('qui', 'Química'), schedule: [{ id: 'b', day: 1, start: '12:00', end: '12:55' }] },
+    ] as Subject[]
+    const monday = (h: number, m: number) => new Date(2026, 10, 16, h, m)
+    assert.equal(subjectFromSchedule(withSchedule, monday(9, 30)), 'fis')
+    assert.equal(subjectFromSchedule(withSchedule, monday(13, 40)), 'qui')
+    assert.equal(subjectFromSchedule(withSchedule, monday(18, 0)), undefined)
   })
 })

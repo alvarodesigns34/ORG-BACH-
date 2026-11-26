@@ -24,6 +24,11 @@ interface ModalProps {
   size?: 'sm' | 'md' | 'lg'
   /** Acción extra en la cabecera, junto a «Cerrar» (p. ej. «Nueva conversación»). */
   headerAction?: ReactNode
+  /**
+   * El campo con data-autofocus recibe el foco también en táctil (sube el
+   * teclado): solo para hojas cuyo único fin es escribir, como «Apuntar».
+   */
+  keyboard?: boolean
 }
 
 /**
@@ -48,6 +53,7 @@ export function Modal({
   footer,
   size = 'md',
   headerAction,
+  keyboard,
 }: ModalProps) {
   const panel = useRef<HTMLDivElement>(null)
   const content = useRef<HTMLDivElement>(null)
@@ -66,6 +72,9 @@ export function Modal({
   useEffect(() => {
     if (!open) return
     restoreFocus.current = document.activeElement as HTMLElement | null
+    // El campo invisible que sube el teclado al abrir «Apuntar» no es a
+    // donde volver: devolverle el foco dejaría el teclado arriba al cerrar.
+    if (restoreFocus.current?.id === 'keyboard-primer') restoreFocus.current = null
 
     const node = panel.current
     if (node) {
@@ -78,7 +87,7 @@ export function Modal({
       // Un campo marcado con data-autofocus manda, pero solo con ratón: en
       // el móvil abriría el teclado cada vez que se abre la hoja.
       const fine = window.matchMedia('(pointer: fine)').matches
-      const preferred = fine ? node.querySelector<HTMLElement>('[data-autofocus]') : null
+      const preferred = fine || keyboard ? node.querySelector<HTMLElement>('[data-autofocus]') : null
       const first =
         preferred ??
         // En táctil el foco va al panel: enfocar un campo sube el teclado y
