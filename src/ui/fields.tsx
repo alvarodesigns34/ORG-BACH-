@@ -12,7 +12,7 @@ import { cx } from './primitives'
 
 /** Estilo común a todo control de formulario, para que no deriven entre sí. */
 const CONTROL = [
-  'w-full bg-fill text-ink rounded-[12px] border border-transparent',
+  'w-full min-w-0 bg-fill text-ink rounded-[12px] border border-transparent',
   'px-3.5 text-[1rem] placeholder:text-ink-3',
   'transition-[border-color,box-shadow,background-color] duration-200',
   'focus:outline-none focus:bg-raised focus:border-accent focus:ring-4 focus:ring-accent/15',
@@ -56,7 +56,7 @@ export function Field({
     [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ') || undefined
 
   return (
-    <div className={cx('flex flex-col gap-1.5', className)}>
+    <div data-field className={cx('flex flex-col gap-1.5', className)}>
       <label
         htmlFor={id}
         className={cx('text-[0.8125rem] font-semibold text-ink-2', hideLabel && 'sr-only')}
@@ -124,7 +124,7 @@ export function Select({
         className={cx(
           pill
             ? cx(
-                'pressable h-10 rounded-full pl-4 pr-9 text-[0.875rem] whitespace-nowrap',
+                'pressable h-10 rounded-full pl-4 pr-9 text-[0.875rem] max-sm:text-[1rem] whitespace-nowrap',
                 'appearance-none cursor-pointer',
                 'focus:outline-none focus-visible:ring-4 focus-visible:ring-accent/20',
                 // Filtro de iOS 26: una cápsula de cristal; aplicado, tintada.

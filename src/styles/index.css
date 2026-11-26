@@ -842,14 +842,17 @@ html {
 }
 .edge-top {
   top: 0;
-  /* Solo cubre la barra de estado (hora, batería): no llega a los botones. */
-  height: calc(env(safe-area-inset-top, 0px) + 6px);
+  /* Cubre la barra de estado y la fila de botones con un degradado del
+     fondo (sin desenfoque, que en Safari de iPhone difuminaba los botones):
+     así el título pequeño no se lee encima del texto que pasa por debajo. */
+  height: calc(env(safe-area-inset-top, 0px) + 52px);
   /* Sin desenfoque: solo un degradado del color de fondo. Un desenfoque aquí
      pasaba por detrás de los botones y, en Safari de iPhone, los difuminaba. */
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   background: linear-gradient(
-    color-mix(in srgb, var(--c-canvas) 85%, transparent) 0%,
+    color-mix(in srgb, var(--c-canvas) 96%, transparent) 0%,
+    color-mix(in srgb, var(--c-canvas) 88%, transparent) 70%,
     transparent 100%
   );
 }
@@ -1502,7 +1505,7 @@ html {
   z-index: 19;
   pointer-events: none;
   background: linear-gradient(
-    color-mix(in srgb, var(--c-canvas) 92%, transparent) 0%,
+    color-mix(in srgb, var(--c-canvas) 96%, transparent) 0%,
     color-mix(in srgb, var(--c-canvas) 70%, transparent) 45%,
     transparent 100%
   );
@@ -1927,3 +1930,4 @@ button:active > .switch-thumb {
     animation: none;
   }
 }
+

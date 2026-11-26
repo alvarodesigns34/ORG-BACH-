@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, m as motion, useDragControls, useReducedMotion } from 'motion/react'
 import { X } from 'lucide-react'
@@ -54,7 +54,8 @@ export function Modal({
   const actions = useRef<HTMLElement>(null)
   const restoreFocus = useRef<HTMLElement | null>(null)
   const modalToken = useRef(Symbol('modal'))
-  const [keyboardInset, setKeyboardInset] = useState(0)
+  // Zona visible cuando el teclado virtual está abierto (null si no lo está).
+  const [visible, setVisible] = useState<{ top: number; height: number } | null>(null)
   const titleId = useId()
   const descId = useId()
   const sheet = !useMediaQuery('(min-width: 640px)')
@@ -97,27 +98,90 @@ export function Modal({
   // es compartido entre diálogos: ver scrollLock.ts.
   useEffect(() => (open ? lockScroll() : undefined), [open])
 
-  // En iOS Safari/PWA el teclado virtual reduce `visualViewport.height` sin
-  // cambiar `100dvh` de inmediato: levantamos la hoja para que el footer no quede tapado.
+  // Teclado virtual. En iOS (Safari y PWA) el teclado no encoge la ventana:
+  // solo encoge `visualViewport`, y a veces además lo desplaza hacia abajo
+  // (`offsetTop`) para enseñar el campo. Antes la hoja se levantaba con un
+  // padding pero conservaba su altura (94dvh): la parte de arriba (título,
+  // nombre, tipo…) se salía por encima de la pantalla y solo se veía lo de
+  // abajo. Ahora el contenedor ocupa EXACTAMENTE la zona visible y la hoja
+  // se limita a ella; el cuerpo se desplaza por dentro.
   useEffect(() => {
-    if (!open || !sheet || typeof window === 'undefined' || !window.visualViewport) {
-      setKeyboardInset(0)
+    if (!open || typeof window === 'undefined' || !window.visualViewport) {
+      setVisible(null)
       return
     }
     const vv = window.visualViewport
+    let frame = 0
     const update = () => {
-      const occluded = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop))
-      setKeyboardInset(occluded > 80 ? occluded : 0)
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        // Con zoom de pellizco la zona visible también encoge: no es teclado.
+        const zoomed = Math.abs(vv.scale - 1) > 0.01
+        const occluded = window.innerHeight - vv.height
+        if (zoomed || occluded < 80) {
+          setVisible(null)
+          return
+        }
+        const next = { top: Math.max(0, Math.round(vv.offsetTop)), height: Math.round(vv.height) }
+        setVisible((prev) =>
+          prev && prev.top === next.top && prev.height === next.height ? prev : next,
+        )
+      })
     }
     update()
     vv.addEventListener('resize', update)
     vv.addEventListener('scroll', update)
     return () => {
+      cancelAnimationFrame(frame)
       vv.removeEventListener('resize', update)
       vv.removeEventListener('scroll', update)
-      setKeyboardInset(0)
+      setVisible(null)
     }
-  }, [open, sheet])
+  }, [open])
+
+  // Que el campo en el que se escribe (con su etiqueta) quede a la vista
+  // dentro del cuerpo de la hoja: al enfocarlo y cada vez que el teclado
+  // cambia la zona visible. Se desplaza solo el cuerpo, nunca la página.
+  const revealFocused = () => {
+    const box = content.current
+    const el = document.activeElement as HTMLElement | null
+    if (!box || !el || !box.contains(el) || el === box) return
+    const tag = el.tagName
+    if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT' && !el.isContentEditable) return
+    const field = el.closest<HTMLElement>('[data-field]')
+    const boxRect = box.getBoundingClientRect()
+    const margin = 14
+    const target =
+      field && field.getBoundingClientRect().height < boxRect.height - margin * 2 ? field : el
+    const r = target.getBoundingClientRect()
+    if (r.top < boxRect.top + margin) {
+      box.scrollTop -= boxRect.top + margin - r.top
+    } else if (r.bottom > boxRect.bottom - margin) {
+      box.scrollTop += Math.min(r.bottom - (boxRect.bottom - margin), r.top - (boxRect.top + margin))
+    }
+  }
+
+  useLayoutEffect(() => {
+    if (visible) revealFocused()
+  }, [visible])
+
+  useEffect(() => {
+    if (!open) return
+    const box = content.current
+    if (!box) return
+    let timer = 0
+    const onFocusIn = () => {
+      // Dos pasadas: ya mismo, y cuando el teclado ha terminado de subir.
+      requestAnimationFrame(revealFocused)
+      clearTimeout(timer)
+      timer = window.setTimeout(revealFocused, 380)
+    }
+    box.addEventListener('focusin', onFocusIn)
+    return () => {
+      clearTimeout(timer)
+      box.removeEventListener('focusin', onFocusIn)
+    }
+  }, [open])
 
   // Esc y el tabulador tienen que funcionar aunque el foco haya salido al
   // fondo. Con diálogos anidados (p. ej. ConfirmDialog sobre un editor),
@@ -181,7 +245,11 @@ export function Modal({
         <motion.div
           key="modal"
           className="fixed inset-0 z-50 flex sm:items-center justify-center items-end"
-          style={keyboardInset > 0 ? { paddingBottom: keyboardInset } : undefined}
+          style={
+            visible
+              ? { top: visible.top, height: visible.height, bottom: 'auto' }
+              : undefined
+          }
           // Mientras baja ya no intercepta toques: se puede seguir usando la
           // página sin esperar a que termine la animación.
           exit={{ pointerEvents: 'none' }}
@@ -208,8 +276,12 @@ export function Modal({
               // (también en el iPhone, con las esquinas concéntricas a las de
               // la pantalla) y deja adivinar la página atenuada de detrás.
               'sheet-glass relative w-full flex flex-col outline-none',
-              'rounded-[34px] mx-2 mb-[max(0.5rem,env(safe-area-inset-bottom))] sm:mb-0 sm:mx-4',
-              'max-h-[calc(94dvh-env(safe-area-inset-bottom))] sm:max-h-[86dvh]',
+              'rounded-[34px] mx-2 sm:mx-4',
+              // Con el teclado abierto la hoja cabe en la zona visible (el
+              // teclado ya tapa el indicador de inicio: sin margen de área segura).
+              visible
+                ? 'mb-2 sm:mb-0 max-h-[calc(100%-1rem)] sm:max-h-[calc(100%-1.5rem)]'
+                : 'mb-[max(0.5rem,env(safe-area-inset-bottom))] sm:mb-0 max-h-[calc(94dvh-env(safe-area-inset-bottom))] sm:max-h-[86dvh]',
               widths[size],
             )}
             initial={hidden}

@@ -270,7 +270,13 @@ export function TopBar({
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 exit={{ opacity: 0, y: 6, filter: 'blur(4px)', transition: exitFast }}
                 transition={spring.snappy}
-                className="absolute inset-x-32 text-center text-[1.0625rem] font-semibold tracking-[-0.012em] truncate"
+                // En el iPhone los tres botones de la derecha ocupan casi media
+                // barra: un título centrado chocaba con ellos («Calendario»,
+                // «Estadísticas»). Va a la izquierda y se corta antes de los botones.
+                className={cx(
+                  'absolute right-[9.75rem] text-left text-[1.0625rem] font-semibold tracking-[-0.012em] truncate',
+                  back ? 'left-[3.75rem]' : 'left-[max(1.25rem,env(safe-area-inset-left))]',
+                )}
               >
                 {title}
               </motion.p>

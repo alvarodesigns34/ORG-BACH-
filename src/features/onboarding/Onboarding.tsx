@@ -116,7 +116,7 @@ export function Onboarding() {
 
   return (
     <>
-      <div className="min-h-dvh grid lg:grid-cols-[5fr_7fr] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <div className="min-h-dvh grid grid-cols-[minmax(0,1fr)] lg:grid-cols-[5fr_7fr] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         {/* --- Columna de presentación --- */}
         <div className="hidden lg:flex flex-col justify-between p-12 xl:p-16 bg-surface border-r border-hairline">
           <div className="flex items-center gap-3">
@@ -386,11 +386,16 @@ export function Onboarding() {
                 )}
 
                 <div className="flex items-center gap-3 mt-6">
-                  <Button variant="ghost" onClick={() => setStep('perfil')}>
+                  <Button variant="ghost" onClick={() => setStep('perfil')} aria-label="Atrás">
                     <ArrowLeft className="size-4" />
-                    Atrás
+                    <span className="max-sm:sr-only">Atrás</span>
                   </Button>
-                  <Button variant="primary" size="lg" onClick={finish} className="ml-auto">
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    onClick={finish}
+                    className="ml-auto max-sm:flex-1 min-w-0"
+                  >
                     {total > 0
                       ? `Empezar con ${total} asignatura${total === 1 ? '' : 's'}`
                       : 'Empezar sin asignaturas'}

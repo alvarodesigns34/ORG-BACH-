@@ -476,7 +476,7 @@ export function CommandPalette({
               }
             }}
             placeholder="Busca tareas, exámenes, asignaturas… o escribe para crear"
-            className="glass-input w-full h-11 rounded-full pl-10 pr-10 text-[0.9375rem] text-ink placeholder:text-ink-3 focus:outline-none"
+            className="glass-input w-full h-11 rounded-full pl-10 pr-10 text-[1rem] text-ink placeholder:text-ink-3 focus:outline-none"
           />
           {query && (
             <button
@@ -551,7 +551,7 @@ export function CommandPalette({
                       )}
                     </span>
                     {item.badge && (
-                      <kbd className="kbd-apple relative z-[1] shrink-0 min-w-6 h-6 px-1.5 inline-grid place-items-center rounded-[7px] text-[0.6875rem] font-semibold text-ink-2 tabular-nums">
+                      <kbd className="kbd-apple pointer-coarse:hidden relative z-[1] shrink-0 min-w-6 h-6 px-1.5 inline-grid place-items-center rounded-[7px] text-[0.6875rem] font-semibold text-ink-2 tabular-nums">
                         {item.badge}
                       </kbd>
                     )}
@@ -566,8 +566,11 @@ export function CommandPalette({
         </ul>
 
         <div className="flex items-center justify-between pt-2 border-t border-hairline text-[0.75rem] text-ink-3">
-          <span>↑↓ mover · Intro abrir · Esc cerrar</span>
-          <span className="hidden sm:inline">Tip: «Derivadas #MAT mañana 45m» crea tarea</span>
+          {/* Las teclas solo sirven con teclado físico; en táctil, el truco útil. */}
+          <span className="pointer-coarse:hidden">↑↓ mover · Intro abrir · Esc cerrar</span>
+          <span className="hidden sm:inline pointer-coarse:inline">
+            Tip: «Derivadas #MAT mañana 45m» crea tarea
+          </span>
         </div>
       </div>
     </Modal>
