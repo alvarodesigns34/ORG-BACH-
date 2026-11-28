@@ -34,6 +34,7 @@ import { AccountAvatar } from '@/layout/chrome'
 import { ThemeToggle } from '@/layout/ThemeToggle'
 import { AccountSection } from '@/features/account/Account'
 import { DigestSection } from '@/features/notifications/DigestCard'
+import { WidgetSection } from '@/features/widget/WidgetSection'
 import { useSync } from '@/sync/useSync'
 import { SnapshotsSheet } from '@/features/backup/Backups'
 import { exportBackup } from '@/storage/backup'
@@ -172,6 +173,7 @@ export function SettingsView({ section }: { section?: string | null }) {
 
         <AccountSection />
         <DigestSection />
+        <WidgetSection />
 
         <ListGroup header="Perfil">
           <RowInput
