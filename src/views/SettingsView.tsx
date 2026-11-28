@@ -1,3 +1,4 @@
+import { scrollBehavior } from '@/ui/motion'
 import { useEffect, useRef, useState } from 'react'
 import {
   Award,
@@ -58,7 +59,7 @@ export function SettingsView({ section }: { section?: string | null }) {
   useEffect(() => {
     if (!section) return
     const id = requestAnimationFrame(() =>
-      document.getElementById(section)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+      document.getElementById(section)?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' }),
     )
     return () => cancelAnimationFrame(id)
   }, [section])

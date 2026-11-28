@@ -67,7 +67,7 @@ import { hrefFor } from '@/router'
 import { useStore } from '@/state/StoreProvider'
 import { useSync } from '@/sync/useSync'
 import { Modal } from '@/ui/Modal'
-import { haptic, spring } from '@/ui/motion'
+import { haptic, scrollBehavior, spring } from '@/ui/motion'
 import { Button, cx } from '@/ui/primitives'
 
 import './assistant.css'
@@ -908,7 +908,7 @@ function Chat({
       toBottom('auto')
       return
     }
-    if (atBottomRef.current || messages.at(-1)?.role === 'user') toBottom('smooth')
+    if (atBottomRef.current || messages.at(-1)?.role === 'user') toBottom(scrollBehavior())
   }, [conversationKey, messages.length, phase, review])
 
   // El teclado encoge la hoja: lo último sigue a la vista.
@@ -1046,7 +1046,7 @@ function Chat({
               <motion.button
                 key="down"
                 type="button"
-                onClick={() => toBottom('smooth')}
+                onClick={() => toBottom(scrollBehavior())}
                 aria-label="Ir al final"
                 initial={{ opacity: 0, scale: 0.6, y: 10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}

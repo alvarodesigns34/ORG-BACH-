@@ -1,3 +1,4 @@
+import { scrollBehavior } from '@/ui/motion'
 import { useState } from 'react'
 import { Calculator, GraduationCap, Plus } from 'lucide-react'
 
@@ -267,7 +268,7 @@ function GradeHero({ average, scopeLabel, averages, scale, active, onSelect, mod
                 href={`#nota-${p.subject.id}`}
                 onClick={(event) => {
                   event.preventDefault()
-                  document.getElementById(`nota-${p.subject.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  document.getElementById(`nota-${p.subject.id}`)?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' })
                 }}
                 className={cx(
                   'grade-ruler-label absolute bottom-0 text-[0.6875rem] font-bold whitespace-nowrap',

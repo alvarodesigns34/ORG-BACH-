@@ -242,9 +242,18 @@ export function PageHeader({
         actions={actions}
       />
       {eyebrow && (
-        <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.04em] text-ink-3 mb-1">
-          {eyebrow}
-        </p>
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <p className="text-[0.8125rem] font-semibold uppercase tracking-[0.04em] text-ink-3">
+            {eyebrow}
+          </p>
+          {/* En el iPhone, las acciones de la portada suben a la fila de la
+              fecha: en su propia línea empujaban lo urgente hacia abajo. */}
+          {large && actions && (
+            <div className="sm:hidden flex items-center gap-2 shrink-0 -my-1 [&_button]:h-8 [&_button]:px-3.5 [&_button]:text-[0.8125rem]">
+              {actions}
+            </div>
+          )}
+        </div>
       )}
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
@@ -264,7 +273,11 @@ export function PageHeader({
         </div>
         {/* En el iPad en horizontal las acciones suben a la barra de
             herramientas flotante, junto al «+». */}
-        {actions && <div className="lg:hidden flex items-center gap-2 shrink-0">{actions}</div>}
+        {actions && (
+          <div className={cx('lg:hidden flex items-center gap-2 shrink-0', large && !!eyebrow && 'max-sm:hidden')}>
+            {actions}
+          </div>
+        )}
       </div>
       {toolbar && <div className="mt-5">{toolbar}</div>}
     </header>

@@ -1,3 +1,4 @@
+import { primerReturnTarget } from './keyboardPrimer'
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, m as motion, useDragControls, useReducedMotion } from 'motion/react'
@@ -74,7 +75,8 @@ export function Modal({
     restoreFocus.current = document.activeElement as HTMLElement | null
     // El campo invisible que sube el teclado al abrir «Apuntar» no es a
     // donde volver: devolverle el foco dejaría el teclado arriba al cerrar.
-    if (restoreFocus.current?.id === 'keyboard-primer') restoreFocus.current = null
+    const primed = primerReturnTarget(restoreFocus.current)
+    if (primed !== undefined) restoreFocus.current = primed
 
     const node = panel.current
     if (node) {
@@ -100,7 +102,13 @@ export function Modal({
       ;(first ?? node).focus({ preventScroll: true })
     }
 
-    return () => restoreFocus.current?.focus({ preventScroll: true })
+    // Se devuelve en la siguiente tarea: al cerrar, el fondo sigue inerte
+    // hasta que corre la limpieza del bloqueo, y un elemento inerte no
+    // acepta el foco (se perdía en <body>).
+    return () => {
+      const target = restoreFocus.current
+      setTimeout(() => target?.isConnected && target.focus({ preventScroll: true }), 0)
+    }
   }, [open])
 
   // Bloquear el fondo (y dejarlo inerte) mientras esté abierto. El bloqueo

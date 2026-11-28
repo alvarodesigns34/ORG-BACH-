@@ -23,6 +23,10 @@ function worthIt(): boolean {
   }).connection
   // Ahorro de datos o red muy lenta: el mapa se baja solo si de verdad se abre.
   if (connection?.saveData || /(^|-)2g$/.test(connection?.effectiveType ?? '')) return false
+  // En el móvil Estudio casi no se usa (es del iPad): medido el 28-11, el
+  // precalentado bajaba ~440 KB (motor y worker) en cada versión nueva sin
+  // entrar nunca. Si se abre Estudio, se descarga igual al entrar.
+  if (window.matchMedia('(max-width: 639px)').matches) return false
   // Con «modo tranquilo» el vuelo no muestra mapa.
   return !getStudyPrefs().quiet
 }

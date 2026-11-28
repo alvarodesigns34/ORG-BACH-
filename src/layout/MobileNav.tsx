@@ -10,10 +10,11 @@ import { AnimatePresence, m as motion } from 'motion/react'
 import { ChevronRight, LayoutGrid, Plus } from 'lucide-react'
 
 import { hrefFor, type RouteId } from '@/router'
-import { exitFast, haptic, spring, useMediaQuery } from '@/ui/motion'
+import { exitFast, haptic, scrollBehavior, spring, useMediaQuery } from '@/ui/motion'
 import { cx } from '@/ui/primitives'
 import { Modal } from '@/ui/Modal'
 import { AssistantIcon, CREATE_ITEMS, useChrome } from './chrome'
+import { primeKeyboard } from '@/ui/keyboardPrimer'
 import { MOBILE_PRIMARY, NAV_ITEMS, NAV_TINTS, tintFill, type NavItem } from './navigation'
 
 interface MobileNavProps {
@@ -130,7 +131,7 @@ export function MobileNav({ current, badges }: MobileNavProps) {
     }
     if (tab.id !== current) window.location.hash = hrefFor(tab.id).slice(1)
     // Tocar la pestaña en la que ya estás sube al principio, como en iOS.
-    else window.scrollTo({ top: 0, behavior: 'smooth' })
+    else window.scrollTo({ top: 0, behavior: scrollBehavior() })
   }
 
   const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -278,7 +279,7 @@ export function MobileNav({ current, badges }: MobileNavProps) {
                           if (handledClick.current) e.preventDefault()
                           else if (isCurrent) {
                             e.preventDefault()
-                            window.scrollTo({ top: 0, behavior: 'smooth' })
+                            window.scrollTo({ top: 0, behavior: scrollBehavior() })
                           }
                         }}
                         className="block h-full rounded-full"
@@ -351,13 +352,39 @@ function CreateButton() {
   const holdTimer = useRef<number | undefined>(undefined)
   const held = useRef(false)
 
+  const fab = useRef<HTMLButtonElement>(null)
+  const menu = useRef<HTMLUListElement>(null)
+
+  // Menú completo con teclado: al abrirse, el foco va a su primera opción;
+  // las flechas lo recorren, Escape lo cierra y devuelve el foco al «+».
   useEffect(() => {
     if (!open) return
+    const items = () =>
+      Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? [])
+    const frame = requestAnimationFrame(() => items()[0]?.focus({ preventScroll: true }))
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
+      const list = items()
+      const index = list.indexOf(document.activeElement as HTMLButtonElement)
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setOpen(false)
+        fab.current?.focus({ preventScroll: true })
+      } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault()
+        const step = event.key === 'ArrowDown' ? 1 : -1
+        list[(index + step + list.length) % list.length]?.focus({ preventScroll: true })
+      } else if (event.key === 'Home' || event.key === 'End') {
+        event.preventDefault()
+        list[event.key === 'Home' ? 0 : list.length - 1]?.focus({ preventScroll: true })
+      } else if (event.key === 'Tab') {
+        setOpen(false)
+      }
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('keydown', onKey)
+    }
   }, [open])
 
   return (
@@ -377,6 +404,7 @@ function CreateButton() {
               aria-hidden
             />
             <motion.ul
+              ref={menu}
               key="menu"
               role="menu"
               aria-label="Crear"
@@ -462,9 +490,19 @@ function CreateButton() {
 
       <motion.button
         type="button"
-        aria-label={open ? 'Cerrar el menú de crear' : 'Apuntar (mantén pulsado para más opciones)'}
-        aria-haspopup="dialog"
+        ref={fab}
+        aria-label={open ? 'Cerrar el menú de crear' : 'Apuntar'}
+        aria-description="Mantén pulsado, o pulsa flecha arriba, para el menú completo"
+        aria-haspopup="menu"
         aria-expanded={open}
+        aria-keyshortcuts="ArrowUp"
+        onKeyDown={(e) => {
+          if (!open && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+            e.preventDefault()
+            haptic()
+            setOpen(true)
+          }
+        }}
         onPointerDown={() => {
           held.current = false
           window.clearTimeout(holdTimer.current)
@@ -494,7 +532,6 @@ function CreateButton() {
           primeKeyboard()
           openQuickCapture()
         }}
-        whileTap={{ scale: 0.92 }}
         transition={spring.snappy}
         className="glass-tinted liquid relative grid place-items-center rounded-full text-white"
         style={{
@@ -613,16 +650,3 @@ function MoreSheet({
   )
 }
 
-/** Campo fuera de la vista que retiene el teclado mientras se abre «Apuntar». */
-function primeKeyboard() {
-  let proxy = document.getElementById('keyboard-primer') as HTMLInputElement | null
-  if (!proxy) {
-    proxy = document.createElement('input')
-    proxy.id = 'keyboard-primer'
-    proxy.setAttribute('aria-hidden', 'true')
-    proxy.tabIndex = -1
-    proxy.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px;pointer-events:none;'
-    document.body.appendChild(proxy)
-  }
-  proxy.focus({ preventScroll: true })
-}

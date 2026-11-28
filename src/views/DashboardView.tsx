@@ -654,14 +654,16 @@ function NowWidget({ hasSubjects }: { hasSubjects: boolean }) {
   if (!anySchedule) {
     return (
       <WidgetCard id="ahora">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-1">
-          <p className="flex-1 text-[0.9375rem] leading-snug text-ink-2 text-pretty">
-            Añade tu horario y aquí verás qué clase toca ahora, cuánto le queda y qué viene después.
+        {/* Una fila: sin horario no hay nada urgente aquí, y no debe
+            empujar «Para hoy» y los exámenes fuera de la primera pantalla. */}
+        <div className="flex items-center gap-3 pt-0.5">
+          <p className="flex-1 text-[0.875rem] leading-snug text-ink-3 text-pretty">
+            Con tu horario, aquí verás qué clase toca ahora.
           </p>
           <Button
             size="sm"
-            variant="primary"
-            className="self-start shrink-0"
+            variant="secondary"
+            className="shrink-0"
             onClick={() => (window.location.hash = '/asignaturas')}
           >
             {hasSubjects ? 'Poner el horario' : 'Crear asignaturas'}
@@ -1082,7 +1084,6 @@ function WeekWidget() {
             <a
               key={day}
               href={hrefFor('calendario', { dia: day })}
-              aria-label={`${formatLongDate(day)}: ${items.length} ${items.length === 1 ? 'elemento' : 'elementos'}`}
               className="group pressable flex flex-col items-center gap-1.5 min-w-0 rounded-2xl py-1 hover:bg-fill/60 transition-colors"
             >
               <span className="text-[0.6875rem] font-semibold text-ink-3">
@@ -1116,6 +1117,12 @@ function WeekWidget() {
                     />
                   )
                 })}
+              </span>
+              {/* El nombre accesible empieza por lo que se ve («J 26») y
+                  sigue con la fecha completa y la carga del día. */}
+              <span className="sr-only">
+                , {formatLongDate(day)}, {items.length} {items.length === 1 ? 'elemento' : 'elementos'}
+                {exam ? ', con examen' : ''}
               </span>
             </a>
           )

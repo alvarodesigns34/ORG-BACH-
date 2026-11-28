@@ -111,7 +111,7 @@
   /* --- Panel (capa de contenido) ---
      Cristal perlado luminoso sobre la luz ambiente: translúcido con desenfoque
      suave, canto superior especular de 1 px y reflejo direccional sutil. */
-  --pane: rgb(255 255 255 / 0.72);
+  --pane: rgb(255 255 255 / 0.84);
   --pane-solid: #ffffff;
   --pane-rim: rgb(255 255 255 / 0.98);
   --pane-edge: rgb(15 23 42 / 0.065);
@@ -212,7 +212,7 @@
 
   --scrim: rgb(0 0 0 / 0.54);
 
-  --pane: rgb(32 32 38 / 0.62);
+  --pane: rgb(32 32 38 / 0.76);
   --pane-solid: #1c1c1e;
   --pane-rim: rgb(255 255 255 / 0.18);
   --pane-edge: rgb(255 255 255 / 0.08);

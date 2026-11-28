@@ -88,3 +88,15 @@ export function useMediaQuery(query: string): boolean {
 export function useCoarsePointer(): boolean {
   return useMediaQuery('(pointer: coarse)')
 }
+
+/**
+ * «smooth» o «auto» según «Reducir movimiento»: el desplazamiento programado
+ * (subir al principio, saltar a una sección) también es movimiento.
+ */
+export function scrollBehavior(): ScrollBehavior {
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+  } catch {
+    return 'smooth'
+  }
+}
